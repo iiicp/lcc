@@ -9,12 +9,16 @@
 *
 * Sign:     不管几岁，快乐万岁
 ***********************************/
-
 #include "llvm/IR/LLVMContext.h"  // 公共的数据结构
 #include "llvm/IR/Module.h"       // 一个源文件的抽象 { 全局变量，函数 {基本块组成} }
 #include "llvm/IR/IRBuilder.h"    // 指令生成器, 加法、减法等等、还可以获取类型
 #include "llvm/IR/Verifier.h"    //校验模块、校验函数
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/ManagedStatic.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include <vector>
+#include "iostream"
 
 using namespace llvm;
 
@@ -74,5 +78,23 @@ int main() {
     irBuilder->CreateRet(s_val);
 
     module->print(errs(), nullptr);
+
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    LLVMLinkInMCJIT();
+
+    int res;
+    {
+        llvm::EngineBuilder builder(std::move(module));
+        auto e = builder
+                .setEngineKind(llvm::EngineKind::JIT)
+                .setOptLevel(llvm::CodeGenOpt::Level::None)
+                .create();
+        std::unique_ptr<llvm::ExecutionEngine> ee(e);
+        void *address = (void *) ee->getFunctionAddress("sum");
+        res = ((int (*)(int)) address)(100);
+    }
+    llvm_shutdown();
+    std::cout << res << std::endl;
     return 0;
 }

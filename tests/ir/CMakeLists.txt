@@ -14,7 +14,7 @@ find_package(LLVM REQUIRED 14)
 message(STATUS "LLVM_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS}")
 message(STATUS "LLVM_TARGETS_TO_BUILD: ${LLVM_TARGETS_TO_BUILD}")
 
-llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes)
+llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes ExecutionEngine MCJIT)
 #message(STATUS "llvm_all: ${llvm_all}")
 
 include_directories(. ${LLVM_INCLUDE_DIRS})
@@ -52,3 +52,6 @@ target_link_libraries(c_fun_if_else ${llvm_all})
 
 add_executable(c_fun_for c_fun_for.cpp)
 target_link_libraries(c_fun_for ${llvm_all})
+
+add_executable(c_fun_fib c_fun_fib.cpp)
+target_link_libraries(c_fun_fib ${llvm_all})

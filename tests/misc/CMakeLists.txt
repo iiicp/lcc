@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.10)
+project(misc)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 17)
+
+add_executable(variant use_variant.cpp)
+add_executable(regex use_regex.cpp)
+add_executable(string use_string.cpp)
+add_executable(char use_char.cpp)
+add_executable(use_preprocess use_preprocess.c)

@@ -12,14 +12,14 @@ message(STATUS "LLVM_INCLUDE_DIRS ${LLVM_INCLUDE_DIRS}")
 llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes ExecutionEngine MCJIT)
 
 #add_subdirectory(tests/ir)
-add_subdirectory(tests/CompilerCore)
+#add_subdirectory(tests/Compiler)
+#add_subdirectory(tests/misc)
 
-add_executable(lcc main.cpp
-        src/CompilerCore/Lexer.cpp
-        src/CompilerCore/Lexer.h
-        src/CompilerCore/Parser.cpp
-        src/CompilerCore/Parser.h
-        src/CompilerCore/CodeGen.cpp
-        src/CompilerCore/CodeGen.h)
-target_include_directories(${PROJECT_NAME} PRIVATE src/CompilerCore ${LLVM_INCLUDE_DIRS})
+file(GLOB lex_src "src/Compiler/Lex/*.cc")
+add_executable(lcc main.cpp ${lex_src})
+target_include_directories(${PROJECT_NAME}
+        PRIVATE
+        src/Compiler
+        src/Compiler/Lex
+        ${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_all})

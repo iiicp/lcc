@@ -1,8 +1,7 @@
 #include <iostream>
 #include <fstream>
-#include "Lex/Lexer.h"
+#include "Lexer.h"
 
-using namespace lcc;
 
 int main() {
     std::cout << "Hello, lcc!" << std::endl;
@@ -20,11 +19,11 @@ int main() {
     file.seekg(0,std::ios_base::beg);
     file.read(source.data(),source.size());
 
-    auto tokens = lcc::lexer::Tokenize(source);
-    for (auto &tok : tokens) {
-        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
-        std::cout << tok.GetTokenSimpleSpelling(tok.GetTokenType()) << std::endl;
-    }
+//    auto tokens = lcc::lexer::Tokenize(source);
+//    for (auto &tok : tokens) {
+//        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
+//        std::cout << tok.GetTokenSimpleSpelling(tok.GetTokenType()) << std::endl;
+//    }
 
     return 0;
 }

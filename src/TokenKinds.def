@@ -2,10 +2,6 @@
 #define TOK(X)
 #endif
 
-#ifndef PPTOK
-#define PPTOK(X, Y) TOK(X)
-#endif
-
 #ifndef PUNCTUATOR
 #define PUNCTUATOR(X, Y) TOK(X)
 #endif
@@ -20,21 +16,6 @@ TOK(identifier)
 TOK(char_constant)
 TOK(string_literal)
 TOK(numeric_constant)
-
-PPTOK(hash, "#")
-PPTOK(hash_hash, "##")
-PPTOK(back_slash, "\\")
-PPTOK(newline, "\n")
-//PPTOK(ifdef, "ifdef")
-//PPTOK(ifndef, "ifndef")
-//PPTOK(elif, "elif")
-//PPTOK(endif, "endif")
-//PPTOK(include, "include")
-//PPTOK(define, "define")
-//PPTOK(undef, "undef")
-//PPTOK(line, "line")
-//PPTOK(error, "error")
-//PPTOK(pragma, "pragma")
 
 PUNCTUATOR(l_square, "[")
 PUNCTUATOR(r_square, "]")
@@ -121,5 +102,4 @@ KEYWORD(while, "while")
 
 #undef KEYWORD
 #undef PUNCTUATOR
-#undef PPTOK
 #undef TOK

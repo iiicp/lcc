@@ -19,11 +19,12 @@ int main() {
     file.seekg(0,std::ios_base::beg);
     file.read(source.data(),source.size());
 
-//    auto tokens = lcc::lexer::Tokenize(source);
-//    for (auto &tok : tokens) {
-//        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
-//        std::cout << tok.GetTokenSimpleSpelling(tok.GetTokenType()) << std::endl;
-//    }
+    lcc::lexer::Lexer lex(reinterpret_cast<uint8_t *>(source.data()), source.size());
+    auto tokens = lex.Tokenize();
+    for (auto &tok : tokens) {
+        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
+        std::cout << tok.GetTokenSpelling() << std::endl;
+    }
 
     return 0;
 }

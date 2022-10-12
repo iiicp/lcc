@@ -20,7 +20,7 @@ enum TokenType {
 };
 class Token {
   using TokenValue =
-      std::variant<std::monostate, char, int32_t, uint32_t, int64_t, uint64_t,
+      std::variant<std::monostate, int32_t, uint32_t, int64_t, uint64_t,
                    float, double, std::string>;
 
 private:

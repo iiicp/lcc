@@ -1,4 +1,4 @@
-//const int a = 1e10;
+const int a = 1e2;
 int fib(int n) {
     if (n <= 1)
         return 1;

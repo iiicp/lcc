@@ -14,7 +14,7 @@ llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes Executi
 file(GLOB lcc_src "src/*.cc")
 
 # compiler and set search include and link llvm lib
-add_executable(${PROJECT_NAME} main.cpp ${lcc_src} src/Token.cc src/Token.cc src/Token.h src/Lexer.cc src/Lexer.h)
+add_executable(${PROJECT_NAME} main.cpp ${lcc_src})
 target_include_directories(${PROJECT_NAME}
         PRIVATE
         src

@@ -12,7 +12,7 @@
 #include "Syntax.h"
 
 namespace lcc::parser {
-PrimaryType::PrimaryType(std::vector<TypeKind> &types) noexcept
+PrimaryType::PrimaryType(std::vector<TypeKind> &&types) noexcept
     : mTypes(types) {}
 PointerType::PointerType(std::unique_ptr<Type> &&type) noexcept
     : mType(std::move(type)) {}
@@ -22,17 +22,13 @@ Expr::Expr(std::unique_ptr<AssignExpr> &&assignExpr,
     : mAssignExpr(std::move(assignExpr)),
       mOptAssignExps(std::move(optAssignExps)) {}
 
-ConstantExpr::ConstantExpr(Value &&value) noexcept : mValue(value) {}
+ConstantExpr::ConstantExpr(ConstantValue &value) : mValue(value) {}
 
-AssignExpr::AssignExpr(std::unique_ptr<UnaryExpr> &&unaryExpr,
-                       AssignOp assignOp,
+AssignExpr::AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr,
+                       lexer::TokenType tokenType,
                        std::unique_ptr<AssignExpr> &&assignExpr) noexcept
-    : mUnaryExpr(std::move(unaryExpr)), mOp(assignOp),
-      mAssignExpr(std::move(assignExpr)),
-      mCategory(AssignExprCategory::UnaryExpr){};
-AssignExpr::AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr) noexcept
-    : mCondExpr(std::move(condExpr)),
-      mCategory(AssignExprCategory::ConditionalExpr){};
+    : mCondExpr(std::move(condExpr)), mTokenType(tokenType),
+      mAssignExpr(std::move(assignExpr)){}
 
 ConditionalExpr::ConditionalExpr(
     std::unique_ptr<LogOrExpr> &&logOrExpr, std::unique_ptr<Expr> &&optExpr,
@@ -175,7 +171,7 @@ ForStmt::ForStmt(std::unique_ptr<Expr> &&initExpr,
       mPostExpr(std::move(postExpr)), mStmt(std::move(stmt)) {}
 
 Declaration::Declaration(std::unique_ptr<Type> &&type, std::string name,
-                         std::unique_ptr<ConstantExpr> &&optValue) noexcept
+                         std::unique_ptr<Expr> &&optValue) noexcept
     : mType(std::move(type)), mName(name), mOptValue(std::move(optValue)) {}
 
 ForDeclarationStmt::ForDeclarationStmt(std::unique_ptr<Declaration> &&initDecl,
@@ -184,6 +180,9 @@ ForDeclarationStmt::ForDeclarationStmt(std::unique_ptr<Declaration> &&initDecl,
                                        std::unique_ptr<Stmt> &&stmt) noexcept
     : mInitDecl(std::move(initDecl)), mControlExpr(std::move(controlExpr)),
       mPostExpr(std::move(postExpr)), mStmt(std::move(stmt)) {}
+
+ReturnStmt::ReturnStmt(std::unique_ptr<Expr> &&optExpr) noexcept
+: mOptExpr(std::move(optExpr)) {}
 
 BlockStmt::BlockStmt(std::vector<std::unique_ptr<Stmt>> &&stmts) noexcept
     : mStmts(std::move(stmts)) {}

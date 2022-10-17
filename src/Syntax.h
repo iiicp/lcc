@@ -14,6 +14,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include "Token.h"
 namespace lcc::parser {
 class Node {
 public:
@@ -27,27 +28,27 @@ public:
 
 class Type {
 public:
+  Type() = default;
   virtual ~Type() = default;
 };
 
+enum class TypeKind {
+  Auto,
+  Char,
+  Short,
+  Int,
+  Long,
+  Float,
+  Double,
+  Signed,
+  UnSigned
+};
 class PrimaryType final : public Type {
-public:
-  enum class TypeKind {
-    Char,
-    Short,
-    Int,
-    Long,
-    Float,
-    Double,
-    Signed,
-    UnSigned
-  };
-
 private:
   std::vector<TypeKind> mTypes;
 
 public:
-  explicit PrimaryType(std::vector<TypeKind> &types) noexcept;
+  explicit PrimaryType(std::vector<TypeKind> &&types) noexcept;
 };
 
 class PointerType final : public Type {
@@ -87,44 +88,26 @@ public:
 };
 
 class ConstantExpr final : public Node {
-  using Value = std::variant<int32_t, uint32_t, int64_t, uint64_t, float,
+public:
+  using ConstantValue = std::variant<int32_t, uint32_t, int64_t, uint64_t, float,
                              double, std::string>;
 
 private:
-  Value mValue;
+  ConstantValue mValue;
 
 public:
-  explicit ConstantExpr(Value &&value) noexcept;
+  explicit ConstantExpr(ConstantValue &value);
 };
-
-enum class AssignOp {
-  Equal,
-  PlusEqual,
-  SlashEqual,
-  StarEqual,
-  MinusEqual,
-  PercentEqual,
-  LessLessEqual,
-  GreaterGreaterEqual,
-  AmpEqual,
-  PipeEqual,
-  CaretEqual
-};
-
-enum class AssignExprCategory { ConditionalExpr, UnaryExpr };
 
 class AssignExpr final : public Node {
 private:
-  AssignExprCategory mCategory;
   std::unique_ptr<ConditionalExpr> mCondExpr;
-  std::unique_ptr<UnaryExpr> mUnaryExpr;
-  AssignOp mOp;
+  lexer::TokenType mTokenType;
   std::unique_ptr<AssignExpr> mAssignExpr;
 
 public:
-  explicit AssignExpr(std::unique_ptr<UnaryExpr> &&unaryExpr, AssignOp assignOp,
+  explicit AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr, lexer::TokenType tokenType,
                       std::unique_ptr<AssignExpr> &&assignExpr) noexcept;
-  explicit AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr) noexcept;
 };
 
 class ConditionalExpr final : public Node {
@@ -417,12 +400,12 @@ class Declaration final : public Stmt {
 private:
   std::unique_ptr<Type> mType;
   std::string mName;
-  std::unique_ptr<ConstantExpr> mOptValue;
+  std::unique_ptr<Expr> mOptValue;
 
 public:
   explicit Declaration(
       std::unique_ptr<Type> &&type, std::string name,
-      std::unique_ptr<ConstantExpr> &&optValue = nullptr) noexcept;
+      std::unique_ptr<Expr> &&optValue = nullptr) noexcept;
 };
 
 class ForDeclarationStmt final : public Stmt {
@@ -445,6 +428,13 @@ public:
 
 class ContinueStmt final : public Stmt {
 public:
+};
+
+class ReturnStmt final : public Stmt {
+private:
+  std::unique_ptr<Expr> mOptExpr;
+public:
+  explicit ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr) noexcept;
 };
 
 class BlockStmt final : public Stmt {

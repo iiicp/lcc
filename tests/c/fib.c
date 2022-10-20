@@ -17,3 +17,7 @@ double /*dd*/sum(double a, float b) {
 const float a11 = 3.34f;
 //const int aa = 1e10;
 const long l = 10ll;
+
+int main() {
+  return 0;
+}

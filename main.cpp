@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "Lexer.h"
-
+#include "Parser.h"
 
 int main() {
     std::cout << "Hello, lcc!" << std::endl;
@@ -25,6 +25,9 @@ int main() {
         std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
         std::cout << tok.GetTokenSpelling() << std::endl;
     }
+
+    lcc::parser::Parser parser(std::move(tokens));
+    auto program = parser.ParseProgram();
 
     return 0;
 }

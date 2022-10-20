@@ -22,11 +22,10 @@ private:
   TokIter mTokEnd;
 
 public:
-  explicit Parser(std::vector<lexer::Token> && tokens): mTokens(std::move(tokens)), mTokCursor(tokens.cbegin()), mTokEnd(tokens.cend()) {}
-  std::unique_ptr<Program> Parse();
+  explicit Parser(std::vector<lexer::Token> && tokens): mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()), mTokEnd(mTokens.cend()) {}
+  std::unique_ptr<Program> ParseProgram();
 
 private:
-  std::unique_ptr<Program> ParseProgram();
   std::unique_ptr<Function> ParseFunction();
   std::unique_ptr<GlobalDecl> ParseGlobalDecl();
   std::unique_ptr<ConstantExpr> ParseConstantExpr();
@@ -45,6 +44,20 @@ private:
   std::unique_ptr<Expr> ParseExpr();
   std::unique_ptr<AssignExpr> ParseAssignExpr();
   std::unique_ptr<ConditionalExpr> ParseConditionalExpr();
+  std::unique_ptr<LogOrExpr> ParseLogOrExpr();
+  std::unique_ptr<LogAndExpr> ParseLogAndExpr();
+  std::unique_ptr<BitOrExpr> ParseBitOrExpr();
+  std::unique_ptr<BitXorExpr> ParseBitXorExpr();
+  std::unique_ptr<BitAndExpr> ParseBitAndExpr();
+  std::unique_ptr<EqualExpr> ParseEqualExpr();
+  std::unique_ptr<RelationalExpr> ParseRelationalExpr();
+  std::unique_ptr<ShiftExpr> ParseShiftExpr();
+  std::unique_ptr<AdditiveExpr> ParseAdditiveExpr();
+  std::unique_ptr<MultiExpr> ParseMultiExpr();
+  std::unique_ptr<CastExpr> ParseCastExpr();
+  std::unique_ptr<UnaryExpr> ParseUnaryExpr();
+  std::unique_ptr<PostFixExpr> ParsePostFixExpr();
+  std::unique_ptr<PrimaryExpr> ParsePrimaryExpr();
   std::unique_ptr<Type> ParseType();
   std::unique_ptr<Type> ParseType(std::unique_ptr<Type> &&baseType);
   bool IsFunction();
@@ -52,7 +65,9 @@ private:
   bool Match(lexer::TokenType tokenType);
   bool Expect(lexer::TokenType tokenType);
   bool Consume(lexer::TokenType tokenType);
+  bool ConsumeAny();
   bool Peek(lexer::TokenType tokenType);
+  bool IsUnaryOp(lexer::TokenType tokenType);
 };
 }
 #endif // LCC_PARSER_H

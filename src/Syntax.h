@@ -41,7 +41,8 @@ enum class TypeKind {
   Float,
   Double,
   Signed,
-  UnSigned
+  UnSigned,
+  Const
 };
 class PrimaryType final : public Type {
 private:
@@ -102,12 +103,12 @@ public:
 class AssignExpr final : public Node {
 private:
   std::unique_ptr<ConditionalExpr> mCondExpr;
-  lexer::TokenType mTokenType;
+  lexer::TokenType mTokType;
   std::unique_ptr<AssignExpr> mAssignExpr;
 
 public:
-  explicit AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr, lexer::TokenType tokenType,
-                      std::unique_ptr<AssignExpr> &&assignExpr) noexcept;
+  explicit AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr, lexer::TokenType tokenType = lexer::unknown,
+                      std::unique_ptr<AssignExpr> &&assignExpr = nullptr) noexcept;
 };
 
 class ConditionalExpr final : public Node {
@@ -178,74 +179,66 @@ public:
       std::vector<std::unique_ptr<EqualExpr>> &&optEqualExps) noexcept;
 };
 
-enum class EqualOp { Equal, NotEqual };
 
 class EqualExpr final : public Node {
 private:
   std::unique_ptr<RelationalExpr> mRelationalExpr;
-  EqualOp mOp;
+  lexer::TokenType mTokType;
   std::vector<std::unique_ptr<RelationalExpr>> mOptRelationExps;
 
 public:
   explicit EqualExpr(std::unique_ptr<RelationalExpr> &&relationalExpr,
-                     EqualOp op,
+                     lexer::TokenType tokenType,
                      std::vector<std::unique_ptr<RelationalExpr>>
                          &&optRelationalExps) noexcept;
 };
 
-enum class RelationOp { Less, Greater, LessEqual, GreaterEqual };
 
 class RelationalExpr final : public Node {
 private:
   std::unique_ptr<ShiftExpr> mShiftExpr;
-  RelationOp mOp;
+  lexer::TokenType mTokType;
   std::vector<std::unique_ptr<ShiftExpr>> mOptShiftExps;
 
 public:
   explicit RelationalExpr(
-      std::unique_ptr<ShiftExpr> &&shiftExpr, RelationOp op,
+      std::unique_ptr<ShiftExpr> &&shiftExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<ShiftExpr>> &&optShiftExps) noexcept;
 };
-
-enum class ShiftOp { ShiftLeft, ShiftRight };
 
 class ShiftExpr final : public Node {
 private:
   std::unique_ptr<AdditiveExpr> mAdditiveExpr;
-  ShiftOp mOp;
+  lexer::TokenType mTokType;
   std::vector<std::unique_ptr<AdditiveExpr>> mOptAdditiveExps;
 
 public:
   explicit ShiftExpr(
-      std::unique_ptr<AdditiveExpr> &&additiveExpr, ShiftOp op,
+      std::unique_ptr<AdditiveExpr> &&additiveExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<AdditiveExpr>> &&optAdditiveExps) noexcept;
 };
-
-enum class AdditiveOp { Plus, Minus };
 
 class AdditiveExpr final : public Node {
 private:
   std::unique_ptr<MultiExpr> mMultiExpr;
-  AdditiveOp mOp;
+  lexer::TokenType mTokType;
   std::vector<std::unique_ptr<MultiExpr>> mOptionalMultiExps;
 
 public:
   explicit AdditiveExpr(
-      std::unique_ptr<MultiExpr> &&multiExpr, AdditiveOp op,
+      std::unique_ptr<MultiExpr> &&multiExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<MultiExpr>> &&optionalMultiExps) noexcept;
 };
-
-enum class MultiOp { Mul, Div, Remainder };
 
 class MultiExpr final : public Node {
 private:
   std::unique_ptr<CastExpr> mCastExpr;
-  MultiOp mOp;
+  lexer::TokenType mTokType;
   std::vector<std::unique_ptr<CastExpr>> mOptCastExps;
 
 public:
   explicit MultiExpr(
-      std::unique_ptr<CastExpr> &&castExpr, MultiOp op,
+      std::unique_ptr<CastExpr> &&castExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<CastExpr>> &&optCastExps) noexcept;
 };
 
@@ -264,76 +257,83 @@ public:
                     std::unique_ptr<CastExpr> &&castExpr) noexcept;
 };
 
-enum class UnaryOp { Amp, Star, Plus, Minus, Tilde, Exclaim };
-
-enum class UnaryCategory {
-  PostFixExpr,
-  PreInc,
-  PreDec,
-  UnaryOp,
-  SizeOfUnary,
-  SizeofType
-};
-
 class UnaryExpr final : public Node {
-private:
-  UnaryCategory mCategory;
-  std::unique_ptr<PostFixExpr> mPostFixExpr;
-  std::unique_ptr<UnaryExpr> mUnaryExpr;
-  UnaryOp mUnaryOp;
-  std::unique_ptr<CastExpr> mCastExpr;
-  std::unique_ptr<Type> mType;
-
 public:
-  explicit UnaryExpr(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept;
-  explicit UnaryExpr(UnaryCategory unaryCategory,
-                     std::unique_ptr<UnaryExpr> &&unaryExpr) noexcept;
-  explicit UnaryExpr(UnaryOp unaryOp,
-                     std::unique_ptr<CastExpr> &&castExpr) noexcept;
-  explicit UnaryExpr(std::unique_ptr<Type> &&type) noexcept;
-};
+  struct PreIncTag {
+    std::unique_ptr<UnaryExpr> mUnaryExpr;
+  };
 
-enum class PostFixExprCategory {
-  ArrIndex,
-  FuncCall,
-  MemberDot,
-  MemberArrow,
-  PostInc,
-  PostDec
+  struct PreDecTag {
+    std::unique_ptr<UnaryExpr> mUnaryExpr;
+  };
+
+  struct UnaryOpTag {
+    lexer::TokenType mTokType;
+    std::unique_ptr<CastExpr> mCastExpr;
+  };
+
+  struct SizeofUnaryTag {
+    std::unique_ptr<UnaryExpr> mUnaryExpr;
+  };
+
+  struct SizeofTypeTag {
+    std::unique_ptr<Type> mType;
+  };
+
+  struct PostFixTag {
+    std::unique_ptr<PostFixExpr> mPostFixExpr;
+  };
+private:
+  using Variant = std::variant<PreIncTag, PreDecTag, UnaryOpTag, SizeofUnaryTag, SizeofTypeTag, PostFixTag>;
+  Variant mTag;
+public:
+  template<typename T>
+  explicit UnaryExpr(T &&tag) noexcept : mTag(std::forward<T>(tag)) {}
 };
 
 class PostFixExpr final : public Node {
-private:
-  PostFixExprCategory mCategory;
-  std::unique_ptr<PrimaryExpr> mPrimaryExpr;
-  std::unique_ptr<Expr> mIndexExpr;
-  std::vector<std::unique_ptr<AssignExpr>> mFuncParams;
-  std::string mIdentifierName;
-
 public:
-  explicit PostFixExpr(std::unique_ptr<PrimaryExpr> &&primaryExpr,
-                       std::unique_ptr<Expr> &&indexExpr) noexcept;
-  explicit PostFixExpr(
-      std::unique_ptr<PrimaryExpr> &&primaryExpr,
-      std::vector<std::unique_ptr<AssignExpr>> &&funcParams) noexcept;
-  explicit PostFixExpr(std::unique_ptr<PrimaryExpr> &&primaryExpr,
-                       PostFixExprCategory category,
-                       std::string identifier = "") noexcept;
+  struct ArrayIndexTag {
+    std::unique_ptr<Expr> mExpr;
+  };
+  struct FuncCallTag {
+    std::vector<std::unique_ptr<AssignExpr>> mOptParams;
+  };
+  struct MemberDotTag {
+    std::string mIdentifier;
+  };
+  struct MemberArrowTag {
+    std::string mIdentifier;
+  };
+  struct PostIncTag {
+  };
+  struct PostDecTag {
+  };
+  using Variant = std::variant<ArrayIndexTag, FuncCallTag, MemberDotTag, MemberArrowTag, PostIncTag, PostDecTag>;
+private:
+  std::vector<Variant> mOptVariants;
+  std::unique_ptr<PrimaryExpr> mPrimaryExpr;
+public:
+  explicit PostFixExpr(std::unique_ptr<PrimaryExpr> && primaryExpr, std::vector<Variant> && optVariant) noexcept;
 };
 
-enum class PrimaryExprCategory { Identifier, Constant, ParentExpr };
-
 class PrimaryExpr final : public Node {
-private:
-  PrimaryExprCategory mCategory;
-  std::string mIdentifierName;
-  std::unique_ptr<ConstantExpr> mConstantExpr;
-  std::unique_ptr<Expr> mExpr;
-
 public:
-  explicit PrimaryExpr(std::string &identifier) noexcept;
-  explicit PrimaryExpr(std::unique_ptr<ConstantExpr> &&constantExpr) noexcept;
-  explicit PrimaryExpr(std::unique_ptr<Expr> &&parentExpr) noexcept;
+  struct IdentifierTag {
+    std::string mIdentifier;
+  };
+  struct ConstantTag {
+    std::unique_ptr<ConstantExpr> mConstantExpr;
+  };
+  struct ExprTag {
+    std::unique_ptr<Expr> mExpr;
+  };
+private:
+  using Variant = std::variant<IdentifierTag, ConstantTag, ExprTag>;
+  Variant mTag;
+public:
+  template <typename T>
+  explicit PrimaryExpr(T &&tag) noexcept: mTag(std::forward<T>(tag)) {}
 };
 
 class Stmt : public Node {

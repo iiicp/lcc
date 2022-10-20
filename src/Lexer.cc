@@ -236,9 +236,7 @@ Token Lexer::ScanNumeric() {
 }
 
 Token Lexer::ScanIntegerNumeric(int base) {
-  if (base == 8) {
-    ++mCursor;
-  } else if (base == 16) {
+  if (base == 16) {
     mCursor += 2;
   }
   uint64_t value = (*mCursor++ - '0');

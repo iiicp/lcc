@@ -12,7 +12,7 @@
 #include "Syntax.h"
 
 namespace lcc::parser {
-PrimaryType::PrimaryType(std::vector<TypeKind> &&types) noexcept
+PrimaryType::PrimaryType(std::vector<lexer::TokenType> &&types) noexcept
     : mTypes(types) {}
 PointerType::PointerType(std::unique_ptr<Type> &&type) noexcept
     : mType(std::move(type)) {}
@@ -160,8 +160,7 @@ GlobalDecl::GlobalDecl(std::unique_ptr<Type> &&type, std::string name,
     : mType(std::move(type)), mName(name), mOptValue(std::move(optValue)) {}
 
 Program::Program(
-    std::vector<std::unique_ptr<Function>> &&functions,
-    std::vector<std::unique_ptr<GlobalDecl>> &&declarations) noexcept
-    : mFunctions(std::move(functions)), mDeclarations(std::move(declarations)) {
+    std::vector<std::unique_ptr<ExternalDeclaration>> &&externalDecl) noexcept
+    : mExternalDecl(std::move(externalDecl)) {
 }
 } // namespace lcc::parser

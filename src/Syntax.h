@@ -11,11 +11,41 @@
  ***********************************/
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
+#include "CodeGenContext.h"
+#include "Token.h"
 #include <string>
 #include <variant>
 #include <vector>
-#include "Token.h"
 namespace lcc::parser {
+class Type {
+public:
+  Type() = default;
+  virtual ~Type() = default;
+  virtual bool IsSigned() const = 0;
+  virtual LLVMTypePtr TypeGen(CodeGenContext &context) = 0;
+};
+
+class PrimaryType final : public Type {
+public:
+  std::vector<lexer::TokenType> mTypes;
+  bool mSign{true};
+
+public:
+  explicit PrimaryType(std::vector<lexer::TokenType> &&types) noexcept;
+  bool IsSigned() const override;
+  LLVMTypePtr TypeGen(CodeGenContext &context) override;
+};
+
+class PointerType final : public Type {
+public:
+  std::unique_ptr<Type> mType;
+
+public:
+  explicit PointerType(std::unique_ptr<Type> &&type) noexcept;
+  bool IsSigned() const override;
+  LLVMTypePtr TypeGen(CodeGenContext &context) override;
+};
+
 class Node {
 public:
   Node() = default;
@@ -24,40 +54,7 @@ public:
   Node &operator=(const Node &) = delete;
   Node(Node &&) = default;
   Node &operator=(Node &&) = default;
-};
-
-class Type {
-public:
-  Type() = default;
-  virtual ~Type() = default;
-};
-
-enum class TypeKind {
-  Auto,
-  Char,
-  Short,
-  Int,
-  Long,
-  Float,
-  Double,
-  Signed,
-  UnSigned,
-  Const
-};
-class PrimaryType final : public Type {
-private:
-  std::vector<TypeKind> mTypes;
-
-public:
-  explicit PrimaryType(std::vector<TypeKind> &&types) noexcept;
-};
-
-class PointerType final : public Type {
-private:
-  std::unique_ptr<Type> mType;
-
-public:
-  explicit PointerType(std::unique_ptr<Type> &&type) noexcept;
+  virtual LLVMValueSignPair Codegen(CodeGenContext &context) const = 0;
 };
 
 class AssignExpr;
@@ -86,18 +83,20 @@ public:
   explicit Expr(
       std::unique_ptr<AssignExpr> &&assignExpr,
       std::vector<std::unique_ptr<AssignExpr>> &&optAssignExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ConstantExpr final : public Node {
 public:
-  using ConstantValue = std::variant<int32_t, uint32_t, int64_t, uint64_t, float,
-                             double, std::string>;
+  using ConstantValue = std::variant<int32_t, uint32_t, int64_t, uint64_t,
+                                     float, double, std::string>;
 
 private:
   ConstantValue mValue;
 
 public:
   explicit ConstantExpr(ConstantValue &value);
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class AssignExpr final : public Node {
@@ -107,8 +106,11 @@ private:
   std::unique_ptr<AssignExpr> mAssignExpr;
 
 public:
-  explicit AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr, lexer::TokenType tokenType = lexer::unknown,
-                      std::unique_ptr<AssignExpr> &&assignExpr = nullptr) noexcept;
+  explicit AssignExpr(
+      std::unique_ptr<ConditionalExpr> &&condExpr,
+      lexer::TokenType tokenType = lexer::unknown,
+      std::unique_ptr<AssignExpr> &&assignExpr = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ConditionalExpr final : public Node {
@@ -122,6 +124,7 @@ public:
       std::unique_ptr<LogOrExpr> &&logOrExpr,
       std::unique_ptr<Expr> &&optExpr = nullptr,
       std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class LogOrExpr final : public Node {
@@ -133,6 +136,7 @@ public:
   explicit LogOrExpr(
       std::unique_ptr<LogAndExpr> &&logAndExpr,
       std::vector<std::unique_ptr<LogAndExpr>> &&optLogAndExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class LogAndExpr final : public Node {
@@ -144,6 +148,7 @@ public:
   explicit LogAndExpr(
       std::unique_ptr<BitOrExpr> &&bitOrExpr,
       std::vector<std::unique_ptr<BitOrExpr>> &&optBitOrExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class BitOrExpr final : public Node {
@@ -155,6 +160,7 @@ public:
   explicit BitOrExpr(
       std::unique_ptr<BitXorExpr> &&bitXorExpr,
       std::vector<std::unique_ptr<BitXorExpr>> &&optBitXorExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class BitXorExpr final : public Node {
@@ -166,6 +172,7 @@ public:
   explicit BitXorExpr(
       std::unique_ptr<BitAndExpr> &&bitAndExpr,
       std::vector<std::unique_ptr<BitAndExpr>> &&optBitAndExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class BitAndExpr final : public Node {
@@ -177,8 +184,8 @@ public:
   explicit BitAndExpr(
       std::unique_ptr<EqualExpr> &&equalExpr,
       std::vector<std::unique_ptr<EqualExpr>> &&optEqualExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
-
 
 class EqualExpr final : public Node {
 private:
@@ -191,8 +198,8 @@ public:
                      lexer::TokenType tokenType,
                      std::vector<std::unique_ptr<RelationalExpr>>
                          &&optRelationalExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
-
 
 class RelationalExpr final : public Node {
 private:
@@ -204,6 +211,7 @@ public:
   explicit RelationalExpr(
       std::unique_ptr<ShiftExpr> &&shiftExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<ShiftExpr>> &&optShiftExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ShiftExpr final : public Node {
@@ -216,6 +224,7 @@ public:
   explicit ShiftExpr(
       std::unique_ptr<AdditiveExpr> &&additiveExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<AdditiveExpr>> &&optAdditiveExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class AdditiveExpr final : public Node {
@@ -228,6 +237,7 @@ public:
   explicit AdditiveExpr(
       std::unique_ptr<MultiExpr> &&multiExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<MultiExpr>> &&optionalMultiExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class MultiExpr final : public Node {
@@ -240,6 +250,7 @@ public:
   explicit MultiExpr(
       std::unique_ptr<CastExpr> &&castExpr, lexer::TokenType tokenType,
       std::vector<std::unique_ptr<CastExpr>> &&optCastExps) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 enum class CastExprCategory { Unary, LeftParent };
@@ -255,6 +266,7 @@ public:
   explicit CastExpr(std::unique_ptr<UnaryExpr> &&unaryExpr) noexcept;
   explicit CastExpr(std::unique_ptr<Type> &&type,
                     std::unique_ptr<CastExpr> &&castExpr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class UnaryExpr final : public Node {
@@ -283,12 +295,16 @@ public:
   struct PostFixTag {
     std::unique_ptr<PostFixExpr> mPostFixExpr;
   };
+
 private:
-  using Variant = std::variant<PreIncTag, PreDecTag, UnaryOpTag, SizeofUnaryTag, SizeofTypeTag, PostFixTag>;
+  using Variant = std::variant<PreIncTag, PreDecTag, UnaryOpTag, SizeofUnaryTag,
+                               SizeofTypeTag, PostFixTag>;
   Variant mTag;
+
 public:
-  template<typename T>
+  template <typename T>
   explicit UnaryExpr(T &&tag) noexcept : mTag(std::forward<T>(tag)) {}
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class PostFixExpr final : public Node {
@@ -305,16 +321,19 @@ public:
   struct MemberArrowTag {
     std::string mIdentifier;
   };
-  struct PostIncTag {
-  };
-  struct PostDecTag {
-  };
-  using Variant = std::variant<ArrayIndexTag, FuncCallTag, MemberDotTag, MemberArrowTag, PostIncTag, PostDecTag>;
+  struct PostIncTag {};
+  struct PostDecTag {};
+  using Variant = std::variant<ArrayIndexTag, FuncCallTag, MemberDotTag,
+                               MemberArrowTag, PostIncTag, PostDecTag>;
+
 private:
   std::vector<Variant> mOptVariants;
   std::unique_ptr<PrimaryExpr> mPrimaryExpr;
+
 public:
-  explicit PostFixExpr(std::unique_ptr<PrimaryExpr> && primaryExpr, std::vector<Variant> && optVariant) noexcept;
+  explicit PostFixExpr(std::unique_ptr<PrimaryExpr> &&primaryExpr,
+                       std::vector<Variant> &&optVariant) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class PrimaryExpr final : public Node {
@@ -328,12 +347,15 @@ public:
   struct ExprTag {
     std::unique_ptr<Expr> mExpr;
   };
+
 private:
   using Variant = std::variant<IdentifierTag, ConstantTag, ExprTag>;
   Variant mTag;
+
 public:
   template <typename T>
-  explicit PrimaryExpr(T &&tag) noexcept: mTag(std::forward<T>(tag)) {}
+  explicit PrimaryExpr(T &&tag) noexcept : mTag(std::forward<T>(tag)) {}
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class Stmt : public Node {
@@ -348,6 +370,7 @@ private:
 
 public:
   explicit ExprStmt(std::unique_ptr<Expr> &&optExpr = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class IfStmt final : public Stmt {
@@ -360,6 +383,7 @@ public:
   explicit IfStmt(std::unique_ptr<Expr> &&expr,
                   std::unique_ptr<Stmt> &&thenStmt,
                   std::unique_ptr<Stmt> &&optElseStmt = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class DoWhileStmt final : public Stmt {
@@ -370,6 +394,7 @@ private:
 public:
   explicit DoWhileStmt(std::unique_ptr<Stmt> &&stmt,
                        std::unique_ptr<Expr> &&expr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class WhileStmt final : public Stmt {
@@ -380,6 +405,7 @@ private:
 public:
   explicit WhileStmt(std::unique_ptr<Expr> &&expr,
                      std::unique_ptr<Stmt> &&stmt) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ForStmt final : public Stmt {
@@ -394,6 +420,7 @@ public:
                    std::unique_ptr<Expr> &&controlExpr,
                    std::unique_ptr<Expr> &&postExpr,
                    std::unique_ptr<Stmt> &&stmt) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class Declaration final : public Stmt {
@@ -403,9 +430,9 @@ private:
   std::unique_ptr<Expr> mOptValue;
 
 public:
-  explicit Declaration(
-      std::unique_ptr<Type> &&type, std::string name,
-      std::unique_ptr<Expr> &&optValue = nullptr) noexcept;
+  explicit Declaration(std::unique_ptr<Type> &&type, std::string name,
+                       std::unique_ptr<Expr> &&optValue = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ForDeclarationStmt final : public Stmt {
@@ -420,21 +447,26 @@ public:
                               std::unique_ptr<Expr> &&controlExpr,
                               std::unique_ptr<Expr> &&postExpr,
                               std::unique_ptr<Stmt> &&stmt) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class BreakStmt final : public Stmt {
 public:
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ContinueStmt final : public Stmt {
 public:
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ReturnStmt final : public Stmt {
 private:
   std::unique_ptr<Expr> mOptExpr;
+
 public:
   explicit ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class BlockStmt final : public Stmt {
@@ -443,9 +475,15 @@ private:
 
 public:
   explicit BlockStmt(std::vector<std::unique_ptr<Stmt>> &&stmts) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
-class Function final : public Node {
+class ExternalDeclaration : public Node {
+protected:
+  ExternalDeclaration() = default;
+};
+
+class Function final : public ExternalDeclaration {
 private:
   std::unique_ptr<Type> mRetType;
   std::string mName;
@@ -457,9 +495,10 @@ public:
       std::unique_ptr<Type> &&retType, std::string name,
       std::vector<std::pair<std::unique_ptr<Type>, std::string>> &&params,
       std::unique_ptr<BlockStmt> &&optBlockStmt = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
-class GlobalDecl final : public Node {
+class GlobalDecl final : public ExternalDeclaration {
 private:
   std::unique_ptr<Type> mType;
   std::string mName;
@@ -469,17 +508,17 @@ public:
   explicit GlobalDecl(
       std::unique_ptr<Type> &&type, std::string name,
       std::unique_ptr<ConstantExpr> &&optValue = nullptr) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class Program final : public Node {
 private:
-  std::vector<std::unique_ptr<Function>> mFunctions;
-  std::vector<std::unique_ptr<GlobalDecl>> mDeclarations;
+  std::vector<std::unique_ptr<ExternalDeclaration>> mExternalDecl;
 
 public:
-  explicit Program(
-      std::vector<std::unique_ptr<Function>> &&functions,
-      std::vector<std::unique_ptr<GlobalDecl>> &&declarations) noexcept;
+  explicit Program(std::vector<std::unique_ptr<ExternalDeclaration>>
+                       &&externalDecl) noexcept;
+  LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 } // namespace lcc::parser
 

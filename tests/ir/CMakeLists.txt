@@ -55,3 +55,6 @@ target_link_libraries(c_fun_for ${llvm_all})
 
 add_executable(c_fun_fib c_fun_fib.cpp)
 target_link_libraries(c_fun_fib ${llvm_all})
+
+add_executable(c_while c_while.cpp)
+target_link_libraries(c_while ${llvm_all})

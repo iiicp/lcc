@@ -12,46 +12,16 @@
 
 namespace lcc::parser {
 
-namespace {
-auto TokenTypeToTypeKind = [](lexer::TokenType tokenType) -> TypeKind {
-  switch (tokenType) {
-  case lexer::kw_auto:
-    return TypeKind::Auto;
-  case lexer::kw_char:
-    return TypeKind::Char;
-  case lexer::kw_short:
-    return TypeKind::Short;
-  case lexer::kw_int:
-    return TypeKind::Int;
-  case lexer::kw_long:
-    return TypeKind::Long;
-  case lexer::kw_float:
-    return TypeKind::Float;
-  case lexer::kw_double:
-    return TypeKind::Double;
-  case lexer::kw_signed:
-    return TypeKind::Signed;
-  case lexer::kw_unsigned:
-    return TypeKind::UnSigned;
-  case lexer::kw_const:
-    return TypeKind::Const;
-  default:
-    assert(0);
-  }
-};
-}
-
 std::unique_ptr<Program> Parser::ParseProgram() {
-  std::vector<std::unique_ptr<Function>> funcs;
-  std::vector<std::unique_ptr<GlobalDecl>> decls;
+  std::vector<std::unique_ptr<ExternalDeclaration>> decls;
   while (mTokCursor != mTokEnd) {
     if (IsFunction()) {
-      funcs.push_back(std::move(ParseFunction()));
+      decls.push_back(std::move(ParseFunction()));
     } else {
       decls.push_back(std::move(ParseGlobalDecl()));
     }
   }
-  return std::make_unique<Program>(std::move(funcs), std::move(decls));
+  return std::make_unique<Program>(std::move(decls));
 }
 std::unique_ptr<Function> Parser::ParseFunction() {
   assert(IsTypeName());
@@ -136,9 +106,9 @@ std::unique_ptr<ConstantExpr> Parser::ParseConstantExpr() {
 }
 
 std::unique_ptr<Type> Parser::ParseType() {
-  std::vector<TypeKind> typeKinds;
+  std::vector<lexer::TokenType> typeKinds;
   while (IsTypeName()) {
-    typeKinds.push_back(TokenTypeToTypeKind(mTokCursor->GetTokenType()));
+    typeKinds.push_back(mTokCursor->GetTokenType());
     ++mTokCursor;
   }
   assert(!typeKinds.empty());

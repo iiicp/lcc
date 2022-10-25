@@ -22,6 +22,7 @@ public:
   Type() = default;
   virtual ~Type() = default;
   virtual bool IsSigned() const = 0;
+  virtual bool IsVoid() const = 0;
   virtual LLVMTypePtr TypeGen(CodeGenContext &context) = 0;
 };
 
@@ -29,10 +30,11 @@ class PrimaryType final : public Type {
 public:
   std::vector<lexer::TokenType> mTypes;
   bool mSign{true};
-
+  bool mVoid{false};
 public:
   explicit PrimaryType(std::vector<lexer::TokenType> &&types) noexcept;
   bool IsSigned() const override;
+  bool IsVoid() const override;
   LLVMTypePtr TypeGen(CodeGenContext &context) override;
 };
 
@@ -43,6 +45,7 @@ public:
 public:
   explicit PointerType(std::unique_ptr<Type> &&type) noexcept;
   bool IsSigned() const override;
+  bool IsVoid() const override;
   LLVMTypePtr TypeGen(CodeGenContext &context) override;
 };
 

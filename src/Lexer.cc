@@ -16,7 +16,9 @@ namespace lcc::lexer {
 std::vector<Token> Lexer::Tokenize() {
   std::vector<Token> tokens;
   while (!IsEOF(mCursor)) {
-    tokens.push_back(GetNextToken());
+    Token tok = GetNextToken();
+    if (tok.GetTokenType() != TokenType::eof)
+      tokens.push_back(tok);
   }
   return std::move(tokens);
 }
@@ -34,9 +36,10 @@ Token Lexer::GetNextToken() {
     return ScanCharacter();
   } else if (IsStringStart()) {
     return ScanStringLiteral();
+  } else if (IsEOF(mCursor)){
+    return Token{mLine, mColumn, TokenType::eof};
   } else {
     assert(0);
-    return Token{mLine, mLine, unknown};
   }
 }
 

@@ -594,11 +594,12 @@ bool Parser::IsFunction() {
 
 bool Parser::IsTypeName() {
   lexer::TokenType type = mTokCursor->GetTokenType();
-  return type == lexer::kw_auto | type == lexer::kw_char |
-         type == lexer::kw_short | type == lexer::kw_int |
-         type == lexer::kw_long | type == lexer::kw_float |
-         type == lexer::kw_double | type == lexer::kw_signed |
-         type == lexer::kw_unsigned | type == lexer::kw_const;
+  return type == lexer::kw_void | type == lexer::kw_auto |
+         type == lexer::kw_char | type == lexer::kw_short |
+         type == lexer::kw_int | type == lexer::kw_long |
+         type == lexer::kw_float | type == lexer::kw_double |
+         type == lexer::kw_signed | type == lexer::kw_unsigned |
+         type == lexer::kw_const;
 }
 
 bool Parser::Match(lexer::TokenType tokenType) {

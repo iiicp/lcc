@@ -14,8 +14,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
 #include <unordered_map>
-namespace lcc::parser {
+namespace lcc {
 
 using LLVMValueSignPair = std::pair<llvm::Value *, bool>;
 using LLVMTypePtr = llvm::Type *;
@@ -25,6 +26,8 @@ public:
   llvm::LLVMContext mContext;
   std::unique_ptr<llvm::Module> mModule;
   llvm::IRBuilder<> mIrBuilder{mContext};
+
+  llvm::Function *mCurrentFunc;
 };
 } // namespace lcc::parser
 

@@ -158,52 +158,148 @@ LLVMValueSignPair IfStmt::Codegen(lcc::CodeGenContext &context) const {
   auto* function = context.mCurrentFunc;
   auto *thenBB = llvm::BasicBlock::Create(context.mContext, "", function);
   auto *elseBB =  mOptElseStmt ? llvm::BasicBlock::Create(context.mContext) : nullptr;
-  auto *mergeBB = llvm::BasicBlock::Create(context.mContext);
-  context.mIrBuilder.CreateCondBr(value, thenBB, elseBB?elseBB:mergeBB);
+  auto *endBB = llvm::BasicBlock::Create(context.mContext);
+  context.mIrBuilder.CreateCondBr(value, thenBB, elseBB?elseBB:endBB);
   context.mIrBuilder.SetInsertPoint(thenBB);
   mThenStmt->Codegen(context);
   if (!thenBB->back().isTerminator()) {
-    context.mIrBuilder.CreateBr(mergeBB);
+    context.mIrBuilder.CreateBr(endBB);
   }
   if (elseBB) {
     function->getBasicBlockList().push_back(elseBB);
     context.mIrBuilder.SetInsertPoint(elseBB);
     mOptElseStmt->Codegen(context);
     if (!elseBB->back().isTerminator()) {
-      context.mIrBuilder.CreateBr(mergeBB);
+      context.mIrBuilder.CreateBr(endBB);
     }
   }
-  function->getBasicBlockList().push_back(mergeBB);
-  context.mIrBuilder.SetInsertPoint(mergeBB);
+  function->getBasicBlockList().push_back(endBB);
+  context.mIrBuilder.SetInsertPoint(endBB);
   return {nullptr, false};
 }
 LLVMValueSignPair WhileStmt::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto *condBB = llvm::BasicBlock::Create(context.mContext, "", context.mCurrentFunc);
+  auto *bodyBB = llvm::BasicBlock::Create(context.mContext);
+  auto *endBB = llvm::BasicBlock::Create(context.mContext);
+  context.mIrBuilder.CreateBr(condBB);
+  context.mIrBuilder.SetInsertPoint(condBB);
+  auto [value, sign] = mExpr->Codegen(context);
+  if (value->getType()->isIntegerTy()) {
+    value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
+  }else if (value->getType()->isFloatingPointTy()) {
+    value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+  }
+  context.mIrBuilder.CreateCondBr(value, bodyBB, endBB);
+
+  context.mCurrentFunc->getBasicBlockList().push_back(bodyBB);
+  context.mIrBuilder.SetInsertPoint(bodyBB);
+  mStmt->Codegen(context);
+  context.mIrBuilder.CreateBr(condBB);
+
+  context.mCurrentFunc->getBasicBlockList().push_back(endBB);
+  context.mIrBuilder.SetInsertPoint(endBB);
+  return {nullptr, false};
 }
 LLVMValueSignPair DoWhileStmt::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto *bodyBB = llvm::BasicBlock::Create(context.mContext, "", context.mCurrentFunc);
+  auto *condBB = llvm::BasicBlock::Create(context.mContext, "");
+  auto *endBB = llvm::BasicBlock::Create(context.mContext);
+
+  context.mIrBuilder.CreateBr(bodyBB);
+  context.mIrBuilder.SetInsertPoint(bodyBB);
+  mStmt->Codegen(context);
+  context.mIrBuilder.CreateBr(condBB);
+
+  context.mCurrentFunc->getBasicBlockList().push_back(condBB);
+  context.mIrBuilder.SetInsertPoint(condBB);
+  auto [value, sign] = mExpr->Codegen(context);
+  if (value->getType()->isIntegerTy()) {
+    value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
+  }else if (value->getType()->isFloatingPointTy()) {
+    value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+  }
+  context.mIrBuilder.CreateCondBr(value, bodyBB, endBB);
+
+  context.mCurrentFunc->getBasicBlockList().push_back(endBB);
+  context.mIrBuilder.SetInsertPoint(endBB);
+  return {nullptr, false};
 }
+
+namespace {
+void GenForIR(const lcc::parser::Expr *cond,
+              const lcc::parser::Expr *post,
+              const lcc::parser::Stmt *body,
+              lcc::CodeGenContext &context) {
+  auto *function = context.mCurrentFunc;
+  auto *condBB = llvm::BasicBlock::Create(context.mContext,"",function);
+  auto *bodyBB = llvm::BasicBlock::Create(context.mContext);
+  auto *postBB = llvm::BasicBlock::Create(context.mContext);
+  auto *endBB = llvm::BasicBlock::Create(context.mContext);
+  context.mIrBuilder.CreateBr(condBB);
+  context.mIrBuilder.SetInsertPoint(condBB);
+  auto [value, sign] = cond ? cond->Codegen(context) : LLVMValueSignPair{context.mIrBuilder.getInt32(1), true};
+  if (value->getType()->isIntegerTy()) {
+    value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
+  }else if (value->getType()->isFloatingPointTy()) {
+    value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+  }
+  context.mIrBuilder.CreateCondBr(value, bodyBB, endBB);
+  function->getBasicBlockList().push_back(bodyBB);
+  context.mIrBuilder.SetInsertPoint(bodyBB);
+  body->Codegen(context);
+  function->getBasicBlockList().push_back(postBB);
+  context.mIrBuilder.CreateBr(postBB);
+  context.mIrBuilder.SetInsertPoint(postBB);
+  if (post) {
+    post->Codegen(context);
+  }
+  context.mIrBuilder.CreateBr(condBB);
+  function->getBasicBlockList().push_back(endBB);
+  context.mIrBuilder.SetInsertPoint(endBB);
+}
+}
+
 LLVMValueSignPair ForStmt::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  if (mInitExpr) {
+    mInitExpr->Codegen(context);
+  }
+  GenForIR(mControlExpr.get(), mPostExpr.get(), mStmt.get(), context);
+  return {nullptr, false};
 }
 LLVMValueSignPair
 ForDeclarationStmt::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  if (mInitDecl)
+    mInitDecl->Codegen(context);
+  GenForIR(mControlExpr.get(), mPostExpr.get(), mStmt.get(), context);
+  return {nullptr, false};
 }
 LLVMValueSignPair ExprStmt::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  return mOptExpr ? mOptExpr->Codegen(context) : LLVMValueSignPair{nullptr, false};
 }
 LLVMValueSignPair ReturnStmt::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  llvm::Value *val = nullptr;
+  auto[value, sign] = mOptExpr ? mOptExpr->Codegen(context) : LLVMValueSignPair{val, false};
+  context.mIrBuilder.CreateRet(value);
+  return {value, sign};
 }
 LLVMValueSignPair BreakStmt::Codegen(lcc::CodeGenContext &context) const {
+  // todo
+  //context.mIrBuilder.CreateBr();
   return {};
 }
 LLVMValueSignPair ContinueStmt::Codegen(lcc::CodeGenContext &context) const {
+  // todo
+  //context.mIrBuilder.CreateBr();
   return {};
 }
 LLVMValueSignPair Declaration::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  LLVMTypePtr allocaType = mType->TypeGen(context);
+  auto *alloca = context.mIrBuilder.CreateAlloca(allocaType, nullptr, mName);
+  if (mOptValue) {
+    auto [value, sign] = mOptValue->Codegen(context);
+    context.mIrBuilder.CreateStore(value, alloca);
+  }
+  return {alloca, mType->IsSigned()};
 }
 LLVMValueSignPair Expr::Codegen(lcc::CodeGenContext &context) const {
   return {};

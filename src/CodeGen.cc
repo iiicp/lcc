@@ -416,24 +416,149 @@ LLVMValueSignPair AssignExpr::Codegen(lcc::CodeGenContext &context) const {
   return {currentVal, sign};
 }
 LLVMValueSignPair ConditionalExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mLogOrExpr->Codegen(context);
+  if (mOptExpr && mOptCondExpr) {
+    if (left->getType()->isIntegerTy()) {
+      left = context.mIrBuilder.CreateICmpNE(left, context.mIrBuilder.getInt32(0));
+    }else if (left->getType()->isFloatingPointTy()) {
+      left = context.mIrBuilder.CreateFCmpUNE(left, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+    }
+    auto *func = context.mCurrentFunc;
+    auto *thenBB = llvm::BasicBlock::Create(context.mContext, "", func);
+    auto *elseBB = llvm::BasicBlock::Create(context.mContext);
+    auto *endBB = llvm::BasicBlock::Create(context.mContext);
+    context.mIrBuilder.CreateCondBr(left, thenBB, elseBB);
+
+    context.mIrBuilder.SetInsertPoint(thenBB);
+    auto [thenV, thenSign] = mOptExpr->Codegen(context);
+    context.mIrBuilder.CreateBr(endBB);
+
+    func->getBasicBlockList().push_back(elseBB);
+    context.mIrBuilder.SetInsertPoint(elseBB);
+    auto [elseV, elseSign] = mOptCondExpr->Codegen(context);
+    context.mIrBuilder.CreateBr(endBB);
+
+    func->getBasicBlockList().push_back(endBB);
+    context.mIrBuilder.SetInsertPoint(endBB);
+
+    auto *phi = context.mIrBuilder.CreatePHI(thenV->getType(), 2);
+    phi->addIncoming(thenV, thenBB);
+    phi->addIncoming(elseV, elseBB);
+
+    return {phi, thenSign | elseSign};
+  }
+  return {left, sign};
 }
 LLVMValueSignPair LogOrExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mLogAndExpr->Codegen(context);
+  for (auto &expr : mOptLogAndExps) {
+    if (left->getType()->isIntegerTy()) {
+      left = context.mIrBuilder.CreateICmpEQ(left, context.mIrBuilder.getInt32(0));
+    }else if (left->getType()->isFloatingPointTy()) {
+      left = context.mIrBuilder.CreateFCmpUEQ(left, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+    }
+    auto *func = context.mCurrentFunc;
+    auto *thenBB = llvm::BasicBlock::Create(context.mContext, "", func);
+    auto *elseBB = llvm::BasicBlock::Create(context.mContext);
+    auto *endBB = llvm::BasicBlock::Create(context.mContext);
+    context.mIrBuilder.CreateCondBr(left, thenBB, elseBB);
+
+    context.mIrBuilder.SetInsertPoint(thenBB);
+    auto [thenValue, thenSign] = expr->Codegen(context);
+    if (thenValue->getType()->isIntegerTy()) {
+      thenValue = context.mIrBuilder.CreateICmpNE(thenValue, context.mIrBuilder.getInt32(0));
+    }else if (thenValue->getType()->isFloatingPointTy()) {
+      thenValue = context.mIrBuilder.CreateFCmpUNE(thenValue, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+    }
+    thenValue = context.mIrBuilder.CreateZExt(thenValue, context.mIrBuilder.getInt32Ty());
+    context.mIrBuilder.CreateBr(endBB);
+
+    func->getBasicBlockList().push_back(elseBB);
+    context.mIrBuilder.SetInsertPoint(elseBB);
+    context.mIrBuilder.CreateBr(endBB);
+
+    func->getBasicBlockList().push_back(endBB);
+    context.mIrBuilder.SetInsertPoint(endBB);
+    auto *phi = context.mIrBuilder.CreatePHI(context.mIrBuilder.getInt32Ty(), 2);
+    phi->addIncoming(thenValue, thenBB);
+    phi->addIncoming(context.mIrBuilder.getInt32(1), elseBB);
+
+    left = phi;
+    sign = true;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair LogAndExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mBitOrExpr->Codegen(context);
+  for (auto &expr : mOptBitOrExps) {
+    if (left->getType()->isIntegerTy()) {
+      left = context.mIrBuilder.CreateICmpNE(left, context.mIrBuilder.getInt32(0));
+    }else if (left->getType()->isFloatingPointTy()) {
+      left = context.mIrBuilder.CreateFCmpUNE(left, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+    }
+    auto *func = context.mCurrentFunc;
+    auto *thenBB = llvm::BasicBlock::Create(context.mContext, "", func);
+    auto *elseBB = llvm::BasicBlock::Create(context.mContext);
+    auto *endBB = llvm::BasicBlock::Create(context.mContext);
+    context.mIrBuilder.CreateCondBr(left, thenBB, elseBB);
+
+    context.mIrBuilder.SetInsertPoint(thenBB);
+    auto [thenVal, thenSign] = expr->Codegen(context);
+    if (thenVal->getType()->isIntegerTy()) {
+      thenVal = context.mIrBuilder.CreateICmpNE(thenVal, context.mIrBuilder.getInt32(0));
+    }else if (left->getType()->isFloatingPointTy()) {
+      thenVal = context.mIrBuilder.CreateFCmpUNE(thenVal, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+    }
+    thenVal = context.mIrBuilder.CreateZExt(thenVal, context.mIrBuilder.getInt32Ty());
+    context.mIrBuilder.CreateBr(endBB);
+
+    func->getBasicBlockList().push_back(elseBB);
+    context.mIrBuilder.SetInsertPoint(elseBB);
+    context.mIrBuilder.CreateBr(endBB);
+
+    func->getBasicBlockList().push_back(endBB);
+    context.mIrBuilder.SetInsertPoint(endBB);
+    auto *phi = context.mIrBuilder.CreatePHI(context.mIrBuilder.getInt32Ty(), 2);
+    phi->addIncoming(thenVal, thenBB);
+    phi->addIncoming(context.mIrBuilder.getInt32(0), elseBB);
+
+    left = phi;
+    sign = true;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair BitOrExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mBitXorExpr->Codegen(context);
+  for (auto &expr : mOptBitXorExps) {
+    auto [newValue, newSign] = expr->Codegen(context);
+    left = context.mIrBuilder.CreateOr(left, newValue);
+    sign = sign | newSign;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair BitXorExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mBitAndExpr->Codegen(context);
+  for (auto &expr : mOptBitAndExps) {
+    auto [newValue, newSign] = expr->Codegen(context);
+    left = context.mIrBuilder.CreateXor(left, newValue);
+    sign = sign | newSign;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair BitAndExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mEqualExpr->Codegen(context);
+  for (auto &expr : mOptEqualExps) {
+    auto [newValue, newSign] = expr->Codegen(context);
+    left = context.mIrBuilder.CreateAnd(left, newValue);
+    sign = sign | newSign;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair EqualExpr::Codegen(lcc::CodeGenContext &context) const {
+  auto [left, sign] = mRelationalExpr->Codegen(context);
+  for (auto &expr : mOptRelationExps) {
+
+  }
   return {};
 }
 LLVMValueSignPair RelationalExpr::Codegen(lcc::CodeGenContext &context) const {

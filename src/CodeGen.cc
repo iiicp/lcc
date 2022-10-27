@@ -556,22 +556,180 @@ LLVMValueSignPair BitAndExpr::Codegen(lcc::CodeGenContext &context) const {
 }
 LLVMValueSignPair EqualExpr::Codegen(lcc::CodeGenContext &context) const {
   auto [left, sign] = mRelationalExpr->Codegen(context);
-  for (auto &expr : mOptRelationExps) {
-
+  for (auto &[op, expr] : mOptRelationExps) {
+    auto [right, rSign] = expr->Codegen(context);
+    switch (op) {
+      case lexer::TokenType::equal_equal: {
+        if (left->getType()->isIntegerTy()) {
+          left = context.mIrBuilder.CreateICmpEQ(left, right);
+        }else if (left->getType()->isFloatingPointTy()) {
+          left = context.mIrBuilder.CreateFCmpUEQ(left, right);
+        }
+        break;
+      }
+      case lexer::TokenType::pipe_equal: {
+        if (left->getType()->isIntegerTy()) {
+          left = context.mIrBuilder.CreateICmpNE(left, right);
+        }else if (left->getType()->isFloatingPointTy()) {
+          left = context.mIrBuilder.CreateFCmpUNE(left, right);
+        }
+        break;
+      }
+      default:
+        assert(0);
+    }
+    sign = true;
+    left = context.mIrBuilder.CreateZExt(left, context.mIrBuilder.getInt32Ty());
   }
-  return {};
+  return {left, sign};
 }
 LLVMValueSignPair RelationalExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mShiftExpr->Codegen(context);
+  for (auto&[op, expr] : mOptShiftExps) {
+    auto [right, rSign] = expr->Codegen(context);
+    switch (op) {
+    case lexer::TokenType::less: {
+      if (left->getType()->isIntegerTy()) {
+        if (sign) {
+          left = context.mIrBuilder.CreateICmpSLT(left, right);
+        }else {
+          left = context.mIrBuilder.CreateICmpULT(left, right);
+        }
+      }else if (left->getType()->isFloatingPointTy()) {
+        left = context.mIrBuilder.CreateFCmpULT(left, right);
+      }
+      break;
+    }
+    case lexer::TokenType::greater: {
+      if (left->getType()->isIntegerTy()) {
+        if (sign) {
+          left = context.mIrBuilder.CreateICmpSGT(left, right);
+        }else {
+          left = context.mIrBuilder.CreateICmpUGT(left, right);
+        }
+      }else if (left->getType()->isFloatingPointTy()) {
+        left = context.mIrBuilder.CreateFCmpUGT(left, right);
+      }
+      break;
+    }
+    case lexer::TokenType::less_equal: {
+      if (left->getType()->isIntegerTy()) {
+        if (sign) {
+          left = context.mIrBuilder.CreateICmpSLE(left, right);
+        }else {
+          left = context.mIrBuilder.CreateICmpULE(left, right);
+        }
+      }else if (left->getType()->isFloatingPointTy()) {
+        left = context.mIrBuilder.CreateFCmpULE(left, right);
+      }
+      break;
+    }
+    case lexer::TokenType::greater_equal: {
+      if (left->getType()->isIntegerTy()) {
+        if (sign) {
+          left = context.mIrBuilder.CreateICmpSGE(left, right);
+        }else {
+          left = context.mIrBuilder.CreateICmpUGE(left, right);
+        }
+      }else if (left->getType()->isFloatingPointTy()) {
+        left = context.mIrBuilder.CreateFCmpUGE(left, right);
+      }
+      break;
+    }
+    default:
+      assert(0);
+    }
+    sign = true;
+    left = context.mIrBuilder.CreateZExt(left, context.mIrBuilder.getInt32Ty());
+  }
+  return {left, sign};
 }
 LLVMValueSignPair ShiftExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mAdditiveExpr->Codegen(context);
+  for (auto &[op, expr] : mOptAdditiveExps) {
+    auto [right, rSign] = expr->Codegen(context);
+    switch (op) {
+    case lexer::TokenType::less_less: {
+      left = context.mIrBuilder.CreateShl(left, right);
+      break;
+    }
+    case lexer::TokenType::greater_greater: {
+      left = context.mIrBuilder.CreateAShr(left, right);
+      break;
+    }
+    default:
+      assert(0);
+    }
+    sign = sign | rSign;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair AdditiveExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mMultiExpr->Codegen(context);
+  for (auto &[op, expr] : mOptionalMultiExps) {
+    auto [right, rSign] = expr->Codegen(context);
+    switch (op) {
+    case lexer::TokenType::plus: {
+      if (left->getType()->isIntegerTy()) {
+        left = context.mIrBuilder.CreateAdd(left, right);
+      }else if (left->getType()->isFloatingPointTy()) {
+        left = context.mIrBuilder.CreateFAdd(left, right);
+      }
+      break;
+    }
+    case lexer::TokenType::minus: {
+      if (left->getType()->isIntegerTy())
+        left = context.mIrBuilder.CreateSub(left, right);
+      else if (left->getType()->isFloatingPointTy())
+        left = context.mIrBuilder.CreateFSub(left, right);
+      break;
+    }
+    default:
+      assert(0);
+    }
+    sign = sign | rSign;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair MultiExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  auto [left, sign] = mCastExpr->Codegen(context);
+  for (auto &[op, expr] : mOptCastExps) {
+    auto [right, rSign] = expr->Codegen(context);
+    switch (op) {
+    case lexer::TokenType::star: {
+      if (left->getType()->isIntegerTy()) {
+        left = context.mIrBuilder.CreateMul(left, right);
+      }else if (left->getType()->isFloatingPointTy()) {
+        left = context.mIrBuilder.CreateFMul(left, right);
+      }
+      break;
+    }
+    case lexer::TokenType::slash: {
+      if (left->getType()->isIntegerTy()) {
+        if (sign)
+          left = context.mIrBuilder.CreateSDiv(left, right);
+        else
+          left = context.mIrBuilder.CreateUDiv(left, right);
+      }else if (left->getType()->isFloatingPointTy())
+        left = context.mIrBuilder.CreateFDiv(left, right);
+      break;
+    }
+    case lexer::TokenType::percent: {
+      if (left->getType()->isIntegerTy()) {
+        if (sign)
+          left = context.mIrBuilder.CreateSRem(left, right);
+        else
+          left = context.mIrBuilder.CreateURem(left, right);
+      }else if (left->getType()->isFloatingPointTy())
+        left = context.mIrBuilder.CreateFRem(left, right);
+      break;
+    }
+    default:
+      assert(0);
+    }
+    sign = sign | rSign;
+  }
+  return {left, sign};
 }
 LLVMValueSignPair CastExpr::Codegen(lcc::CodeGenContext &context) const {
   return {};

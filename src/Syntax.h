@@ -193,66 +193,64 @@ public:
 class EqualExpr final : public Node {
 private:
   std::unique_ptr<RelationalExpr> mRelationalExpr;
-  lexer::TokenType mTokType;
-  std::vector<std::unique_ptr<RelationalExpr>> mOptRelationExps;
+  std::vector<std::pair<lexer::TokenType,std::unique_ptr<RelationalExpr>>> mOptRelationExps;
 
 public:
-  explicit EqualExpr(std::unique_ptr<RelationalExpr> &&relationalExpr,
-                     lexer::TokenType tokenType,
-                     std::vector<std::unique_ptr<RelationalExpr>>
-                         &&optRelationalExps) noexcept;
+  explicit EqualExpr(
+      std::unique_ptr<RelationalExpr> &&relationalExpr,
+      std::vector<std::pair<lexer::TokenType, std::unique_ptr<RelationalExpr>>>
+          &&optRelationalExps) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class RelationalExpr final : public Node {
 private:
   std::unique_ptr<ShiftExpr> mShiftExpr;
-  lexer::TokenType mTokType;
-  std::vector<std::unique_ptr<ShiftExpr>> mOptShiftExps;
+  std::vector<std::pair<lexer::TokenType,std::unique_ptr<ShiftExpr>>> mOptShiftExps;
 
 public:
   explicit RelationalExpr(
-      std::unique_ptr<ShiftExpr> &&shiftExpr, lexer::TokenType tokenType,
-      std::vector<std::unique_ptr<ShiftExpr>> &&optShiftExps) noexcept;
+      std::unique_ptr<ShiftExpr> &&shiftExpr,
+      std::vector<std::pair<lexer::TokenType, std::unique_ptr<ShiftExpr>>>
+          &&optShiftExps) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class ShiftExpr final : public Node {
 private:
   std::unique_ptr<AdditiveExpr> mAdditiveExpr;
-  lexer::TokenType mTokType;
-  std::vector<std::unique_ptr<AdditiveExpr>> mOptAdditiveExps;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<AdditiveExpr>>> mOptAdditiveExps;
 
 public:
   explicit ShiftExpr(
-      std::unique_ptr<AdditiveExpr> &&additiveExpr, lexer::TokenType tokenType,
-      std::vector<std::unique_ptr<AdditiveExpr>> &&optAdditiveExps) noexcept;
+      std::unique_ptr<AdditiveExpr> &&additiveExpr,
+      std::vector<std::pair<lexer::TokenType, std::unique_ptr<AdditiveExpr>>>
+          &&optAdditiveExps) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class AdditiveExpr final : public Node {
 private:
   std::unique_ptr<MultiExpr> mMultiExpr;
-  lexer::TokenType mTokType;
-  std::vector<std::unique_ptr<MultiExpr>> mOptionalMultiExps;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<MultiExpr>>> mOptionalMultiExps;
 
 public:
   explicit AdditiveExpr(
-      std::unique_ptr<MultiExpr> &&multiExpr, lexer::TokenType tokenType,
-      std::vector<std::unique_ptr<MultiExpr>> &&optionalMultiExps) noexcept;
+      std::unique_ptr<MultiExpr> &&multiExpr,
+      std::vector<std::pair<lexer::TokenType, std::unique_ptr<MultiExpr>>>
+          &&optionalMultiExps) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
 class MultiExpr final : public Node {
 private:
   std::unique_ptr<CastExpr> mCastExpr;
-  lexer::TokenType mTokType;
-  std::vector<std::unique_ptr<CastExpr>> mOptCastExps;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<CastExpr>>> mOptCastExps;
 
 public:
   explicit MultiExpr(
-      std::unique_ptr<CastExpr> &&castExpr, lexer::TokenType tokenType,
-      std::vector<std::unique_ptr<CastExpr>> &&optCastExps) noexcept;
+      std::unique_ptr<CastExpr> &&castExpr,
+      std::vector<std::pair<lexer::TokenType, std::unique_ptr<CastExpr>>> &&optCastExps) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 

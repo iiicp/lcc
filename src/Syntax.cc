@@ -28,7 +28,7 @@ AssignExpr::AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr,
                        lexer::TokenType tokenType,
                        std::unique_ptr<AssignExpr> &&assignExpr) noexcept
     : mCondExpr(std::move(condExpr)), mTokType(tokenType),
-      mAssignExpr(std::move(assignExpr)){}
+      mAssignExpr(std::move(assignExpr)) {}
 
 ConditionalExpr::ConditionalExpr(
     std::unique_ptr<LogOrExpr> &&logOrExpr, std::unique_ptr<Expr> &&optExpr,
@@ -67,34 +67,38 @@ BitAndExpr::BitAndExpr(
 }
 
 EqualExpr::EqualExpr(
-    std::unique_ptr<RelationalExpr> &&relationalExpr, lexer::TokenType tokenType,
-    std::vector<std::unique_ptr<RelationalExpr>> &&optRelationalExps) noexcept
-    : mRelationalExpr(std::move(relationalExpr)), mTokType(tokenType),
+    std::unique_ptr<RelationalExpr> &&relationalExpr,
+    std::vector<std::pair<lexer::TokenType, std::unique_ptr<RelationalExpr>>>
+        &&optRelationalExps) noexcept
+    : mRelationalExpr(std::move(relationalExpr)),
       mOptRelationExps(std::move(optRelationalExps)) {}
 
 RelationalExpr::RelationalExpr(
-    std::unique_ptr<ShiftExpr> &&shiftExpr, lexer::TokenType tokenType,
-    std::vector<std::unique_ptr<ShiftExpr>> &&optShiftExps) noexcept
-    : mShiftExpr(std::move(shiftExpr)), mTokType(tokenType),
-      mOptShiftExps(std::move(optShiftExps)) {}
+    std::unique_ptr<ShiftExpr> &&shiftExpr,
+    std::vector<std::pair<lexer::TokenType, std::unique_ptr<ShiftExpr>>>
+        &&optShiftExps) noexcept
+    : mShiftExpr(std::move(shiftExpr)), mOptShiftExps(std::move(optShiftExps)) {
+}
 
 ShiftExpr::ShiftExpr(
-    std::unique_ptr<AdditiveExpr> &&additiveExpr, lexer::TokenType tokenType,
-    std::vector<std::unique_ptr<AdditiveExpr>> &&optAdditiveExps) noexcept
-    : mAdditiveExpr(std::move(additiveExpr)), mTokType(tokenType),
+    std::unique_ptr<AdditiveExpr> &&additiveExpr,
+    std::vector<std::pair<lexer::TokenType, std::unique_ptr<AdditiveExpr>>>
+        &&optAdditiveExps) noexcept
+    : mAdditiveExpr(std::move(additiveExpr)),
       mOptAdditiveExps(std::move(optAdditiveExps)) {}
 
 AdditiveExpr::AdditiveExpr(
-    std::unique_ptr<MultiExpr> &&multiExpr, lexer::TokenType tokenType,
-    std::vector<std::unique_ptr<MultiExpr>> &&optionalMultiExps) noexcept
-    : mMultiExpr(std::move(multiExpr)), mTokType(tokenType),
+    std::unique_ptr<MultiExpr> &&multiExpr,
+    std::vector<std::pair<lexer::TokenType, std::unique_ptr<MultiExpr>>>
+        &&optionalMultiExps) noexcept
+    : mMultiExpr(std::move(multiExpr)),
       mOptionalMultiExps(std::move(optionalMultiExps)) {}
 
 MultiExpr::MultiExpr(
-    std::unique_ptr<CastExpr> &&castExpr, lexer::TokenType tokenType,
-    std::vector<std::unique_ptr<CastExpr>> &&optCastExps) noexcept
-    : mCastExpr(std::move(castExpr)), mTokType(tokenType),
-      mOptCastExps(std::move(optCastExps)) {}
+    std::unique_ptr<CastExpr> &&castExpr,
+    std::vector<std::pair<lexer::TokenType, std::unique_ptr<CastExpr>>>
+        &&optCastExps) noexcept
+    : mCastExpr(std::move(castExpr)), mOptCastExps(std::move(optCastExps)) {}
 
 CastExpr::CastExpr(std::unique_ptr<UnaryExpr> &&unaryExpr) noexcept
     : mUnaryExpr(std::move(unaryExpr)), mCategory(CastExprCategory::Unary),
@@ -105,8 +109,10 @@ CastExpr::CastExpr(std::unique_ptr<Type> &&type,
     : mUnaryExpr(nullptr), mCategory(CastExprCategory::LeftParent),
       mType(std::move(type)), mCastExpr(std::move(castExpr)) {}
 
-PostFixExpr::PostFixExpr(std::unique_ptr<PrimaryExpr> && primaryExpr, std::vector<Variant> && optVariant) noexcept
-: mPrimaryExpr(std::move(primaryExpr)), mOptVariants(std::move(optVariant)) {}
+PostFixExpr::PostFixExpr(std::unique_ptr<PrimaryExpr> &&primaryExpr,
+                         std::vector<Variant> &&optVariant) noexcept
+    : mPrimaryExpr(std::move(primaryExpr)),
+      mOptVariants(std::move(optVariant)) {}
 
 ExprStmt::ExprStmt(std::unique_ptr<Expr> &&optExpr) noexcept
     : mOptExpr(std::move(optExpr)) {}
@@ -143,7 +149,7 @@ ForDeclarationStmt::ForDeclarationStmt(std::unique_ptr<Declaration> &&initDecl,
       mPostExpr(std::move(postExpr)), mStmt(std::move(stmt)) {}
 
 ReturnStmt::ReturnStmt(std::unique_ptr<Expr> &&optExpr) noexcept
-: mOptExpr(std::move(optExpr)) {}
+    : mOptExpr(std::move(optExpr)) {}
 
 BlockStmt::BlockStmt(std::vector<std::unique_ptr<Stmt>> &&stmts) noexcept
     : mStmts(std::move(stmts)) {}
@@ -161,6 +167,5 @@ GlobalDecl::GlobalDecl(std::unique_ptr<Type> &&type, std::string name,
 
 Program::Program(
     std::vector<std::unique_ptr<ExternalDeclaration>> &&externalDecl) noexcept
-    : mExternalDecl(std::move(externalDecl)) {
-}
+    : mExternalDecl(std::move(externalDecl)) {}
 } // namespace lcc::parser

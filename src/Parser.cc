@@ -392,64 +392,59 @@ std::unique_ptr<BitAndExpr> Parser::ParseBitAndExpr() {
 
 std::unique_ptr<EqualExpr> Parser::ParseEqualExpr() {
   auto expr = ParseRelationalExpr();
-  lexer::TokenType tokenType = lexer::unknown;
-  std::vector<std::unique_ptr<RelationalExpr>> relationalExprArr;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<RelationalExpr>>> relationalExprArr;
   while(mTokCursor->GetTokenType() == lexer::equal_equal
          ||mTokCursor->GetTokenType() == lexer::exclaim_equal) {
-    tokenType = mTokCursor->GetTokenType();
+    lexer::TokenType tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
-    relationalExprArr.push_back(ParseRelationalExpr());
+    relationalExprArr.push_back({tokenType, ParseRelationalExpr()});
   }
-  return std::make_unique<EqualExpr>(std::move(expr), tokenType, std::move(relationalExprArr));
+  return std::make_unique<EqualExpr>(std::move(expr), std::move(relationalExprArr));
 }
 
 std::unique_ptr<RelationalExpr>  Parser::ParseRelationalExpr() {
   auto expr = ParseShiftExpr();
-  lexer::TokenType tokenType = lexer::unknown;
-  std::vector<std::unique_ptr<ShiftExpr>> relationalExprArr;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<ShiftExpr>>> relationalExprArr;
   while (mTokCursor->GetTokenType() == lexer::less || mTokCursor->GetTokenType() == lexer::less_equal
          || mTokCursor->GetTokenType() == lexer::greater || mTokCursor->GetTokenType() == lexer::greater_equal) {
-    tokenType = mTokCursor->GetTokenType();
+    lexer::TokenType tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
-    relationalExprArr.push_back(ParseShiftExpr());
+    relationalExprArr.push_back({tokenType, ParseShiftExpr()});
   }
-  return std::make_unique<RelationalExpr>(std::move(expr), tokenType, std::move(relationalExprArr));
+  return std::make_unique<RelationalExpr>(std::move(expr), std::move(relationalExprArr));
 }
 
 std::unique_ptr<ShiftExpr> Parser::ParseShiftExpr() {
   auto expr = ParseAdditiveExpr();
-  lexer::TokenType tokenType = lexer::unknown;
-  std::vector<std::unique_ptr<AdditiveExpr>> additiveExprArr;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<AdditiveExpr>>> additiveExprArr;
   while (mTokCursor->GetTokenType() == lexer::less_less || mTokCursor->GetTokenType() == lexer::greater_greater) {
-    tokenType = mTokCursor->GetTokenType();
+    lexer::TokenType tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
-    additiveExprArr.push_back(ParseAdditiveExpr());
+    additiveExprArr.push_back({tokenType, ParseAdditiveExpr()});
   }
-  return std::make_unique<ShiftExpr>(std::move(expr), tokenType, std::move(additiveExprArr));
+  return std::make_unique<ShiftExpr>(std::move(expr), std::move(additiveExprArr));
 }
 
 std::unique_ptr<AdditiveExpr> Parser::ParseAdditiveExpr() {
   auto expr = ParseMultiExpr();
-  lexer::TokenType tokenType = lexer::unknown;
-  std::vector<std::unique_ptr<MultiExpr>> multiExprArr;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<MultiExpr>>> multiExprArr;
   while (mTokCursor->GetTokenType() == lexer::plus || mTokCursor->GetTokenType() == lexer::minus) {
-    tokenType = mTokCursor->GetTokenType();
+    lexer::TokenType tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
-    multiExprArr.push_back(ParseMultiExpr());
+    multiExprArr.push_back({tokenType, ParseMultiExpr()});
   }
-  return std::make_unique<AdditiveExpr>(std::move(expr), tokenType, std::move(multiExprArr));
+  return std::make_unique<AdditiveExpr>(std::move(expr), std::move(multiExprArr));
 }
 
 std::unique_ptr<MultiExpr> Parser::ParseMultiExpr() {
   auto expr = ParseCastExpr();
-  lexer::TokenType tokenType = lexer::unknown;
-  std::vector<std::unique_ptr<CastExpr>> castExprArr;
+  std::vector<std::pair<lexer::TokenType, std::unique_ptr<CastExpr>>> castExprArr;
   while (mTokCursor->GetTokenType() == lexer::star || mTokCursor->GetTokenType() == lexer::slash || mTokCursor->GetTokenType() == lexer::percent) {
-    tokenType = mTokCursor->GetTokenType();
+    lexer::TokenType tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
-    castExprArr.push_back(ParseCastExpr());
+    castExprArr.push_back({tokenType, ParseCastExpr()});
   }
-  return std::make_unique<MultiExpr>(std::move(expr), tokenType, std::move(castExprArr));
+  return std::make_unique<MultiExpr>(std::move(expr), std::move(castExprArr));
 }
 
 std::unique_ptr<CastExpr> Parser::ParseCastExpr() {

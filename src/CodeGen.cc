@@ -181,6 +181,9 @@ LLVMValueSignPair WhileStmt::Codegen(lcc::CodeGenContext &context) const {
   auto *condBB = llvm::BasicBlock::Create(context.mContext, "", context.mCurrentFunc);
   auto *bodyBB = llvm::BasicBlock::Create(context.mContext);
   auto *endBB = llvm::BasicBlock::Create(context.mContext);
+  context.mBreaks.push_back(endBB);
+  context.mContinues.push_back(condBB);
+
   context.mIrBuilder.CreateBr(condBB);
   context.mIrBuilder.SetInsertPoint(condBB);
   auto [value, sign] = mExpr->Codegen(context);
@@ -195,15 +198,19 @@ LLVMValueSignPair WhileStmt::Codegen(lcc::CodeGenContext &context) const {
   context.mIrBuilder.SetInsertPoint(bodyBB);
   mStmt->Codegen(context);
   context.mIrBuilder.CreateBr(condBB);
-
   context.mCurrentFunc->getBasicBlockList().push_back(endBB);
   context.mIrBuilder.SetInsertPoint(endBB);
+
+  context.mBreaks.pop_back();
+  context.mContinues.pop_back();
   return {nullptr, false};
 }
 LLVMValueSignPair DoWhileStmt::Codegen(lcc::CodeGenContext &context) const {
   auto *bodyBB = llvm::BasicBlock::Create(context.mContext, "", context.mCurrentFunc);
   auto *condBB = llvm::BasicBlock::Create(context.mContext, "");
   auto *endBB = llvm::BasicBlock::Create(context.mContext);
+  context.mBreaks.push_back(endBB);
+  context.mContinues.push_back(condBB);
 
   context.mIrBuilder.CreateBr(bodyBB);
   context.mIrBuilder.SetInsertPoint(bodyBB);
@@ -222,6 +229,9 @@ LLVMValueSignPair DoWhileStmt::Codegen(lcc::CodeGenContext &context) const {
 
   context.mCurrentFunc->getBasicBlockList().push_back(endBB);
   context.mIrBuilder.SetInsertPoint(endBB);
+
+  context.mBreaks.pop_back();
+  context.mContinues.pop_back();
   return {nullptr, false};
 }
 
@@ -235,6 +245,9 @@ void GenForIR(const lcc::parser::Expr *cond,
   auto *bodyBB = llvm::BasicBlock::Create(context.mContext);
   auto *postBB = llvm::BasicBlock::Create(context.mContext);
   auto *endBB = llvm::BasicBlock::Create(context.mContext);
+  context.mBreaks.push_back(endBB);
+  context.mContinues.push_back(condBB);
+
   context.mIrBuilder.CreateBr(condBB);
   context.mIrBuilder.SetInsertPoint(condBB);
   auto [value, sign] = cond ? cond->Codegen(context) : LLVMValueSignPair{context.mIrBuilder.getInt32(1), true};
@@ -256,6 +269,9 @@ void GenForIR(const lcc::parser::Expr *cond,
   context.mIrBuilder.CreateBr(condBB);
   function->getBasicBlockList().push_back(endBB);
   context.mIrBuilder.SetInsertPoint(endBB);
+
+  context.mBreaks.pop_back();
+  context.mContinues.pop_back();
 }
 }
 
@@ -283,14 +299,12 @@ LLVMValueSignPair ReturnStmt::Codegen(lcc::CodeGenContext &context) const {
   return {value, sign};
 }
 LLVMValueSignPair BreakStmt::Codegen(lcc::CodeGenContext &context) const {
-  // todo
-  //context.mIrBuilder.CreateBr();
-  return {};
+  context.mIrBuilder.CreateBr(context.mBreaks.back());
+  return {nullptr, false};
 }
 LLVMValueSignPair ContinueStmt::Codegen(lcc::CodeGenContext &context) const {
-  // todo
-  //context.mIrBuilder.CreateBr();
-  return {};
+  context.mIrBuilder.CreateBr(context.mContinues.back());
+  return {nullptr, false};
 }
 LLVMValueSignPair Declaration::Codegen(lcc::CodeGenContext &context) const {
   LLVMTypePtr allocaType = mType->TypeGen(context);

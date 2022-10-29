@@ -27,6 +27,10 @@ public:
   std::unique_ptr<llvm::Module> mModule;
   llvm::IRBuilder<> mIrBuilder{mContext};
 
+  std::vector<llvm::BasicBlock *> mBreaks;
+  std::vector<llvm::BasicBlock *> mContinues;
+
+
   llvm::Function *mCurrentFunc;
 };
 } // namespace lcc::parser

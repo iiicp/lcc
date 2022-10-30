@@ -11,6 +11,13 @@
  ***********************************/
 #include "CodeGen.h"
 namespace lcc::parser{
+namespace {
+template<typename ... Ts>
+struct Overload : Ts ... {
+  using Ts::operator() ...;
+};
+template<class... Ts> Overload(Ts...) -> Overload<Ts...>;
+}
 bool PrimaryType::IsSigned() const {
   return mSign;
 }
@@ -96,6 +103,7 @@ LLVMValueSignPair GlobalDecl::Codegen(lcc::CodeGenContext &context) const {
   context.mModule->getOrInsertGlobal(mName, type);
   auto *globalVar = context.mModule->getGlobalVariable(mName);
   globalVar->setInitializer(llvm::cast<llvm::Constant>(constant));
+  context.AddGlobal(mName, {globalVar, sign});
   return {constant, sign};
 }
 LLVMValueSignPair Function::Codegen(lcc::CodeGenContext &context) const {
@@ -120,11 +128,16 @@ LLVMValueSignPair Function::Codegen(lcc::CodeGenContext &context) const {
     return {func, false};
 
   context.mCurrentFunc = func;
+  context.AddGlobal(mName, {func, false});
+  context.ClearScope();
   auto *entryBB = llvm::BasicBlock::Create(context.mContext, "entry", func);
   context.mIrBuilder.SetInsertPoint(entryBB);
+  i = -1;
   for (auto &iter : func->args()) {
-    auto *address = context.mIrBuilder.CreateAlloca(iter.getType(), nullptr, iter.getName());
+    ++i;
+    auto *address = context.mIrBuilder.CreateAlloca(iter.getType());
     context.mIrBuilder.CreateStore(&iter, address);
+    context.AddLocal(paramName[i], {address, true});
   }
   mOptBlockStmt->Codegen(context);
 
@@ -143,8 +156,10 @@ LLVMValueSignPair Function::Codegen(lcc::CodeGenContext &context) const {
   return {func, false};
 }
 LLVMValueSignPair BlockStmt::Codegen(lcc::CodeGenContext &context) const {
+  context.PushScope();
   for (auto &stmt : mStmts)
     stmt->Codegen(context);
+  context.PopScope();
   return {nullptr, false};
 }
 LLVMValueSignPair IfStmt::Codegen(lcc::CodeGenContext &context) const {
@@ -284,9 +299,11 @@ LLVMValueSignPair ForStmt::Codegen(lcc::CodeGenContext &context) const {
 }
 LLVMValueSignPair
 ForDeclarationStmt::Codegen(lcc::CodeGenContext &context) const {
+  context.PushScope();
   if (mInitDecl)
     mInitDecl->Codegen(context);
   GenForIR(mControlExpr.get(), mPostExpr.get(), mStmt.get(), context);
+  context.PopScope();
   return {nullptr, false};
 }
 LLVMValueSignPair ExprStmt::Codegen(lcc::CodeGenContext &context) const {
@@ -308,11 +325,13 @@ LLVMValueSignPair ContinueStmt::Codegen(lcc::CodeGenContext &context) const {
 }
 LLVMValueSignPair Declaration::Codegen(lcc::CodeGenContext &context) const {
   LLVMTypePtr allocaType = mType->TypeGen(context);
-  auto *alloca = context.mIrBuilder.CreateAlloca(allocaType, nullptr, mName);
+  llvm::IRBuilder<> tmp(&context.mCurrentFunc->getEntryBlock(), context.mCurrentFunc->getEntryBlock().begin());
+  auto *alloca = tmp.CreateAlloca(allocaType, nullptr, mName);
   if (mOptValue) {
     auto [value, sign] = mOptValue->Codegen(context);
     context.mIrBuilder.CreateStore(value, alloca);
   }
+  context.AddLocal(mName, {alloca, true});
   return {alloca, mType->IsSigned()};
 }
 LLVMValueSignPair Expr::Codegen(lcc::CodeGenContext &context) const {
@@ -424,10 +443,11 @@ LLVMValueSignPair AssignExpr::Codegen(lcc::CodeGenContext &context) const {
     context.mIrBuilder.CreateStore(currentVal, left);
     break;
   }
-  default:
-    assert(0);
+//  default:
+//    assert(0);
   }
-  return {currentVal, sign};
+  /// todo ????
+  return {context.mIrBuilder.CreateLoad(left->getType(), left), sign};
 }
 LLVMValueSignPair ConditionalExpr::Codegen(lcc::CodeGenContext &context) const {
   auto [left, sign] = mLogOrExpr->Codegen(context);
@@ -746,19 +766,245 @@ LLVMValueSignPair MultiExpr::Codegen(lcc::CodeGenContext &context) const {
   return {left, sign};
 }
 LLVMValueSignPair CastExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  return std::visit(
+        Overload{
+          [&context](const std::unique_ptr<UnaryExpr> & unaryExpr) -> LLVMValueSignPair {
+            return unaryExpr->Codegen(context);
+          },
+          [&context](const std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>& typeCast) -> LLVMValueSignPair  {
+            // todo type cast
+            return typeCast.second->Codegen(context);
+          }
+      },
+      mVariant);
 }
 LLVMValueSignPair UnaryExpr::Codegen(lcc::CodeGenContext &context) const {
+  return std::visit(
+      Overload{
+          [&context](const std::unique_ptr<UnaryExprUnaryOperator> &unaryExprUnaryOperator) -> LLVMValueSignPair  {
+            return unaryExprUnaryOperator->Codegen(context);
+          },
+          [&context](const std::unique_ptr<UnaryExprSizeOf> &unaryExprSizeOf) -> LLVMValueSignPair {
+            return unaryExprSizeOf->Codegen(context);
+          },
+          [&context](const std::unique_ptr<UnaryExprPostFixExpr> &unaryExprPostFixExpr) -> LLVMValueSignPair {
+            return unaryExprPostFixExpr->Codegen(context);
+          }
+      }, mVariant);
+}
+LLVMValueSignPair UnaryExprUnaryOperator::Codegen(lcc::CodeGenContext &context) const {
+  auto [value, sign] = mUnaryExpr->Codegen(context);
+  switch (mTok) {
+  case lexer::amp: {
+    auto loadInst = llvm::cast<llvm::LoadInst>(value);
+    assert(loadInst);
+    return {loadInst->getPointerOperand(), sign};
+  }
+  case lexer::star: {
+//    auto pointType = llvm::cast<llvm::PointerType>(value->getType());
+//    assert(pointType);
+//    return {context.mIrBuilder.CreateLoad(pointType->getPointerElementType(),value), sign};
+      return {context.mIrBuilder.CreateLoad(value->getType(), value), sign};
+  }
+  case lexer::plus: {
+    return {value, sign};
+  }
+  case lexer::minus: {
+    if (value->getType()->isIntegerTy()) {
+      return {context.mIrBuilder.CreateNeg(value), true};
+    }else {
+      return {context.mIrBuilder.CreateFNeg(value), true};
+    }
+  }
+  case lexer::tilde: {
+    assert(value->getType()->isIntegerTy());
+    return {context.mIrBuilder.CreateNot(value), sign};
+  }
+  case lexer::exclaim: {
+    if (value->getType()->isIntegerTy()) {
+      value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
+    }else if (value->getType()->isFloatingPointTy()) {
+      value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(value->getType(), 0));
+    }else {
+      assert(0);
+    }
+    return {context.mIrBuilder.CreateZExt(context.mIrBuilder.CreateNot(value), context.mIrBuilder.getInt32Ty()), sign};
+  }
+  case lexer::plus_plus: {
+    return {nullptr, false};
+  }
+  case lexer::minus_minus: {
+    return {nullptr, false};
+  }
+  default:
+    assert(0);
+  }
+  return {nullptr, false};
+}
+LLVMValueSignPair UnaryExprSizeOf::Codegen(lcc::CodeGenContext &context) const {
+  // todo
   return {};
+}
+LLVMValueSignPair UnaryExprPostFixExpr::Codegen(lcc::CodeGenContext &context) const {
+  return mPostExpr->Codegen(context);
 }
 LLVMValueSignPair PostFixExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  return std::visit(
+      Overload{
+          [&context](
+              const std::unique_ptr<PostFixExprDecrement> &postFixExprDecrement)
+              -> LLVMValueSignPair {
+            return postFixExprDecrement->Codegen(context);
+          },
+          [&context](
+              const std::unique_ptr<PostFixExprIncrement> &postFixExprIncrement)
+              -> LLVMValueSignPair {
+            return postFixExprIncrement->Codegen(context);
+          },
+          [&context](const std::unique_ptr<PostFixExprArrow> &postFixExprArrow)
+              -> LLVMValueSignPair {
+            return postFixExprArrow->Codegen(context);
+          },
+          [&context](const std::unique_ptr<PostFixExprDot> &postFixExprDot)
+              -> LLVMValueSignPair { return postFixExprDot->Codegen(context); },
+          [&context](
+              const std::unique_ptr<PostFixExprSubscript> &postFixExprSubscript)
+              -> LLVMValueSignPair {
+            return postFixExprSubscript->Codegen(context);
+          },
+          [&context](
+              const std::unique_ptr<PostFixExprFuncCall> &postFixExprFuncCall)
+              -> LLVMValueSignPair {
+            return postFixExprFuncCall->Codegen(context);
+          },
+          [&context](
+              const std::unique_ptr<PostFixExprPrimary> &postFixExprPrimary)
+              -> LLVMValueSignPair {
+            return postFixExprPrimary->Codegen(context);
+          },
+      },
+      mVariant);
+}
+LLVMValueSignPair PostFixExprDecrement::Codegen(lcc::CodeGenContext &context) const {
+  return { nullptr, false };
+}
+LLVMValueSignPair PostFixExprIncrement::Codegen(lcc::CodeGenContext &context) const {
+  return { nullptr, false };
+}
+LLVMValueSignPair PostFixExprArrow::Codegen(lcc::CodeGenContext &context) const {
+  return { nullptr, false };
+}
+LLVMValueSignPair PostFixExprDot::Codegen(lcc::CodeGenContext &context) const {
+  return { nullptr, false };
+}
+LLVMValueSignPair
+PostFixExprSubscript::Codegen(lcc::CodeGenContext &context) const {
+  return { nullptr, false };
+}
+LLVMValueSignPair PostFixExprFuncCall::Codegen(lcc::CodeGenContext &context) const {
+  auto [value, sign] = mPostFixExpr->Codegen(context);
+  std::vector<llvm::Value *> arguments;
+  for (auto &assignExpr : mOptParams) {
+    arguments.push_back(assignExpr->Codegen(context).first);
+  }
+  auto &func = llvm::cast<llvm::Function>(*value);
+  return {context.mIrBuilder.CreateCall(func.getFunctionType(), &func, arguments), false};
+}
+LLVMValueSignPair PostFixExprPrimary::Codegen(lcc::CodeGenContext &context) const {
+  return mPrimaryExpr->Codegen(context);
 }
 LLVMValueSignPair PrimaryExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  return std::visit(
+      Overload{
+          [&context](
+              const std::unique_ptr<PrimaryExprConstant> &primaryExprConstant)
+              -> LLVMValueSignPair {
+            return primaryExprConstant->Codegen(context);
+          },
+          [&context](
+              const std::unique_ptr<PrimaryExprIdentifier> &primaryExprIdentifier)
+              -> LLVMValueSignPair {
+            return primaryExprIdentifier->Codegen(context);
+          },
+          [&context](const std::unique_ptr<PrimaryExprParent> &primaryExprParent)
+              -> LLVMValueSignPair {
+            return primaryExprParent->Codegen(context);
+          }
+      },
+      mVariant);
+}
+LLVMValueSignPair PrimaryExprIdentifier::Codegen(lcc::CodeGenContext &context) const {
+  auto [value, sign] = context.FindVar(mIdentifier);
+  assert(value);
+  if (llvm::isa<llvm::Function>(*value)) {
+    return {value, sign};
+  }
+  return {context.mIrBuilder.CreateLoad(llvm::cast<llvm::PointerType>(value->getType())->getPointerElementType(), value), sign};
+}
+LLVMValueSignPair PrimaryExprConstant::Codegen(lcc::CodeGenContext &context) const {
+  return std::visit(
+      Overload{
+          [&context](int32_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt32(value), true};
+          },
+          [&context](int64_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt64(value), true};
+          },
+          [&context](uint32_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt32(value), false};
+          },
+          [&context](uint64_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt64(value), false};
+          },
+          [&context](float value) -> LLVMValueSignPair {
+            return {
+                llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), value),
+                true};
+          },
+          [&context](double value) -> LLVMValueSignPair {
+            return {
+                llvm::ConstantFP::get(context.mIrBuilder.getDoubleTy(), value),
+                true};
+          },
+          [&context](const std::string &value) -> LLVMValueSignPair {
+            return {nullptr, false};
+          },
+      },
+      mVariant);
+}
+LLVMValueSignPair PrimaryExprParent::Codegen(lcc::CodeGenContext &context) const {
+  return mExpr->Codegen(context);
 }
 LLVMValueSignPair ConstantExpr::Codegen(lcc::CodeGenContext &context) const {
-  return {};
+  return std::visit(
+      Overload{
+          [&context](int32_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt32(value), true};
+          },
+          [&context](int64_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt64(value), true};
+          },
+          [&context](uint32_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt32(value), false};
+          },
+          [&context](uint64_t value) -> LLVMValueSignPair {
+            return {context.mIrBuilder.getInt64(value), false};
+          },
+          [&context](float value) -> LLVMValueSignPair {
+            return {
+                llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), value),
+                true};
+          },
+          [&context](double value) -> LLVMValueSignPair {
+            return {
+                llvm::ConstantFP::get(context.mIrBuilder.getDoubleTy(), value),
+                true};
+          },
+          [&context](const std::string &value) -> LLVMValueSignPair {
+            return {nullptr, false};
+          },
+      },
+      mValue);
 }
 }
 namespace lcc::codegen {

@@ -60,22 +60,52 @@ public:
   virtual LLVMValueSignPair Codegen(CodeGenContext &context) const = 0;
 };
 
-class AssignExpr;
-class ConditionalExpr;
-class UnaryExpr;
-class LogOrExpr;
-class LogAndExpr;
-class BitOrExpr;
-class BitXorExpr;
-class BitAndExpr;
-class EqualExpr;
-class RelationalExpr;
-class ShiftExpr;
-class AdditiveExpr;
-class MultiExpr;
-class CastExpr;
-class PostFixExpr;
+class PrimaryExprIdentifier;
+class PrimaryExprConstant;
+class PrimaryExprParent;
 class PrimaryExpr;
+class PostFixExprSubscript;
+class PostFixExprIncrement;
+class PostFixExprDecrement;
+class PostFixExprDot;
+class PostFixExprArrow;
+class PostFixExprFuncCall;
+class PostFixExprPrimary;
+class PostFixExpr;
+class UnaryExprPostFixExpr;
+class UnaryExprUnaryOperator;
+class UnaryExprSizeOf;
+class UnaryExpr;
+class CastExpr;
+class MultiExpr;
+class AdditiveExpr;
+class ShiftExpr;
+class RelationalExpr;
+class EqualExpr;
+class BitAndExpr;
+class BitXorExpr;
+class BitOrExpr;
+class LogAndExpr;
+class LogOrExpr;
+class ConditionalExpr;
+class AssignExpr;
+class Expr;
+class ExprStmt;
+class IfStmt;
+class DoWhileStmt;
+class WhileStmt;
+class ForStmt;
+class Declaration;
+class ForDeclarationStmt;
+class BreakStmt;
+class ContinueStmt;
+class ReturnStmt;
+class BlockStmt;
+class Stmt;
+class Function;
+class GlobalDecl;
+class ExternalDeclaration;
+class Program;
 
 class Expr final : public Node {
 private:
@@ -254,108 +284,168 @@ public:
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
-enum class CastExprCategory { Unary, LeftParent };
 
 class CastExpr final : public Node {
-private:
-  CastExprCategory mCategory;
-  std::unique_ptr<UnaryExpr> mUnaryExpr;
-  std::unique_ptr<Type> mType;
-  std::unique_ptr<CastExpr> mCastExpr;
-
+  using Variant = std::variant<std::unique_ptr<UnaryExpr>,
+                               std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>>;
 public:
-  explicit CastExpr(std::unique_ptr<UnaryExpr> &&unaryExpr) noexcept;
-  explicit CastExpr(std::unique_ptr<Type> &&type,
-                    std::unique_ptr<CastExpr> &&castExpr) noexcept;
+  Variant mVariant;
+public:
+  explicit CastExpr(Variant &&unaryOrCast) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
+};
+
+class UnaryExprUnaryOperator final : public Node {
+private:
+  lexer::TokenType mTok;
+  std::unique_ptr<UnaryExpr> mUnaryExpr;
+public:
+  explicit UnaryExprUnaryOperator(
+      lexer::TokenType tokTy,
+      std::unique_ptr<UnaryExpr> && unaryExpr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class UnaryExprPostFixExpr final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostExpr;
+public:
+  explicit UnaryExprPostFixExpr(std::unique_ptr<PostFixExpr> && postExpr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class UnaryExprSizeOf final : public Node {
+  using Variant = std::variant<std::unique_ptr<UnaryExpr>, std::shared_ptr<Type>>;
+  Variant mUnaryOrType;
+public:
+    explicit UnaryExprSizeOf(Variant &&variant) noexcept;
+    LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
 };
 
 class UnaryExpr final : public Node {
+  using Variant = std::variant<
+      std::unique_ptr<UnaryExprPostFixExpr>,
+      std::unique_ptr<UnaryExprUnaryOperator>,
+      std::unique_ptr<UnaryExprSizeOf>>;
+  Variant mVariant;
 public:
-  struct PreIncTag {
-    std::unique_ptr<UnaryExpr> mUnaryExpr;
-  };
-
-  struct PreDecTag {
-    std::unique_ptr<UnaryExpr> mUnaryExpr;
-  };
-
-  struct UnaryOpTag {
-    lexer::TokenType mTokType;
-    std::unique_ptr<CastExpr> mCastExpr;
-  };
-
-  struct SizeofUnaryTag {
-    std::unique_ptr<UnaryExpr> mUnaryExpr;
-  };
-
-  struct SizeofTypeTag {
-    std::unique_ptr<Type> mType;
-  };
-
-  struct PostFixTag {
-    std::unique_ptr<PostFixExpr> mPostFixExpr;
-  };
-
-private:
-  using Variant = std::variant<PreIncTag, PreDecTag, UnaryOpTag, SizeofUnaryTag,
-                               SizeofTypeTag, PostFixTag>;
-  Variant mTag;
-
-public:
-  template <typename T>
-  explicit UnaryExpr(T &&tag) noexcept : mTag(std::forward<T>(tag)) {}
+  explicit UnaryExpr(Variant &&variant) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
+};
+
+class PostFixExprPrimary final : public Node {
+private:
+  std::unique_ptr<PrimaryExpr> mPrimaryExpr;
+public:
+  explicit PostFixExprPrimary(std::unique_ptr<PrimaryExpr> && primaryExpr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PostFixExprSubscript final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostFixExpr;
+  std::unique_ptr<Expr> mExpr;
+public:
+  explicit PostFixExprSubscript(std::unique_ptr<PostFixExpr> && postFixExpr,
+                               std::unique_ptr<Expr> && expr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PostFixExprDot final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostFixExpr;
+  std::string mIdentifier;
+public:
+  explicit PostFixExprDot(std::unique_ptr<PostFixExpr> && postFixExpr,
+                          std::string identifier) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PostFixExprArrow final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostFixExpr;
+  std::string mIdentifier;
+public:
+  explicit PostFixExprArrow(std::unique_ptr<PostFixExpr> && postFixExpr,
+                            std::string identifier) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PostFixExprFuncCall final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostFixExpr;
+  std::vector<std::unique_ptr<AssignExpr>> mOptParams;
+public:
+  explicit PostFixExprFuncCall(std::unique_ptr<PostFixExpr> && postFixExpr,
+                               std::vector<std::unique_ptr<AssignExpr>> && optParams) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PostFixExprIncrement final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostFixExpr;
+public:
+  explicit PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PostFixExprDecrement final : public Node {
+private:
+  std::unique_ptr<PostFixExpr> mPostFixExpr;
+public:
+  explicit PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
 };
 
 class PostFixExpr final : public Node {
+  using Variant = std::variant<
+        std::unique_ptr<PostFixExprPrimary>,
+        std::unique_ptr<PostFixExprSubscript>,
+        std::unique_ptr<PostFixExprDot>,
+        std::unique_ptr<PostFixExprArrow>,
+        std::unique_ptr<PostFixExprFuncCall>,
+        std::unique_ptr<PostFixExprIncrement>,
+        std::unique_ptr<PostFixExprDecrement>>;
+  Variant mVariant;
 public:
-  struct ArrayIndexTag {
-    std::unique_ptr<Expr> mExpr;
-  };
-  struct FuncCallTag {
-    std::vector<std::unique_ptr<AssignExpr>> mOptParams;
-  };
-  struct MemberDotTag {
-    std::string mIdentifier;
-  };
-  struct MemberArrowTag {
-    std::string mIdentifier;
-  };
-  struct PostIncTag {};
-  struct PostDecTag {};
-  using Variant = std::variant<ArrayIndexTag, FuncCallTag, MemberDotTag,
-                               MemberArrowTag, PostIncTag, PostDecTag>;
-
-private:
-  std::vector<Variant> mOptVariants;
-  std::unique_ptr<PrimaryExpr> mPrimaryExpr;
-
-public:
-  explicit PostFixExpr(std::unique_ptr<PrimaryExpr> &&primaryExpr,
-                       std::vector<Variant> &&optVariant) noexcept;
+  explicit PostFixExpr(Variant && variant) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 
-class PrimaryExpr final : public Node {
-public:
-  struct IdentifierTag {
-    std::string mIdentifier;
-  };
-  struct ConstantTag {
-    std::unique_ptr<ConstantExpr> mConstantExpr;
-  };
-  struct ExprTag {
-    std::unique_ptr<Expr> mExpr;
-  };
-
+class PrimaryExprConstant final : public Node {
+  using Variant = std::variant<int32_t, uint32_t, int64_t, uint64_t, float, double, std::string>;
 private:
-  using Variant = std::variant<IdentifierTag, ConstantTag, ExprTag>;
-  Variant mTag;
-
+  Variant mVariant;
 public:
-  template <typename T>
-  explicit PrimaryExpr(T &&tag) noexcept : mTag(std::forward<T>(tag)) {}
+  explicit PrimaryExprConstant(Variant variant);
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PrimaryExprIdentifier final : public Node {
+private:
+  std::string mIdentifier;
+public:
+  explicit PrimaryExprIdentifier(std::string identifier);
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PrimaryExprParent final : public Node {
+private:
+  std::unique_ptr<Expr> mExpr;
+public:
+  explicit PrimaryExprParent(std::unique_ptr<Expr> && expr) noexcept;
+  LLVMValueSignPair Codegen(lcc::CodeGenContext &context) const override;
+};
+
+class PrimaryExpr final : public Node {
+private:
+  using Variant = std::variant<
+        std::unique_ptr<PrimaryExprConstant>,
+        std::unique_ptr<PrimaryExprIdentifier>,
+        std::unique_ptr<PrimaryExprParent>>;
+  Variant mVariant;
+public:
+  explicit PrimaryExpr(Variant &&variant) noexcept;
   LLVMValueSignPair Codegen(CodeGenContext &context) const override;
 };
 

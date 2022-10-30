@@ -68,6 +68,7 @@ private:
   bool ConsumeAny();
   bool Peek(lexer::TokenType tokenType);
   bool IsUnaryOp(lexer::TokenType tokenType);
+  bool IsPostFixExpr(lexer::TokenType tokenType);
 };
 }
 #endif // LCC_PARSER_H

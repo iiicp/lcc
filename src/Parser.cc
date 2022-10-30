@@ -9,6 +9,7 @@
  ***********************************/
 
 #include "Parser.h"
+#include <stack>
 
 namespace lcc::parser {
 
@@ -453,120 +454,131 @@ std::unique_ptr<CastExpr> Parser::ParseCastExpr() {
     assert(IsTypeName());
     auto ty = ParseType();
     assert(Match(lexer::r_paren));
-    return std::make_unique<CastExpr>(std::move(ty), ParseCastExpr());
-  }else {
+    return std::make_unique<CastExpr>(
+        std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>(
+            std::move(ty), ParseCastExpr()));
+  } else {
     return std::make_unique<CastExpr>(ParseUnaryExpr());
   }
 }
 
 std::unique_ptr<UnaryExpr> Parser::ParseUnaryExpr() {
-  if (Peek(lexer::plus_plus)) {
-    Consume(lexer::plus_plus);
-    UnaryExpr::PreIncTag tag;
-    tag.mUnaryExpr = ParseUnaryExpr();
-    return std::make_unique<UnaryExpr>(std::move(tag));
-  }else if (Peek(lexer::minus_minus)) {
-    Consume(lexer::minus_minus);
-    UnaryExpr::PreDecTag tag;
-    tag.mUnaryExpr = ParseUnaryExpr();
-    return std::make_unique<UnaryExpr>(std::move(tag));
-  }else if (IsUnaryOp(mTokCursor->GetTokenType())) {
-    UnaryExpr::UnaryOpTag tag;
-    tag.mTokType = mTokCursor->GetTokenType();
+  if (IsUnaryOp(mTokCursor->GetTokenType())) {
+    lexer::TokenType tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
-    tag.mCastExpr = ParseCastExpr();
-    return std::make_unique<UnaryExpr>(std::move(tag));
+    auto expr = std::make_unique<UnaryExprUnaryOperator>(tokenType, ParseUnaryExpr());
+    return std::make_unique<UnaryExpr>(std::move(expr));
   }else if (Peek(lexer::kw_sizeof)) {
     Consume(lexer::kw_sizeof);
-    if (Match(lexer::l_paren)) {
-      UnaryExpr::SizeofTypeTag tag;
-      tag.mType = ParseType();
-      assert(Match(lexer::r_paren));
-      return std::make_unique<UnaryExpr>(std::move(tag));
+    if (Peek(lexer::l_paren)) {
+      Consume(lexer::l_paren);
+      auto type = ParseType();
+      Expect(lexer::r_paren);
+      ConsumeAny();
+      auto expr = std::make_unique<UnaryExprSizeOf>(std::move(type));
+      return std::make_unique<UnaryExpr>(std::move(expr));
     }else {
-      UnaryExpr::SizeofUnaryTag tag;
-      tag.mUnaryExpr = ParseUnaryExpr();
-      return std::make_unique<UnaryExpr>(std::move(tag));
+      auto expr = std::make_unique<UnaryExprSizeOf>(ParseUnaryExpr());
+      return std::make_unique<UnaryExpr>(std::move(expr));
     }
   }else {
-    UnaryExpr::PostFixTag tag;
-    tag.mPostFixExpr = ParsePostFixExpr();
-    return std::make_unique<UnaryExpr>(std::move(tag));
+    auto expr = std::make_unique<UnaryExprPostFixExpr>(ParsePostFixExpr());
+    return std::make_unique<UnaryExpr>(std::move(expr));
   }
 }
 
-std::unique_ptr<PostFixExpr> Parser::ParsePostFixExpr() {
-  auto expr = ParsePrimaryExpr();
-  std::vector<PostFixExpr::Variant> variants;
-  while (true) {
-    if (Peek(lexer::l_square)) {
-      ConsumeAny();
-      PostFixExpr::ArrayIndexTag tag;
-      tag.mExpr = ParseExpr();
+std::unique_ptr<PostFixExpr> Parser::ParsePostFixExpr()
+{
+  std::stack<std::unique_ptr<PostFixExpr>> stack;
+  while (IsPostFixExpr(mTokCursor->GetTokenType())) {
+    auto tokType = mTokCursor->GetTokenType();
+    if (tokType == lexer::identifier || tokType == lexer::char_constant
+        || tokType == lexer::numeric_constant) {
+      assert(stack.empty());
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprPrimary>(ParsePrimaryExpr())));
+    }else if (tokType == lexer::l_square) {
+      assert(!stack.empty());
+      Consume(lexer::l_square);
+      auto expr = ParseExpr();
       assert(Match(lexer::r_square));
-      variants.push_back(std::move(tag));
-    }else if (Peek(lexer::l_paren)) {
-      ConsumeAny();
-      PostFixExpr::FuncCallTag tag;
+      auto postfixExpr = std::move(stack.top());
+      stack.pop();
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprSubscript>(std::move(postfixExpr), std::move(expr))));
+    }else if (tokType == lexer::l_paren) {
+      Consume(lexer::l_paren);
       std::vector<std::unique_ptr<AssignExpr>> params;
       if (!Peek(lexer::r_paren)) {
         params.push_back(ParseAssignExpr());
-        while (Peek(lexer::comma)) {
-          Consume(lexer::comma);
-          params.push_back(ParseAssignExpr());
-        }
       }
-      assert(Match(lexer::r_paren));
-      tag.mOptParams = std::move(params);
-      variants.push_back(std::move(tag));
-    }else if (Peek(lexer::period)) {
+      while (mTokCursor->GetTokenType() != lexer::r_paren) {
+        assert(Match(lexer::comma));
+        params.push_back(ParseAssignExpr());
+      }
+      Consume(lexer::r_paren);
+      auto postfixExpr = std::move(stack.top());
+      stack.pop();
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprFuncCall>(std::move(postfixExpr), std::move(params))));
+    }else if (tokType == lexer::period) {
       Consume(lexer::period);
-      PostFixExpr::MemberDotTag tag;
-      variants.push_back(std::move(tag));
-    }else if (Peek(lexer::arrow)) {
+      Expect(lexer::identifier);
+      std::string identifier = std::get<std::string>(mTokCursor->GetTokenValue());
+      assert(Match(lexer::identifier));
+      auto postfixExpr = std::move(stack.top());
+      stack.pop();
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprDot>(std::move(postfixExpr), identifier)));
+    }else if (tokType == lexer::arrow) {
       Consume(lexer::arrow);
-      PostFixExpr::MemberArrowTag tag;
-      variants.push_back(std::move(tag));
-    }else if (Peek(lexer::plus_plus)) {
+      Expect(lexer::identifier);
+      std::string identifier = std::get<std::string>(mTokCursor->GetTokenValue());
+      assert(Match(lexer::identifier));
+      auto postfixExpr = std::move(stack.top());
+      stack.pop();
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprArrow>(std::move(postfixExpr), identifier)));
+    }else if (tokType == lexer::plus_plus) {
       Consume(lexer::plus_plus);
-      PostFixExpr::PostIncTag tag;
-      variants.push_back(std::move(tag));
-    }else if (Peek(lexer::minus_minus)) {
+      auto postfixExpr = std::move(stack.top());
+      stack.pop();
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprIncrement>(std::move(postfixExpr))));
+    }else if (tokType == lexer::minus_minus) {
       Consume(lexer::minus_minus);
-      PostFixExpr::PostDecTag tag;
-      variants.push_back(std::move(tag));
-    }else {
-      break;
+      auto postfixExpr = std::move(stack.top());
+      stack.pop();
+      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprDecrement>(std::move(postfixExpr))));
     }
   }
-  return std::make_unique<PostFixExpr>(std::move(expr), std::move(variants));
+  assert(stack.size() == 1);
+  auto ret = std::move(stack.top());
+  stack.pop();
+  return ret;
 }
 
 std::unique_ptr<PrimaryExpr> Parser::ParsePrimaryExpr() {
   if (Peek(lexer::identifier)) {
-    PrimaryExpr::IdentifierTag tag;
-    tag.mIdentifier = std::get<std::string>(mTokCursor->GetTokenValue());
+    std::string identifier = std::get<std::string>(mTokCursor->GetTokenValue());
     Consume(lexer::identifier);
-    return std::make_unique<PrimaryExpr>(std::move(tag));
+    auto expr = std::make_unique<PrimaryExprIdentifier>(identifier);
+    return std::make_unique<PrimaryExpr>(std::move(expr));
   }else if (Peek(lexer::char_constant) || Peek(lexer::numeric_constant) || Peek(lexer::string_literal)) {
-    PrimaryExpr::ConstantTag tag;
-    ConstantExpr::ConstantValue value = std::visit([](auto && val) -> ConstantExpr::ConstantValue {
-      using T = std::decay_t<decltype(val)>;
-      if constexpr (!std::is_same_v<T, std::monostate>) {
-        return val;
-      }else {
-        assert(0);
-      }
-    }, mTokCursor->GetTokenValue());
-    tag.mConstantExpr = std::make_unique<ConstantExpr>(value);
+    auto expr = std::make_unique<PrimaryExprConstant>(std::visit(
+        [](auto &&val) -> std::variant<int32_t, uint32_t, int64_t, uint64_t,
+                                       float, double, std::string> {
+          using T = std::decay_t<decltype(val)>;
+          if constexpr (std::is_same_v<T, std::monostate>) {
+            assert(0);
+          } else {
+            return val;
+          }
+        },
+        mTokCursor->GetTokenValue()));
     ConsumeAny();
-    return std::make_unique<PrimaryExpr>(std::move(tag));
+    return std::make_unique<PrimaryExpr>(std::move(expr));
   }else {
-    assert(Match(lexer::l_paren));
-    PrimaryExpr::ExprTag tag;
-    tag.mExpr = ParseExpr();
+    Expect(lexer::l_paren);
+    Consume(lexer::l_paren);
+    auto expr = ParseExpr();
     assert(Match(lexer::r_paren));
-    return std::make_unique<PrimaryExpr>(std::move(tag));
+    auto primaryExprParent = std::make_unique<PrimaryExprParent>(std::move(expr));
+    return std::make_unique<PrimaryExpr>(std::move(primaryExprParent));
   }
 }
 
@@ -631,9 +643,18 @@ bool Parser::Peek(lexer::TokenType tokenType) {
 
 bool Parser::IsUnaryOp(lexer::TokenType tokenType) {
   if (tokenType == lexer::amp || tokenType == lexer::star || tokenType == lexer::plus ||
-      tokenType == lexer::minus || tokenType == lexer::tilde || tokenType == lexer::exclaim) {
+      tokenType == lexer::minus || tokenType == lexer::tilde || tokenType == lexer::exclaim
+      || tokenType == lexer::plus_plus || tokenType == lexer::minus_minus) {
     return true;
   }
   return false;
+}
+
+bool Parser::IsPostFixExpr(lexer::TokenType tokenType) {
+  return ( tokenType == lexer::l_paren || tokenType == lexer::l_square
+      || tokenType == lexer::period || tokenType == lexer::arrow
+      || tokenType == lexer::plus_plus || tokenType == lexer::minus_minus
+      || tokenType == lexer::identifier || tokenType == lexer::char_constant
+          || tokenType == lexer::numeric_constant);
 }
 } // namespace lcc::parser

@@ -7,7 +7,7 @@
 int main() {
     std::cout << "Hello, lcc!" << std::endl;
 
-    std::ifstream file("../tests/c/test.c");
+    std::ifstream file("../tests/c/fib_test.c");
     if(!file.is_open())
     {
         std::cerr<<"Could not open source file";
@@ -30,7 +30,7 @@ int main() {
     lcc::parser::Parser parser(std::move(tokens));
     auto program = parser.ParseProgram();
 
-    lcc::CodeGenContext context;
-    lcc::codegen::CodeGen gen(std::move(program), context);
+//    lcc::CodeGenContext context;
+//    lcc::codegen::CodeGen gen(std::move(program), context);
     return 0;
 }

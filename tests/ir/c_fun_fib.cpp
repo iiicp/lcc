@@ -20,8 +20,8 @@
 using namespace llvm;
 
 int fib(int n) {
-    if (n <= 2)
-        return n;
+    if (n <= 1)
+        return 1;
     return fib(n-1) + fib(n-2);
 }
 
@@ -46,6 +46,15 @@ int main()
     irBuilder->CreateStore(fib->getArg(0), ll0);
 
     Value *n = irBuilder->CreateLoad(intType, ll0);
+    if (llvm::isa<LoadInst>(n)) {
+      std::cout << "1" << std::endl;
+      auto *t1 = llvm::cast<llvm::LoadInst>(n)->getPointerOperand();
+      auto *t2 = llvm::cast<llvm::LoadInst>(n)->getPointerOperandType();
+      assert(t2->getPointerElementType()->isIntegerTy());
+      std::cout << "3" << std::endl;
+    }else {
+      std::cout << "2" << std::endl;
+    }
     Value *value = irBuilder->CreateICmpSLE(n, irBuilder->getInt32(2));
     irBuilder->CreateCondBr(value, trueBB, elseBB);
 
@@ -83,7 +92,7 @@ int main()
         std::unique_ptr<ExecutionEngine> ee(b);
         // 获取函数地址
         void *address = (void *)ee->getFunctionAddress("fib");
-        ret = ((int(*)(int))address)(10);
+        ret = ((int(*)(int))address)(5);
     }
     llvm_shutdown();
 

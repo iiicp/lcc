@@ -81,12 +81,12 @@ LLVMValueSignPair Program::Codegen(CodeGenContext &context) const {
     for (auto &ext : mExternalDecl) {
       ext->Codegen(context);
     }
-    if (llvm::verifyModule(*context.mModule)) {
-      context.mModule->print(llvm::errs(), nullptr);
-      std::terminate();
-    }else {
-      context.mModule->print(llvm::outs(), nullptr);
-    }
+//    if (llvm::verifyModule(*context.mModule)) {
+//      context.mModule->print(llvm::errs(), nullptr);
+//      std::terminate();
+//    }else {
+//      context.mModule->print(llvm::outs(), nullptr);
+//    }
     return {nullptr, false};
 }
 LLVMValueSignPair GlobalDecl::Codegen(lcc::CodeGenContext &context) const {
@@ -345,28 +345,33 @@ LLVMValueSignPair Expr::Codegen(lcc::CodeGenContext &context) const {
 }
 LLVMValueSignPair AssignExpr::Codegen(lcc::CodeGenContext &context) const {
   auto [left, sign] = mCondExpr->Codegen(context);
-  llvm::Value *currentVal = nullptr;
+  if (mTokType == lexer::unknown) {
+    return {left, sign};
+  }
+  assert(llvm::isa<llvm::LoadInst>(left));
+  auto* elePtr = llvm::cast<llvm::LoadInst>(left)->getPointerOperand();
+  auto* eleType = elePtr->getType()->getPointerElementType();
+
   switch (mTokType) {
   case lexer::equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
-    context.mIrBuilder.CreateStore(newValue, left);
+    context.mIrBuilder.CreateStore(newValue, elePtr);
     break;
   }
   case lexer::plus_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
       currentVal = context.mIrBuilder.CreateAdd(currentVal, newValue);
     }else if (currentVal->getType()->isFloatingPointTy()) {
       currentVal = context.mIrBuilder.CreateFAdd(currentVal, newValue);
     }
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::slash_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
       if (sign) {
         currentVal = context.mIrBuilder.CreateSDiv(currentVal, newValue);
@@ -376,78 +381,77 @@ LLVMValueSignPair AssignExpr::Codegen(lcc::CodeGenContext &context) const {
     }else if (currentVal->getType()->isFloatingPointTy()) {
       currentVal = context.mIrBuilder.CreateFDiv(currentVal, newValue);
     }
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::star_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
         currentVal = context.mIrBuilder.CreateMul(currentVal, newValue);
     }else if (currentVal->getType()->isFloatingPointTy()) {
         currentVal = context.mIrBuilder.CreateFMul(currentVal, newValue);
     }
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::minus_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
       currentVal = context.mIrBuilder.CreateSub(currentVal, newValue);
     }else if (currentVal->getType()->isFloatingPointTy()) {
       currentVal = context.mIrBuilder.CreateFSub(currentVal, newValue);
     }
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::percent_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     currentVal = context.mIrBuilder.CreateSRem(currentVal, newValue);
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::less_less_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateShl(currentVal, newValue);
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::greater_greater_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateAShr(currentVal, newValue);
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::amp_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateAdd(currentVal, newValue);
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::pipe_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateOr(currentVal, newValue);
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
   case lexer::caret_equal: {
     auto [newValue, newSign] = mAssignExpr->Codegen(context);
-    currentVal = context.mIrBuilder.CreateLoad(newValue->getType(),left);
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateXor(currentVal, newValue);
-    context.mIrBuilder.CreateStore(currentVal, left);
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
 //  default:
 //    assert(0);
   }
-  /// todo ????
-  return {context.mIrBuilder.CreateLoad(left->getType(), left), sign};
+  return {context.mIrBuilder.CreateLoad(eleType, elePtr), sign};
 }
 LLVMValueSignPair ConditionalExpr::Codegen(lcc::CodeGenContext &context) const {
   auto [left, sign] = mLogOrExpr->Codegen(context);
@@ -801,10 +805,8 @@ LLVMValueSignPair UnaryExprUnaryOperator::Codegen(lcc::CodeGenContext &context) 
     return {loadInst->getPointerOperand(), sign};
   }
   case lexer::star: {
-//    auto pointType = llvm::cast<llvm::PointerType>(value->getType());
-//    assert(pointType);
-//    return {context.mIrBuilder.CreateLoad(pointType->getPointerElementType(),value), sign};
-      return {context.mIrBuilder.CreateLoad(value->getType(), value), sign};
+    assert(value->getType()->isPointerTy());
+    return {context.mIrBuilder.CreateLoad(value->getType()->getPointerElementType(), value), sign};
   }
   case lexer::plus: {
     return {value, sign};
@@ -831,13 +833,33 @@ LLVMValueSignPair UnaryExprUnaryOperator::Codegen(lcc::CodeGenContext &context) 
     return {context.mIrBuilder.CreateZExt(context.mIrBuilder.CreateNot(value), context.mIrBuilder.getInt32Ty()), sign};
   }
   case lexer::plus_plus: {
-    return {nullptr, false};
+    assert(llvm::isa<llvm::LoadInst>(value));
+    auto* elePtr = llvm::cast<llvm::LoadInst>(value)->getPointerOperand();
+    auto* eleType = elePtr->getType()->getPointerElementType();
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
+    if (currentVal->getType()->isIntegerTy()) {
+      currentVal = context.mIrBuilder.CreateAdd(currentVal, context.mIrBuilder.getInt32(1));
+    }else if (currentVal->getType()->isFloatingPointTy()) {
+      currentVal = context.mIrBuilder.CreateFAdd(currentVal, context.mIrBuilder.getInt32(1));
+    }
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
+    return {currentVal, true};
   }
   case lexer::minus_minus: {
-    return {nullptr, false};
+    assert(llvm::isa<llvm::LoadInst>(value));
+    auto* elePtr = llvm::cast<llvm::LoadInst>(value)->getPointerOperand();
+    auto* eleType = elePtr->getType()->getPointerElementType();
+    llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
+    if (currentVal->getType()->isIntegerTy()) {
+      currentVal = context.mIrBuilder.CreateSub(currentVal, context.mIrBuilder.getInt32(1));
+    }else if (currentVal->getType()->isFloatingPointTy()) {
+      currentVal = context.mIrBuilder.CreateFSub(currentVal, context.mIrBuilder.getInt32(1));
+    }
+    context.mIrBuilder.CreateStore(currentVal, elePtr);
+    return {currentVal, true};
   }
-  default:
-    assert(0);
+//  default:
+//    assert(0);
   }
   return {nullptr, false};
 }
@@ -886,10 +908,34 @@ LLVMValueSignPair PostFixExpr::Codegen(lcc::CodeGenContext &context) const {
       mVariant);
 }
 LLVMValueSignPair PostFixExprDecrement::Codegen(lcc::CodeGenContext &context) const {
-  return { nullptr, false };
+  auto [left, sign] = mPostFixExpr->Codegen(context);
+  assert(llvm::isa<llvm::LoadInst>(left));
+  auto* elePtr = llvm::cast<llvm::LoadInst>(left)->getPointerOperand();
+  auto* eleType = elePtr->getType()->getPointerElementType();
+  llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
+  llvm::Value* retVal = currentVal;
+  if (currentVal->getType()->isIntegerTy()) {
+    currentVal = context.mIrBuilder.CreateNSWSub(currentVal, context.mIrBuilder.getInt32(1));
+  }else if (currentVal->getType()->isFloatingPointTy()) {
+    currentVal = context.mIrBuilder.CreateFSub(currentVal, context.mIrBuilder.getInt32(1));
+  }
+  context.mIrBuilder.CreateStore(currentVal, elePtr);
+  return {retVal, true};
 }
 LLVMValueSignPair PostFixExprIncrement::Codegen(lcc::CodeGenContext &context) const {
-  return { nullptr, false };
+  auto [left, sign] = mPostFixExpr->Codegen(context);
+  assert(llvm::isa<llvm::LoadInst>(left));
+  auto* elePtr = llvm::cast<llvm::LoadInst>(left)->getPointerOperand();
+  auto* eleType = elePtr->getType()->getPointerElementType();
+  llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
+  llvm::Value* retVal = currentVal;
+  if (currentVal->getType()->isIntegerTy()) {
+    currentVal = context.mIrBuilder.CreateAdd(currentVal, context.mIrBuilder.getInt32(1));
+  }else if (currentVal->getType()->isFloatingPointTy()) {
+    currentVal = context.mIrBuilder.CreateFAdd(currentVal, context.mIrBuilder.getInt32(1));
+  }
+  context.mIrBuilder.CreateStore(currentVal, elePtr);
+  return {retVal, true};
 }
 LLVMValueSignPair PostFixExprArrow::Codegen(lcc::CodeGenContext &context) const {
   return { nullptr, false };
@@ -907,8 +953,8 @@ LLVMValueSignPair PostFixExprFuncCall::Codegen(lcc::CodeGenContext &context) con
   for (auto &assignExpr : mOptParams) {
     arguments.push_back(assignExpr->Codegen(context).first);
   }
-  auto &func = llvm::cast<llvm::Function>(*value);
-  return {context.mIrBuilder.CreateCall(func.getFunctionType(), &func, arguments), false};
+  auto *func = static_cast<llvm::Function *>(value);
+  return {context.mIrBuilder.CreateCall(func->getFunctionType(), func, arguments), false};
 }
 LLVMValueSignPair PostFixExprPrimary::Codegen(lcc::CodeGenContext &context) const {
   return mPrimaryExpr->Codegen(context);
@@ -936,10 +982,11 @@ LLVMValueSignPair PrimaryExpr::Codegen(lcc::CodeGenContext &context) const {
 LLVMValueSignPair PrimaryExprIdentifier::Codegen(lcc::CodeGenContext &context) const {
   auto [value, sign] = context.FindVar(mIdentifier);
   assert(value);
-  if (llvm::isa<llvm::Function>(*value)) {
-    return {value, sign};
+  llvm::Function *func = context.mModule->getFunction(mIdentifier);
+  if (func) {
+    return {func, sign};
   }
-  return {context.mIrBuilder.CreateLoad(llvm::cast<llvm::PointerType>(value->getType())->getPointerElementType(), value), sign};
+  return {context.mIrBuilder.CreateLoad(value->getType()->getPointerElementType(), value), sign};
 }
 LLVMValueSignPair PrimaryExprConstant::Codegen(lcc::CodeGenContext &context) const {
   return std::visit(

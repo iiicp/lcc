@@ -16,7 +16,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include <unordered_map>
-#include <unordered_map>
 namespace lcc {
 
 using LLVMValueSignPair = std::pair<llvm::Value *, bool>;
@@ -32,11 +31,11 @@ public:
   std::vector<llvm::BasicBlock *> mContinues;
 
   llvm::Function *mCurrentFunc;
-  std::vector<std::list<std::pair<std::string, LLVMValueSignPair>>> mLocalScope;
+  std::vector<std::unordered_map<std::string, LLVMValueSignPair>> mLocalScope;
   std::unordered_map<std::string, LLVMValueSignPair> mGlobalScope;
 
   void AddLocal(const std::string &name, LLVMValueSignPair valueSignPair) {
-    mLocalScope.back().push_back({name, valueSignPair});
+    mLocalScope.back()[name] = valueSignPair;
   }
 
   void AddGlobal(const std::string &name, LLVMValueSignPair valueSignPair) {
@@ -44,11 +43,9 @@ public:
   }
 
   LLVMValueSignPair FindVar(const std::string& name) {
-    for (auto list = mLocalScope.rbegin(); list != mLocalScope.rend(); ++list) {
-      for (auto begin = list->rbegin(); begin != list->rend(); ++begin) {
-        if (begin->first == name) {
-          return begin->second;
-        }
+    for (auto mp = mLocalScope.rbegin(); mp != mLocalScope.rend(); ++mp) {
+      if (mp->find(name) != mp->end()) {
+        return (*mp)[name];
       }
     }
     return mGlobalScope[name];

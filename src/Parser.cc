@@ -155,7 +155,7 @@ std::unique_ptr<Stmt> Parser::ParseStmt() {
   }else if (Peek(lexer::l_brace)) {
     stmt = ParseBlockStmt();
   }else{
-    Expect(lexer::identifier);
+    //Expect(lexer::identifier);
     stmt = ParseExprStmt();
   }
   return stmt;
@@ -321,6 +321,7 @@ std::unique_ptr<AssignExpr> Parser::ParseAssignExpr() {
   case lexer::amp_equal:
   case lexer::caret_equal: {
     tokenType = mTokCursor->GetTokenType();
+    ConsumeAny();
     return std::make_unique<AssignExpr>(std::move(conditionExpr), tokenType, ParseAssignExpr());
   }
   default:

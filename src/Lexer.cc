@@ -480,6 +480,7 @@ Token Lexer::ScanPunctuator() {
   case '!': {
     ++mCursor;
     if (*mCursor == '=') {
+      ++mCursor;
       type = exclaim_equal;
     } else {
       type = exclaim;
@@ -489,6 +490,7 @@ Token Lexer::ScanPunctuator() {
   case '/': {
     ++mCursor;
     if (*mCursor == '=') {
+      ++mCursor;
       type = slash_equal;
     } else {
       type = slash;
@@ -498,6 +500,7 @@ Token Lexer::ScanPunctuator() {
   case '%': {
     ++mCursor;
     if (*mCursor == '=') {
+      ++mCursor;
       type = percent_equal;
     } else {
       type = percent;

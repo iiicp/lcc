@@ -267,11 +267,13 @@ std::unique_ptr<Declaration> Parser::ParseDeclStmt() {
 
 std::unique_ptr<BreakStmt> Parser::ParseBreakStmt() {
     assert(Match(lexer::kw_break));
+    assert(Match(lexer::semi));
     return std::make_unique<BreakStmt>();
 }
 
 std::unique_ptr<ContinueStmt> Parser::ParseContinueStmt() {
   assert(Match(lexer::kw_continue));
+  assert(Match(lexer::semi));
   return std::make_unique<ContinueStmt>();
 }
 
@@ -450,14 +452,19 @@ std::unique_ptr<MultiExpr> Parser::ParseMultiExpr() {
 }
 
 std::unique_ptr<CastExpr> Parser::ParseCastExpr() {
+  TokIter start = mTokCursor;
   if (Peek(lexer::l_paren)) {
     ConsumeAny();
-    assert(IsTypeName());
-    auto ty = ParseType();
-    assert(Match(lexer::r_paren));
-    return std::make_unique<CastExpr>(
-        std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>(
-            std::move(ty), ParseCastExpr()));
+    if(IsTypeName()) {
+      auto ty = ParseType();
+      assert(Match(lexer::r_paren));
+      return std::make_unique<CastExpr>(
+          std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>(
+              std::move(ty), ParseCastExpr()));
+    }else {
+      mTokCursor = start;
+      return std::make_unique<CastExpr>(ParseUnaryExpr());
+    }
   } else {
     return std::make_unique<CastExpr>(ParseUnaryExpr());
   }
@@ -491,13 +498,10 @@ std::unique_ptr<UnaryExpr> Parser::ParseUnaryExpr() {
 std::unique_ptr<PostFixExpr> Parser::ParsePostFixExpr()
 {
   std::stack<std::unique_ptr<PostFixExpr>> stack;
+  stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprPrimary>(ParsePrimaryExpr())));
   while (IsPostFixExpr(mTokCursor->GetTokenType())) {
     auto tokType = mTokCursor->GetTokenType();
-    if (tokType == lexer::identifier || tokType == lexer::char_constant
-        || tokType == lexer::numeric_constant) {
-      assert(stack.empty());
-      stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprPrimary>(ParsePrimaryExpr())));
-    }else if (tokType == lexer::l_square) {
+    if (tokType == lexer::l_square) {
       assert(!stack.empty());
       Consume(lexer::l_square);
       auto expr = ParseExpr();

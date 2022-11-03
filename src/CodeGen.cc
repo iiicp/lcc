@@ -146,6 +146,7 @@ LLVMValueSignPair Function::Codegen(lcc::CodeGenContext &context) const {
     if (retType->isVoidTy()) {
       context.mIrBuilder.CreateRetVoid();
     }else {
+      func->print(llvm::errs());
       assert(0);
     }
   }
@@ -164,11 +165,13 @@ LLVMValueSignPair BlockStmt::Codegen(lcc::CodeGenContext &context) const {
 }
 LLVMValueSignPair IfStmt::Codegen(lcc::CodeGenContext &context) const {
   auto[value, sign] = mExpr->Codegen(context);
-//  auto [value, sign] = LLVMValueSignPair{context.mIrBuilder.getInt32(1), true};
+
   if (value->getType()->isIntegerTy()) {
       value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
   }else if (value->getType()->isFloatingPointTy()) {
-    value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+      value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+  } else {
+    assert(0);
   }
   auto* function = context.mCurrentFunc;
   auto *thenBB = llvm::BasicBlock::Create(context.mContext, "", function);
@@ -188,8 +191,10 @@ LLVMValueSignPair IfStmt::Codegen(lcc::CodeGenContext &context) const {
       context.mIrBuilder.CreateBr(endBB);
     }
   }
-  function->getBasicBlockList().push_back(endBB);
-  context.mIrBuilder.SetInsertPoint(endBB);
+  if (endBB->hasNPredecessorsOrMore(1)) {
+    function->getBasicBlockList().push_back(endBB);
+    context.mIrBuilder.SetInsertPoint(endBB);
+  }
   return {nullptr, false};
 }
 LLVMValueSignPair WhileStmt::Codegen(lcc::CodeGenContext &context) const {
@@ -206,6 +211,8 @@ LLVMValueSignPair WhileStmt::Codegen(lcc::CodeGenContext &context) const {
     value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
   }else if (value->getType()->isFloatingPointTy()) {
     value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+  }else {
+    assert(0);
   }
   context.mIrBuilder.CreateCondBr(value, bodyBB, endBB);
 
@@ -239,6 +246,8 @@ LLVMValueSignPair DoWhileStmt::Codegen(lcc::CodeGenContext &context) const {
     value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
   }else if (value->getType()->isFloatingPointTy()) {
     value = context.mIrBuilder.CreateFCmpUNE(value, llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), 0));
+  }else {
+    assert(0);
   }
   context.mIrBuilder.CreateCondBr(value, bodyBB, endBB);
 
@@ -261,7 +270,7 @@ void GenForIR(const lcc::parser::Expr *cond,
   auto *postBB = llvm::BasicBlock::Create(context.mContext);
   auto *endBB = llvm::BasicBlock::Create(context.mContext);
   context.mBreaks.push_back(endBB);
-  context.mContinues.push_back(condBB);
+  context.mContinues.push_back(postBB);
 
   context.mIrBuilder.CreateBr(condBB);
   context.mIrBuilder.SetInsertPoint(condBB);
@@ -325,7 +334,7 @@ LLVMValueSignPair ContinueStmt::Codegen(lcc::CodeGenContext &context) const {
 }
 LLVMValueSignPair Declaration::Codegen(lcc::CodeGenContext &context) const {
   LLVMTypePtr allocaType = mType->TypeGen(context);
-  llvm::IRBuilder<> tmp(&context.mCurrentFunc->getEntryBlock(), context.mCurrentFunc->getEntryBlock().begin());
+  llvm::IRBuilder<> tmp(&context.mCurrentFunc->getEntryBlock(), context.mCurrentFunc->getEntryBlock().end());
   auto *alloca = tmp.CreateAlloca(allocaType, nullptr, mName);
   if (mOptValue) {
     auto [value, sign] = mOptValue->Codegen(context);
@@ -605,7 +614,7 @@ LLVMValueSignPair EqualExpr::Codegen(lcc::CodeGenContext &context) const {
         }
         break;
       }
-      case lexer::TokenType::pipe_equal: {
+      case lexer::TokenType::exclaim_equal: {
         if (left->getType()->isIntegerTy()) {
           left = context.mIrBuilder.CreateICmpNE(left, right);
         }else if (left->getType()->isFloatingPointTy()) {
@@ -918,6 +927,8 @@ LLVMValueSignPair PostFixExprDecrement::Codegen(lcc::CodeGenContext &context) co
     currentVal = context.mIrBuilder.CreateNSWSub(currentVal, context.mIrBuilder.getInt32(1));
   }else if (currentVal->getType()->isFloatingPointTy()) {
     currentVal = context.mIrBuilder.CreateFSub(currentVal, context.mIrBuilder.getInt32(1));
+  }else {
+    assert(0);
   }
   context.mIrBuilder.CreateStore(currentVal, elePtr);
   return {retVal, true};

@@ -16,7 +16,7 @@ Mac平台
 brew install llvm@14
 ```
 
-Ubuntu 20.04
+Linux平台
 
 ```
 1, sudo apt-get update

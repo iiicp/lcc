@@ -69,5 +69,5 @@ int testBlockStmt() {
 }
 
 int main() {
-  return testBlockStmt();
+  return testBreakContinue();
 }

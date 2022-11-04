@@ -1,29 +1,57 @@
+
+
 ### 基于LLVM的C编译器--lcc
 
 #### 编译步骤
 
-Mac平台编译:
+一，安装LLVM12或者LLVM14
 
-```
+Mac平台
+
+```bash
 1, 安装homebrew
 可以使用国内源: https://brew.idayer.com/
 
 2, 安装LLVM14
 brew install llvm@14
+```
 
-3，clone仓库
-git clone git@github.com:iiicp/lcc.git
+Ubuntu 20.04
 
-4，使用CMake进行构建
+```
+1, sudo apt-get update
+2, sudo apt-get -y install llvm-12
+```
+
+二，安装CMake工具
+
+Mac平台
+
+```
+brew install cmake
+```
+
+Linux平台
+
+```
+sudo apt install cmake
+```
+
+三，Clone仓库
+
+```
+1, git clone git@github.com:iiicp/lcc.git
+
+2, CMake进行构建
 cd lcc
 mkdir build
 cd build 
 cmake .. -DLLVM_DIR="Path to Your LLVM CMake dir"
-eg: cmake ..-DLLVM_DIR=/opt/homebrew/opt/llvm@14/lib/cmake/llvm
+// eg: cmake ..-DLLVM_DIR=/opt/homebrew/opt/llvm@14/lib/cmake/llvm
 make 
 
-5, 使用lcc
-./lcc test.c
+3, 使用lcc
+./lcc ../tests/c/stmt.c
 ```
 
 
@@ -55,9 +83,8 @@ int main() {
 }
 ```
 
-
-
 ### lcc开发进展
+
 - [x] 2022.11.03  v0.1
 
 ## lcc目前功能列表
@@ -150,3 +177,6 @@ int main() {
 ### 七：Driver
 
 ### 八：跨平台
+
+
+

@@ -16,7 +16,6 @@ int main(int argc, char *argv[]) {
       return 0;
     }
 
-//    std::ifstream file("../tests/c/fib_test.c");
     std::ifstream file(argv[1]);
     if(!file.is_open())
     {

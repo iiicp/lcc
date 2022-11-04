@@ -10,7 +10,7 @@
 
 #include "Lexer.h"
 #include <iostream>
-
+#include <cassert>
 namespace lcc::lexer {
 
 std::vector<Token> Lexer::Tokenize() {

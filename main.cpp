@@ -6,6 +6,7 @@
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/ManagedStatic.h"
 
 int main(int argc, char *argv[]) {
     std::cout << "Hello, lcc!" << std::endl;

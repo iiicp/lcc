@@ -36,10 +36,11 @@ Token Lexer::GetNextToken() {
     return ScanCharacter();
   } else if (IsStringStart()) {
     return ScanStringLiteral();
-  } else if (IsEOF(mCursor)){
-    return Token{mLine, mColumn, TokenType::eof};
   } else {
-    assert(0);
+    while (!IsEOF(mCursor)) {
+      ++mCursor;
+    }
+    return Token{mLine, mColumn, TokenType::eof};
   }
 }
 

@@ -16,9 +16,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include <unordered_map>
+namespace lcc::parser {
+class Type;
+}
 namespace lcc {
 
-using LLVMValueSignPair = std::pair<llvm::Value *, bool>;
+using NodeRetValue = std::tuple<llvm::Value *, llvm::Type*, bool>;
 using LLVMTypePtr = llvm::Type *;
 
 class CodeGenContext {
@@ -31,18 +34,18 @@ public:
   std::vector<llvm::BasicBlock *> mContinues;
 
   llvm::Function *mCurrentFunc;
-  std::vector<std::unordered_map<std::string, LLVMValueSignPair>> mLocalScope;
-  std::unordered_map<std::string, LLVMValueSignPair> mGlobalScope;
+  std::vector<std::unordered_map<std::string, NodeRetValue>> mLocalScope;
+  std::unordered_map<std::string, NodeRetValue> mGlobalScope;
 
-  void AddLocal(const std::string &name, LLVMValueSignPair valueSignPair) {
+  void AddLocal(const std::string &name, NodeRetValue valueSignPair) {
     mLocalScope.back()[name] = valueSignPair;
   }
 
-  void AddGlobal(const std::string &name, LLVMValueSignPair valueSignPair) {
+  void AddGlobal(const std::string &name, NodeRetValue valueSignPair) {
     mGlobalScope[name] = valueSignPair;
   }
 
-  LLVMValueSignPair FindVar(const std::string& name) {
+  NodeRetValue FindVar(const std::string& name) {
     for (auto mp = mLocalScope.rbegin(); mp != mLocalScope.rend(); ++mp) {
       if (mp->find(name) != mp->end()) {
         return (*mp)[name];

@@ -115,7 +115,7 @@ int main() {
 
 - [x] 2022.11.03  v0.1
 
-[v0.1功能列表](https://github.com/iiicp/lcc/wiki/lcc-v0.1)
+[v0.1功能列表](https://github.com/iiicp/lcc/wiki/lcc-v0.1)   
 [v0.2todo](https://github.com/iiicp/lcc/wiki/lcc-v0.2-todo)
 
 

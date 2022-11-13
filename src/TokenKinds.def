@@ -12,10 +12,10 @@
 
 TOK(unknown) // not a token
 TOK(eof)     // end of file
-TOK(identifier)
-TOK(char_constant)
-TOK(string_literal)
-TOK(numeric_constant)
+TOK(identifier)     // abc123
+TOK(char_constant)   // 'a'
+TOK(string_literal)  // "hello"
+TOK(numeric_constant)  // 123
 
 PUNCTUATOR(l_square, "[")
 PUNCTUATOR(r_square, "]")

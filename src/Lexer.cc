@@ -13,611 +13,379 @@
 #include <cassert>
 namespace lcc {
 
+namespace charinfo {
+LLVM_READNONE inline bool isASCII(char Ch) {
+  return static_cast<unsigned char>(Ch) <= 127;
+}
+
+LLVM_READNONE inline bool isVerticalWhitespace(char Ch) {
+  return isASCII(Ch) && (Ch == '\r' || Ch == '\n');
+}
+
+LLVM_READNONE inline bool isHorizontalWhitespace(char Ch) {
+  return isASCII(Ch) && (Ch == ' ' || Ch == '\t' || Ch == '\f' || Ch == '\v');
+}
+
+LLVM_READNONE inline bool isWhitespace(char Ch) {
+  return isHorizontalWhitespace(Ch) || isVerticalWhitespace(Ch);
+}
+
+LLVM_READNONE inline bool isDigit(char Ch) {
+  return isASCII(Ch) && Ch >= '0' && Ch <= '9';
+}
+
+LLVM_READNONE inline bool isOctDigit(char Ch) {
+  return isASCII(Ch) && Ch >= '0' && Ch <= '7';
+}
+
+LLVM_READNONE inline bool isHexDigit(char Ch) {
+  return isASCII(Ch) && (isDigit(Ch) || (Ch >= 'A' && Ch <= 'F'));
+}
+
+LLVM_READNONE inline bool isIdentifierHead(char Ch) {
+  return isASCII(Ch) &&
+         (Ch == '_' || (Ch >= 'A' && Ch <= 'Z') || (Ch >= 'a' && Ch <= 'z'));
+}
+LLVM_READNONE inline bool isIdentifierBody(char Ch) {
+  return isIdentifierHead(Ch) || isDigit(Ch);
+}
+LLVM_READNONE inline bool isPunctuatorHead(char Ch) {
+  return isASCII(Ch) &&
+         (Ch == '[' || Ch == ']' || Ch == '(' || Ch == ')' || Ch == '{' ||
+          Ch == '}' || Ch == '.' || Ch == '&' || Ch == '*' || Ch == '+' ||
+          Ch == '-' || Ch == '~' || Ch == '!' || Ch == '/' || Ch == '%' ||
+          Ch == '<' || Ch == '>' || Ch == '^' || Ch == '|' || Ch == '?' ||
+          Ch == ':' || Ch == ';' || Ch == '=' || Ch == ',');
+}
+
+LLVM_READNONE inline bool isNumericHead(char Ch, char PeekCh) {
+  return isASCII(Ch) &&
+         (charinfo::isDigit(Ch) || (Ch == '.' && charinfo::isDigit(PeekCh)));
+}
+LLVM_READNONE inline bool isCharHead(char Ch) {
+  return isASCII(Ch) && (Ch == '\'');
+}
+
+LLVM_READNONE inline bool isStringHead(char Ch) {
+  return isASCII(Ch) && (Ch == '"');
+}
+} // namespace charinfo
+
 std::vector<Token> Lexer::Tokenize() {
   std::vector<Token> tokens;
-  while (!IsEOF(mCursor)) {
-    Token tok = GetNextToken();
-    if (tok.GetTokenType() != tok::eof)
+  while (*CurPtr) {
+    Token tok;
+    next(tok);
+    if (tok.getKind() != tok::eof)
       tokens.push_back(tok);
   }
-  return std::move(tokens);
+  return tokens;
 }
 
-Token Lexer::GetNextToken() {
-  ScanWhiteSpace();
-  mColumn = mCursor - mLineHead + 1;
-  if (IsLetter()) {
-    return ScanIdentifier();
-  } else if (IsNumericStart()) { // .1f
-    return ScanNumeric();
-  } else if (IsPunctuatorStart()) {
-    return ScanPunctuator();
-  } else if (IsCharStart()) {
-    return ScanCharacter();
-  } else if (IsStringStart()) {
-    return ScanStringLiteral();
+void Lexer::next(Token &Result) {
+  SkipWhiteSpace();
+  SkipComment();
+
+  if (charinfo::isIdentifierHead(*CurPtr)) {
+    LexIdentifier(Result);
+  } else if (charinfo::isNumericHead(*CurPtr, CurPtr[1])) { // .1f
+    LexNumeric(Result);
+  } else if (charinfo::isPunctuatorHead(*CurPtr)) {
+    LexPunctuator(Result);
+  } else if (charinfo::isCharHead(*CurPtr)) {
+    LexCharacter(Result);
+  } else if (charinfo::isStringHead(*CurPtr)) {
+    LexStringLiteral(Result);
   } else {
-    while (!IsEOF(mCursor)) {
-      ++mCursor;
+    while (!*CurPtr) {
+      ++CurPtr;
     }
-    return Token{mLine, mColumn, tok::eof};
+    Result.setKind(tok::eof);
   }
 }
 
-bool Lexer::IsEOF(uint8_t *CharPtr) const {
-  return (*CharPtr == '\0' && CharPtr == mSrcEnd);
-}
-
-bool Lexer::IsLetter() const {
-  uint8_t ch = *mCursor;
-  return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || (ch == '_');
-}
-bool Lexer::IsDigit() const {
-  uint8_t ch = *mCursor;
-  return '0' <= ch && ch <= '9';
-}
-bool Lexer::IsHexDigit() const {
-  uint8_t ch = *mCursor;
-  return IsDigit() || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F';
-}
-bool Lexer::IsOctDigit() const {
-  uint8_t ch = *mCursor;
-  return '0' <= ch && ch <= '7';
-}
-
-bool Lexer::IsXDigit(int base) const {
-  if (base == 8) {
-    return IsOctDigit();
-  } else if (base == 16) {
-    return IsHexDigit();
-  } else {
-    return IsDigit();
+void Lexer::SkipWhiteSpace() {
+  while (*CurPtr && charinfo::isWhitespace(*CurPtr)) {
+    ++CurPtr;
   }
 }
 
-bool Lexer::IsDigit(uint8_t *CharPtr) const {
-  uint8_t ch = *CharPtr;
-  return '0' << ch && ch <= '9';
-}
-bool Lexer::IsLetterOrDigit() const { return IsLetter() || IsDigit(); }
-
-bool Lexer::IsPunctuatorStart() const {
-  uint8_t ch = *mCursor;
-  return ch == '[' || ch == ']' || ch == '(' || ch == ')' || ch == '{' ||
-         ch == '}' || ch == '.' || ch == '&' || ch == '*' || ch == '+' ||
-         ch == '-' || ch == '~' || ch == '!' || ch == '/' || ch == '%' ||
-         ch == '<' || ch == '>' || ch == '^' || ch == '|' || ch == '?' ||
-         ch == ':' || ch == ';' || ch == '=' || ch == ',';
-}
-
-bool Lexer::IsNumericStart() const {
-  return IsDigit() || (*mCursor == '.' && IsDigit(mCursor + 1));
-}
-
-bool Lexer::IsCharStart() const { return *mCursor == '\''; }
-
-bool Lexer::IsStringStart() const { return *mCursor == '"'; }
-
-void Lexer::ScanWhiteSpace() {
-  char ch = *mCursor;
-  while (ch == ' ' || ch == '\t' || ch == '\v' || ch == '\f' || ch == '\r' ||
-         ch == '\n' || ch == '/' || ch == '#') {
-    switch (ch) {
-    case '\n': {
-      mLine++;
-      mLineHead = ++mCursor;
-      break;
-    }
-    case '/': {
-      if (mCursor[1] != '/' && mCursor[1] != '*')
-        return;
-      ++mCursor;
-      if (*mCursor == '/') {
-        while (*mCursor != '\n' && !IsEOF(mCursor)) {
-          ++mCursor;
-        }
-      } else {
-        ++mCursor;
-        while (mCursor[0] != '*' || mCursor[1] != '/') {
-          if (*mCursor == '\n') {
-            ++mLine;
-            mLineHead = ++mCursor;
-          } else if (IsEOF(mCursor) || IsEOF(mCursor + 1)) {
-            std::cerr << "miss */"
-                      << "line: " << mLine << ", col: " << mCursor - mLineHead
-                      << std::endl;
-            return;
-          } else {
-            ++mCursor;
-          }
-        }
-        mCursor += 2;
+void Lexer::SkipComment() {
+  if (*CurPtr == '/' && CurPtr[1] == '/') {
+      CurPtr += 2;
+      while (*CurPtr && *CurPtr != '\n') {
+        ++CurPtr;
       }
-      break;
-    }
-    default: {
-      ++mCursor;
-      break;
-    }
-    }
-    ch = *mCursor;
+  } else if (*CurPtr == '/' && CurPtr[1] == '*') {
+      CurPtr += 2;
+      while (CurPtr[0] != '*' || CurPtr[1] != '/') {
+        if (!CurPtr[0] || !CurPtr[1]) {
+          Diags.report(getLoc(), diag::err_unterminated_block_comment);
+          return;
+        }
+        ++CurPtr;
+      }
+      CurPtr += 2;
   }
 }
 
-Token Lexer::ScanIdentifier() {
-  uint8_t *b = mCursor++;
-  while (IsLetterOrDigit()) {
-    ++mCursor;
+void Lexer::LexIdentifier(Token &Result) {
+  const char *Start = CurPtr;
+  const char *End = CurPtr + 1;
+  while (charinfo::isIdentifierBody(*End)) {
+    ++End;
   }
-  std::string value(b, mCursor);
-  if (mKeywordTypeMap.find(value) != mKeywordTypeMap.end()) {
-    return Token{mLine, mColumn, mKeywordTypeMap[value], value};
-  } else {
-    return Token{mLine, mColumn, tok::identifier, value};
-  }
+  llvm::StringRef Name(Start, End-Start);
+  formToken(Result, End, getKeyword(Name, tok::identifier));
 }
 
-Token Lexer::ScanCharacter() {
-  ++mCursor;
-  int32_t ch;
-  if (*mCursor == '\'') {
-    std::cerr << "empty character '"
-              << "line: " << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    assert(0);
-  } else if (*mCursor == '\n' || IsEOF(mCursor)) {
-    std::cerr << "empty character, miss '"
-              << "line: " << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    assert(0);
+void Lexer::LexCharacter(Token &Result) {
+  const char *End = CurPtr + 1;
+  if (*End == '\'') {
+    Diags.report(getLoc(),diag::err_empty_char_constant);
+    formToken(Result, End, tok::char_constant);
+    return;
+  } else if (*End == '\n' || !*End) {
+    Diags.report(getLoc(), diag::err_unterminated_char_constant);
+    formToken(Result, End, tok::char_constant);
+    return;
   } else {
-    if (*mCursor == '\\') {
-      ch = ScanEscapeChar();
+    if (*End == '\\') {
+      ScanEscapeChar(End);
     } else {
-      ch = *mCursor++;
+      ++End;
     }
   }
-  if (*mCursor != '\'') {
-    std::cerr << "unclosed '" << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    assert(0);
+  if (*End != '\'') {
+    Diags.report(getLoc(), diag::err_unterminated_char_constant);
+    formToken(Result, End, tok::char_constant);
+  }else {
+    ++End;
+    formToken(Result, End, tok::char_constant);
   }
-  ++mCursor;
-  return Token{mLine, mColumn, tok::char_constant, ch};
 }
 
-Token Lexer::ScanStringLiteral() {
-  ++mCursor;
+void Lexer::LexStringLiteral(Token &Result) {
+  const char *Start = CurPtr;
+  const char *End = CurPtr + 1;
   std::string value;
-  while (*mCursor != '"') {
-    if (*mCursor == '\n' || IsEOF(mCursor)) {
-      std::cerr << "legal str " << mLine << ", col: " << mCursor - mLineHead
-                << std::endl;
-      assert(0);
-    } else if (*mCursor == '\\') {
-      value += (char)ScanEscapeChar();
+  while (*End != '"') {
+    if (*End == '\n' || !*End) {
+      Diags.report(getLoc(), diag::err_unterminated_string_constant);
+      return;
+    } else if (*End == '\\') {
+      ScanEscapeChar(End);
     } else {
-      value += (char)*mCursor++;
+      ++End;
     }
   }
-  ++mCursor;
-  return Token{mLine, mColumn, tok::string_literal, value};
+  // skip "
+  ++End;
+  formToken(Result, End, tok::string_literal, llvm::StringRef(CurPtr, End-Start));
 }
 
-Token Lexer::ScanNumeric() {
-  uint8_t *start = mCursor;
-  int base = 10;
-
-  if (*mCursor == '.') {
-    return ScanFloatNumeric();
+void Lexer::LexNumeric(Token &Result) {
+  const char *Start = CurPtr;
+  const char *End = CurPtr + 1;
+  int32_t value = (*Start - '0');
+  while (charinfo::isDigit(*End)) {
+    value = value * 10 + (*End++ - '0');
   }
-
-  if (*mCursor == '0') {
-    base = 8;
-    mCursor++;
-    if (*mCursor == 'x' || *mCursor == 'X') {
-      base = 16;
-      mCursor++;
-    }
-  }
-
-  while (IsXDigit(base)) {
-    ++mCursor;
-  }
-
-  if (*mCursor == '.' || *mCursor == 'E' || *mCursor == 'e') {
-    if (base == 8) {
-      std::cerr << "no oct float " << mLine << ", col: " << mCursor - mLineHead
-                << std::endl;
-      assert(0);
-    }
-    mCursor = start;
-    return ScanFloatNumeric();
-  }
-
-  mCursor = start;
-  return ScanIntegerNumeric(base);
+  formToken(Result, End, tok::numeric_constant, value);
 }
 
-Token Lexer::ScanIntegerNumeric(int base) {
-  if (base == 16) {
-    mCursor += 2;
-  }
-  uint64_t value = (*mCursor++ - '0');
-  while (IsXDigit(base)) {
-    value = value * base + (*mCursor++ - '0');
-  }
-  IntegerType type = ScanIntegerSuffix();
-  if (type == IntegerType::U) {
-    return Token{mLine, mColumn, tok::numeric_constant, (uint32_t)value};
-  } else if (type == IntegerType::UL || type == IntegerType::ULL) {
-    return Token{mLine, mColumn, tok::numeric_constant, (uint64_t)value};
-  } else if (type == IntegerType::L || type == IntegerType::LL) {
-    return Token{mLine, mColumn, tok::numeric_constant, (int64_t)value};
-  } else {
-    return Token{mLine, mColumn, tok::numeric_constant, (int32_t)value};
-  }
-}
-
-Token Lexer::ScanFloatNumeric() {
-  const char *start = (const char *)mCursor;
-  char *end = nullptr;
-  double value = strtod(start, &end);
-  if (end == nullptr)
-    assert(0);
-  mCursor = (uint8_t *)end;
-  if (*mCursor == 'f' || *mCursor == 'F') {
-    ++mCursor;
-    return Token{mLine, mColumn, tok::numeric_constant, (float)value};
-  } else if (*mCursor == 'L' || *mCursor == 'l') {
-    ++mCursor;
-    return Token{mLine, mColumn, tok::numeric_constant, value};
-  } else {
-    return Token{mLine, mColumn, tok::numeric_constant, value};
-  }
-}
-
-IntegerType Lexer::ScanIntegerSuffix() {
-  if (*mCursor == 'u' || *mCursor == 'U') {
-    ++mCursor;
-    if (*mCursor == 'l' || *mCursor == 'L') {
-      ++mCursor;
-      if (*mCursor == 'L' || *mCursor == 'L') {
-        ++mCursor;
-        return IntegerType::ULL;
-      } else {
-        return IntegerType::UL;
-      }
-    } else {
-      return IntegerType::U;
-    }
-  } else if (*mCursor == 'l' || *mCursor == 'L') {
-    ++mCursor;
-    if (*mCursor == 'l' || *mCursor == 'L') {
-      ++mCursor;
-      if (*mCursor == 'u' || *mCursor == 'U') {
-        ++mCursor;
-        return IntegerType::ULL;
-      } else {
-        return IntegerType::LL;
-      }
-    } else {
-      return IntegerType::L;
-    }
-  } else {
-    return IntegerType::Default;
-  }
-};
-
-int32_t Lexer::ScanEscapeChar() {
-  ++mCursor;
-  int32_t ch;
-  switch (*mCursor++) {
+void Lexer::ScanEscapeChar(const char *&Ptr) {
+  ++Ptr;
+  switch (*Ptr) {
   case 'a':
-    return '\a';
   case 'b':
-    return '\b';
   case 't':
-    return '\t';
   case 'v':
-    return '\v';
   case 'r':
-    return '\r';
   case 'f':
-    return '\f';
   case 'n':
-    return '\n';
   case '\'':
   case '\"':
-  case '\?':
-  case '\\':
-    return *(mCursor - 1);
-  case 'x': {
-    if (!IsHexDigit()) {
-      std::cerr << "warning: miss hexdigit "
-                << "line: " << mLine << ", col: " << mCursor - mLineHead
-                << std::endl;
-      return 'x';
-    }
-    ch = *mCursor++;
-    // \xffa
-    // (f*16+f)*16+a
-    while (IsHexDigit()) {
-      if ('a' <= *mCursor && *mCursor <= 'f') {
-        ch = (ch << 4) + (*mCursor - 'a') + 10;
-      } else if ('A' <= *mCursor && *mCursor <= 'F') {
-        ch = (ch << 4) + (*mCursor - 'A') + 10;
-      } else {
-        ch = (ch << 4) + (*mCursor - '0');
-      }
-    }
-    return ch;
-  }
-  case 0:
-  case 1:
-  case 2:
-  case 3:
-  case 4:
-  case 5:
-  case 6:
-  case 7: {
-    ch = *mCursor++;
-    if (IsOctDigit()) {
-      ch = (ch << 3) + *mCursor++ - '0';
-      if (IsOctDigit()) {
-        ch = (ch << 3) + *mCursor++ - '0';
-      }
-    }
-    return ch;
+  case '\\': {
+    ++Ptr;
+    break;
   }
   default:
-    std::cerr << "warning illegal escape: " << *(mCursor - 1)
-              << "line: " << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    return *(mCursor - 1);
+    break;
   }
 }
 
-Token Lexer::ScanPunctuator() {
-  tok::TokenKind type = tok::unknown;
-  switch (*mCursor) {
-  case '[': {
-    type = tok::l_square;
-    ++mCursor;
+void Lexer::LexPunctuator(Token &Result) {
+  switch (*CurPtr) {
+#define CASE(ch, tok)                                                          \
+  case ch:                                                                     \
+    formToken(Result, CurPtr + 1, tok);                                        \
     break;
-  }
-  case ']': {
-    type = tok::r_square;
-    ++mCursor;
-    break;
-  }
-  case '(': {
-    type = tok::l_paren;
-    ++mCursor;
-    break;
-  }
-  case ')': {
-    type = tok::r_paren;
-    ++mCursor;
-    break;
-  }
-  case '{': {
-    type = tok::l_brace;
-    ++mCursor;
-    break;
-  }
-  case '}': {
-    type = tok::r_brace;
-    ++mCursor;
-    break;
-  }
+    CASE('[', tok::l_square);
+    CASE(']', tok::r_square);
+    CASE('(', tok::l_paren);
+    CASE(')', tok::r_paren);
+    CASE('{', tok::l_brace);
+    CASE('}', tok::r_brace);
+    CASE('~', tok::tilde);
+    CASE('?', tok::question);
+    CASE(':', tok::colon);
+    CASE(';', tok::semi);
+    CASE(',', tok::comma);
+#undef CASE
   case '.': {
-    mCursor++;
-    if (*mCursor == '.' && !IsEOF(mCursor + 1) && mCursor[1] == '.') {
-      mCursor += 2;
-      type = tok::ellipsis;
+    if (CurPtr[1] == '.' && CurPtr[2] == '.') {
+      formToken(Result, CurPtr + 3, tok::ellipsis);
     } else {
-      type = tok::period;
+      formToken(Result, CurPtr + 1, tok::period);
     }
     break;
   }
   case '&': {
-    ++mCursor;
-    if (*mCursor == '&') {
-      ++mCursor;
-      type = tok::amp_amp;
-    } else if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::amp_equal;
+    if (CurPtr[1] == '&') {
+      formToken(Result, CurPtr + 2, tok::amp_amp);
+    } else if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::amp_equal);
     } else {
-      type = tok::amp;
+      formToken(Result, CurPtr + 1, tok::amp);
     }
     break;
   }
   case '*': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::star_equal;
+    if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::star_equal);
     } else {
-      type = tok::star;
+      formToken(Result, CurPtr + 1, tok::star);
     }
     break;
   }
   case '+': {
-    ++mCursor;
-    if (*mCursor == '+') {
-      ++mCursor;
-      type = tok::plus_plus;
-    } else if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::plus_equal;
+    if (CurPtr[1] == '+') {
+      formToken(Result, CurPtr + 2, tok::plus_plus);
+    } else if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::plus_equal);
     } else {
-      type = tok::plus;
+      formToken(Result, CurPtr + 1, tok::plus);
     }
     break;
   }
   case '-': {
-    ++mCursor;
-    if (*mCursor == '>') {
-      ++mCursor;
-      type = tok::arrow;
-    } else if (*mCursor == '-') {
-      ++mCursor;
-      type = tok::minus_minus;
-    } else if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::minus_equal;
+    if (CurPtr[1] == '>') {
+      formToken(Result, CurPtr + 2, tok::arrow);
+    } else if (CurPtr[1] == '-') {
+      formToken(Result, CurPtr + 2, tok::minus_minus);
+    } else if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::minus_equal);
     } else {
-      type = tok::minus;
+      formToken(Result, CurPtr + 1, tok::minus);
     }
     break;
   }
-  case '~': {
-    ++mCursor;
-    type = tok::tilde;
-    break;
-  }
   case '!': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::exclaim_equal;
+    if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::exclaim_equal);
     } else {
-      type = tok::exclaim;
+      formToken(Result, CurPtr + 1, tok::exclaim);
     }
     break;
   }
   case '/': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::slash_equal;
+    if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::slash_equal);
     } else {
-      type = tok::slash;
+      formToken(Result, CurPtr + 1, tok::slash);
     }
     break;
   }
   case '%': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::percent_equal;
+    if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::percent_equal);
     } else {
-      type = tok::percent;
+      formToken(Result, CurPtr + 1, tok::percent);
     }
     break;
   }
   case '<': {
-    ++mCursor;
-    if (*mCursor == '<') {
-      ++mCursor;
-      if (*mCursor == '=') {
-        ++mCursor;
-        type = tok::less_less_equal;
+    if (CurPtr[1] == '<') {
+      if (CurPtr[2] == '=') {
+        formToken(Result, CurPtr + 3, tok::less_less_equal);
       } else {
-        type = tok::less_less;
+        formToken(Result, CurPtr + 2, tok::less_less);
       }
-    } else if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::less_equal;
+    } else if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::less_equal);
     } else {
-      type = tok::less;
+      formToken(Result, CurPtr + 1, tok::less);
     }
     break;
   }
   case '>': {
-    ++mCursor;
-    if (*mCursor == '>') {
-      ++mCursor;
-      if (*mCursor == '=') {
-        ++mCursor;
-        type = tok::greater_greater_equal;
+    if (CurPtr[1] == '>') {
+      if (CurPtr[2] == '=') {
+        formToken(Result, CurPtr + 3, tok::greater_greater_equal);
       } else {
-        type = tok::greater_greater;
+        formToken(Result, CurPtr + 2, tok::greater_greater);
       }
-    } else if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::greater_equal;
+    } else if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::greater_equal);
     } else {
-      type = tok::greater;
+      formToken(Result, CurPtr + 1, tok::greater);
     }
     break;
   }
   case '^': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::caret_equal;
+    if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::caret_equal);
     } else {
-      type = tok::caret;
+      formToken(Result, CurPtr + 1, tok::caret);
     }
     break;
   }
   case '|': {
-    ++mCursor;
-    if (*mCursor == '|') {
-      ++mCursor;
-      type = tok::pipe_pipe;
-    } else if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::pipe_equal;
+    if (CurPtr[1] == '|') {
+      formToken(Result, CurPtr + 2, tok::pipe_pipe);
+    } else if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::pipe_equal);
     } else {
-      type = tok::pipe;
+      formToken(Result, CurPtr + 1, tok::pipe);
     }
     break;
   }
-  case '?': {
-    ++mCursor;
-    type = tok::question;
-    break;
-  }
-  case ':': {
-    ++mCursor;
-    type = tok::colon;
-    break;
-  }
-  case ';': {
-    ++mCursor;
-    type = tok::semi;
-    break;
-  }
-  case ',': {
-    ++mCursor;
-    type = tok::comma;
-    break;
-  }
+
   case '=': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
-      type = tok::equal_equal;
+    if (CurPtr[1] == '=') {
+      formToken(Result, CurPtr + 2, tok::equal_equal);
     } else {
-      type = tok::equal;
+      formToken(Result, CurPtr + 1, tok::equal);
     }
     break;
   }
   }
-  return Token{mLine, mColumn, type};
 }
 
-void Lexer::InitKeyWordTypeMap() {
-  mKeywordTypeMap = {{"auto", tok::kw_auto},         {"break", tok::kw_break},
-                     {"case", tok::kw_case},         {"char", tok::kw_char},
-                     {"const", tok::kw_const},       {"continue", tok::kw_continue},
-                     {"default", tok::kw_default},   {"do", tok::kw_do},
-                     {"double", tok::kw_double},     {"else", tok::kw_else},
-                     {"enum", tok::kw_enum},         {"extern", tok::kw_extern},
-                     {"float", tok::kw_float},       {"for", tok::kw_for},
-                     {"goto", tok::kw_goto},         {"if", tok::kw_if},
-                     {"inline", tok::kw_inline},     {"int", tok::kw_int},
-                     {"long", tok::kw_long},         {"register", tok::kw_register},
-                     {"restrict", tok::kw_restrict}, {"return", tok::kw_return},
-                     {"short", tok::kw_short},       {"signed", tok::kw_signed},
-                     {"sizeof", tok::kw_sizeof},     {"static", tok::kw_static},
-                     {"struct", tok::kw_struct},     {"switch", tok::kw_switch},
-                     {"typedef", tok::kw_typedef},   {"union", tok::kw_union},
-                     {"unsigned", tok::kw_unsigned}, {"void", tok::kw_void},
-                     {"volatile", tok::kw_volatile}, {"while", tok::kw_while}};
+void Lexer::addKeywords() {
+#define KEYWORD(NAME, FLAGS) addKeyword(llvm::StringRef(#NAME), tok::kw_##NAME);
+#include "TokenKinds.def"
+}
+
+void Lexer::addKeyword(llvm::StringRef Keyword, tok::TokenKind TokenCode) {
+  HashTable.insert(std::make_pair(Keyword, TokenCode));
+}
+
+tok::TokenKind Lexer::getKeyword(llvm::StringRef Name,
+                          tok::TokenKind DefaultTokenCode) {
+  auto Result = HashTable.find(Name);
+  if (Result != HashTable.end())
+    return Result->second;
+  return DefaultTokenCode;
+}
+
+void Lexer::formToken(Token &Result, const char *TokEnd, tok::TokenKind Kind, Token::Variant Value) {
+  size_t TokLen = TokEnd - CurPtr;
+  Result.Ptr = CurPtr;
+  Result.Length = TokLen;
+  Result.Kind = Kind;
+  Result.Loc = llvm::SMLoc::getFromPointer(CurPtr);
+  Result.Value = Value;
 }
 } // namespace lcc::lexer

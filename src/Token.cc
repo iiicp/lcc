@@ -9,37 +9,23 @@
  ***********************************/
 
 #include "Token.h"
-#include <sstream>
 namespace lcc {
 
 std::string Token::GetTokenSpelling() const {
-  const char *punctuator = getPunctuatorSpelling(mType);
+  const char *punctuator = getPunctuatorSpelling(Kind);
   if (punctuator) {
     return punctuator;
   }
-  const char *keyword = getKeywordSpelling(mType);
+  const char *keyword = getKeywordSpelling(Kind);
   if (keyword) {
     return keyword;
   }
-  switch (mType) {
+  switch (Kind) {
   case tok::identifier:
   case tok::char_constant:
   case tok::string_literal:
   case tok::numeric_constant:
-    return std::visit(
-        [](auto &&Value) -> std::string {
-          using T = std::decay_t<decltype(Value)>;
-          if constexpr (std::is_same<T, std::monostate>::value) {
-            return "";
-          } else if constexpr (std::is_same<T, std::monostate>::value) {
-            return Value;
-          } else {
-            std::ostringstream os;
-            os << Value;
-            return os.str();
-          }
-        },
-        mValue);
+    return llvm::StringRef(Ptr, Length).str();
   case tok::eof:
     return "eof";
   default:

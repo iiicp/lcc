@@ -81,12 +81,12 @@ NodeRetValue Program::Codegen(CodeGenContext &context) const {
     for (auto &ext : mExternalDecl) {
       ext->Codegen(context);
     }
-//    if (llvm::verifyModule(*context.mModule)) {
-//      context.mModule->print(llvm::errs(), nullptr);
-//      std::terminate();
-//    }else {
-//      context.mModule->print(llvm::outs(), nullptr);
-//    }
+    if (llvm::verifyModule(*context.mModule)) {
+      context.mModule->print(llvm::errs(), nullptr);
+      std::terminate();
+    }else {
+      context.mModule->print(llvm::outs(), nullptr);
+    }
     return {nullptr, nullptr, false};
 }
 NodeRetValue GlobalDecl::Codegen(lcc::CodeGenContext &context) const {

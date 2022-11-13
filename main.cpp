@@ -16,25 +16,29 @@ int main(int argc, char *argv[]) {
       return 0;
     }
 
-    std::ifstream file(argv[1]);
-    if(!file.is_open())
-    {
-        std::cerr<<"Could not open source file";
-        return -1;
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+        FileOrErr = llvm::MemoryBuffer::getFile(argv[1]);
+    if (std::error_code BufferError =
+            FileOrErr.getError()) {
+      llvm::WithColor::error(llvm::errs(), argv[0])
+          << "Error reading " << argv[1] << ": "
+          << BufferError.message() << "\n";
+      return -1;
     }
-    std::string source;
-    file.seekg(0,std::ios_base::end);
-    std::size_t pos = file.tellg();
-    source.resize(pos);
-    file.seekg(0,std::ios_base::beg);
-    file.read(source.data(),source.size());
+    llvm::SourceMgr SrcMgr;
+    lcc::DiagnosticsEngine Diags(SrcMgr);
 
-    lcc::Lexer lex(reinterpret_cast<uint8_t *>(source.data()), source.size());
+    // Tell SrcMgr about this buffer, which is what the
+    // parser will pick up.
+    SrcMgr.AddNewSourceBuffer(std::move(*FileOrErr),
+                              llvm::SMLoc());
+
+    lcc::Lexer lex(SrcMgr, Diags);
     auto tokens = lex.Tokenize();
-//    for (auto &tok : tokens) {
-//        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
-//        std::cout << tok.GetTokenSpelling() << std::endl;
-//    }
+    for (auto &tok : tokens) {
+//        std::cout << tok.getLocation();
+        std::cout << tok.GetTokenSpelling() << std::endl;
+    }
 
     lcc::Parser parser(std::move(tokens));
     auto program = parser.ParseProgram();

@@ -1,0 +1,8 @@
+#ifndef DIAG
+#define DIAG(ID, Level, Msg)
+#endif
+DIAG(err_unterminated_block_comment, Error, "unterminated */ comment")
+DIAG(err_empty_char_constant, Error, "empty '' constant")
+DIAG(err_unterminated_char_constant, Error, "unterminated ' char constant")
+DIAG(err_unterminated_string_constant, Error, "unterminated \" constant")
+#undef DIAG

@@ -13,16 +13,16 @@
 #include <vector>
 #include "Token.h"
 #include "Syntax.h"
-namespace lcc::parser {
+namespace lcc {
 class Parser {
 private:
-  std::vector<lexer::Token> mTokens;
-  using TokIter = std::vector<lexer::Token>::const_iterator;
+  std::vector<Token> mTokens;
+  using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
 
 public:
-  explicit Parser(std::vector<lexer::Token> && tokens): mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()), mTokEnd(mTokens.cend()) {}
+  explicit Parser(std::vector<Token> && tokens): mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()), mTokEnd(mTokens.cend()) {}
   std::unique_ptr<Program> ParseProgram();
 
 private:
@@ -62,13 +62,13 @@ private:
   std::unique_ptr<Type> ParseType(std::unique_ptr<Type> &&baseType);
   bool IsFunction();
   bool IsTypeName();
-  bool Match(lexer::TokenType tokenType);
-  bool Expect(lexer::TokenType tokenType);
-  bool Consume(lexer::TokenType tokenType);
+  bool Match(tok::TokenKind tokenType);
+  bool Expect(tok::TokenKind tokenType);
+  bool Consume(tok::TokenKind tokenType);
   bool ConsumeAny();
-  bool Peek(lexer::TokenType tokenType);
-  bool IsUnaryOp(lexer::TokenType tokenType);
-  bool IsPostFixExpr(lexer::TokenType tokenType);
+  bool Peek(tok::TokenKind tokenType);
+  bool IsUnaryOp(tok::TokenKind tokenType);
+  bool IsPostFixExpr(tok::TokenKind tokenType);
 };
 }
 #endif // LCC_PARSER_H

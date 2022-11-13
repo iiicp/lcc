@@ -13,11 +13,8 @@
 #include <cstdint>
 #include <string>
 #include <variant>
-namespace lcc::lexer {
-enum TokenType {
-#define TOK(X) X,
-#include "TokenKinds.def"
-};
+#include "TokenKinds.h"
+namespace lcc{
 class Token {
   using TokenValue =
       std::variant<std::monostate, int32_t, uint32_t, int64_t, uint64_t,
@@ -26,19 +23,19 @@ class Token {
 private:
   uint64_t mLine;
   uint64_t mColumn;
-  TokenType mType;
+  tok::TokenKind mType;
   TokenValue mValue;
 
 public:
-  explicit Token(uint64_t Line, uint64_t Column, TokenType Type)
+  explicit Token(uint64_t Line, uint64_t Column, tok::TokenKind Type)
       : mLine(Line), mColumn(Column), mType(Type) {}
   template <typename T>
-  explicit Token(uint64_t Line, uint64_t Column, TokenType Type, T &&Value)
+  explicit Token(uint64_t Line, uint64_t Column, tok::TokenKind Type, T &&Value)
       : mLine(Line), mColumn(Column), mType(Type),
         mValue(std::forward<T>(Value)) {}
   [[nodiscard]] uint64_t GetLine() const { return mLine; }
   [[nodiscard]] uint64_t GetColumn() const { return mColumn; }
-  [[nodiscard]] TokenType GetTokenType() const { return mType; }
+  [[nodiscard]] tok::TokenKind GetTokenType() const { return mType; }
   [[nodiscard]] const TokenValue &GetTokenValue() const { return mValue; }
 
   std::string GetTokenSpelling() const;

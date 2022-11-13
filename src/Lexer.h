@@ -14,7 +14,7 @@
 #include "Token.h"
 #include <unordered_map>
 #include <vector>
-namespace lcc::lexer {
+namespace lcc {
 enum class IntegerType {
   Default,
   U,
@@ -30,7 +30,7 @@ private:
   uint8_t *mSrcEnd;
   uint32_t mLine;
   uint32_t mColumn;
-  std::unordered_map<std::string, TokenType> mKeywordTypeMap;
+  std::unordered_map<std::string, tok::TokenKind> mKeywordTypeMap;
 
 public:
   Lexer(uint8_t *SrcStart, uint32_t SrcSize)

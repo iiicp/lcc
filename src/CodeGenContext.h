@@ -16,11 +16,9 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include <unordered_map>
-namespace lcc::parser {
-class Type;
-}
-namespace lcc {
 
+namespace lcc {
+class Type;
 using NodeRetValue = std::tuple<llvm::Value *, llvm::Type*, bool>;
 using LLVMTypePtr = llvm::Type *;
 

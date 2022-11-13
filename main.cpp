@@ -29,18 +29,18 @@ int main(int argc, char *argv[]) {
     file.seekg(0,std::ios_base::beg);
     file.read(source.data(),source.size());
 
-    lcc::lexer::Lexer lex(reinterpret_cast<uint8_t *>(source.data()), source.size());
+    lcc::Lexer lex(reinterpret_cast<uint8_t *>(source.data()), source.size());
     auto tokens = lex.Tokenize();
 //    for (auto &tok : tokens) {
 //        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
 //        std::cout << tok.GetTokenSpelling() << std::endl;
 //    }
 
-    lcc::parser::Parser parser(std::move(tokens));
+    lcc::Parser parser(std::move(tokens));
     auto program = parser.ParseProgram();
 
     lcc::CodeGenContext context;
-    lcc::codegen::CodeGen gen(std::move(program), context);
+    lcc::CodeGen gen(std::move(program), context);
     assert(!llvm::verifyModule(*context.mModule));
 
     /// 此处要初始化jit环境

@@ -11,7 +11,7 @@
 #include "Parser.h"
 #include <stack>
 
-namespace lcc::parser {
+namespace lcc {
 
 std::unique_ptr<Program> Parser::ParseProgram() {
   std::vector<std::unique_ptr<ExternalDeclaration>> decls;
@@ -27,28 +27,28 @@ std::unique_ptr<Program> Parser::ParseProgram() {
 std::unique_ptr<Function> Parser::ParseFunction() {
   assert(IsTypeName());
   auto retType = ParseType();
-  assert(Expect(lexer::identifier));
+  assert(Expect(tok::identifier));
   std::string funcName = std::get<std::string>(mTokCursor->GetTokenValue());
-  Consume(lexer::identifier);
-  assert(Match(lexer::l_paren));
+  Consume(tok::identifier);
+  assert(Match(tok::l_paren));
   std::vector<std::pair<std::unique_ptr<Type>, std::string>> params;
-  while (mTokCursor->GetTokenType() != lexer::r_paren) {
+  while (mTokCursor->GetTokenType() != tok::r_paren) {
     auto ty = ParseType();
     std::string name;
-    if (Match(lexer::comma)) {
+    if (Match(tok::comma)) {
       name = "";
     } else {
-      assert(mTokCursor->GetTokenType() == lexer::identifier);
+      assert(mTokCursor->GetTokenType() == tok::identifier);
       name = std::get<std::string>(mTokCursor->GetTokenValue());
-      Consume(lexer::identifier);
-      if (Peek(lexer::comma))
-        Consume(lexer::comma);
+      Consume(tok::identifier);
+      if (Peek(tok::comma))
+        Consume(tok::comma);
     }
     params.push_back({std::move(ty), name});
   }
-  Consume(lexer::r_paren);
-  if (mTokCursor->GetTokenType() == lexer::semi) {
-    Consume(lexer::semi);
+  Consume(tok::r_paren);
+  if (mTokCursor->GetTokenType() == tok::semi) {
+    Consume(tok::semi);
     return std::make_unique<Function>(std::move(retType), funcName,
                                       std::move(params));
   } else {
@@ -59,34 +59,34 @@ std::unique_ptr<Function> Parser::ParseFunction() {
 std::unique_ptr<GlobalDecl> Parser::ParseGlobalDecl() {
   assert(IsTypeName());
   auto ty = ParseType();
-  assert(Expect(lexer::identifier));
+  assert(Expect(tok::identifier));
   std::string varName = std::get<std::string>(mTokCursor->GetTokenValue());
-  Consume(lexer::identifier);
+  Consume(tok::identifier);
   std::unique_ptr<GlobalDecl> globalDecl;
-  if (Match(lexer::equal)) {
+  if (Match(tok::equal)) {
     globalDecl = std::make_unique<GlobalDecl>(std::move(ty), varName, ParseConstantExpr());
   } else {
     globalDecl = std::make_unique<GlobalDecl>(std::move(ty), varName);
   }
-  assert(Match(lexer::semi));
+  assert(Match(tok::semi));
   return std::move(globalDecl);
 }
 
 std::unique_ptr<ConstantExpr> Parser::ParseConstantExpr() {
   switch (mTokCursor->GetTokenType()) {
-  case lexer::char_constant: {
+  case tok::char_constant: {
     ConstantExpr::ConstantValue val =
         std::get<int32_t>(mTokCursor->GetTokenValue());
     ConsumeAny();
     return std::make_unique<ConstantExpr>(val);
   }
-  case lexer::string_literal: {
+  case tok::string_literal: {
     ConstantExpr::ConstantValue val =
         std::get<std::string>(mTokCursor->GetTokenValue());
     ConsumeAny();
     return std::make_unique<ConstantExpr>(val);
   }
-  case lexer::numeric_constant: {
+  case tok::numeric_constant: {
     auto val = std::visit(
         [](auto &&value) -> ConstantExpr::ConstantValue {
           using T = std::decay_t<decltype(value)>;
@@ -107,7 +107,7 @@ std::unique_ptr<ConstantExpr> Parser::ParseConstantExpr() {
 }
 
 std::unique_ptr<Type> Parser::ParseType() {
-  std::vector<lexer::TokenType> typeKinds;
+  std::vector<tok::TokenKind> typeKinds;
   while (IsTypeName()) {
     typeKinds.push_back(mTokCursor->GetTokenType());
     ++mTokCursor;
@@ -118,7 +118,7 @@ std::unique_ptr<Type> Parser::ParseType() {
 }
 
 std::unique_ptr<Type> Parser::ParseType(std::unique_ptr<Type> &&baseType) {
-  if (Match(lexer::star)) {
+  if (Match(tok::star)) {
     return std::make_unique<PointerType>(ParseType(std::move(baseType)));
   } else {
     return std::move(baseType);
@@ -127,16 +127,16 @@ std::unique_ptr<Type> Parser::ParseType(std::unique_ptr<Type> &&baseType) {
 
 std::unique_ptr<Stmt> Parser::ParseStmt() {
   std::unique_ptr<Stmt> stmt;
-  if (Peek(lexer::kw_if)) {
+  if (Peek(tok::kw_if)) {
     stmt = ParseIfStmt();
-  }else if (Peek(lexer::kw_do)) {
+  }else if (Peek(tok::kw_do)) {
     stmt = ParseDoWhileStmt();
-  }else if (Peek(lexer::kw_while)) {
+  }else if (Peek(tok::kw_while)) {
     stmt = ParseWhileStmt();
-  }else if (Peek(lexer::kw_for)) {
+  }else if (Peek(tok::kw_for)) {
     TokIter start = mTokCursor;
-    Consume(lexer::kw_for);
-    Match(lexer::l_paren);
+    Consume(tok::kw_for);
+    Match(tok::l_paren);
     if (IsTypeName()) {
       mTokCursor = start;
       stmt = ParseForDeclStmt();
@@ -146,38 +146,38 @@ std::unique_ptr<Stmt> Parser::ParseStmt() {
     }
   }else if (IsTypeName()) {
     stmt = ParseDeclStmt();
-  }else if (Peek(lexer::kw_break)) {
+  }else if (Peek(tok::kw_break)) {
     stmt = ParseBreakStmt();
-  }else if (Peek(lexer::kw_continue)) {
+  }else if (Peek(tok::kw_continue)) {
     stmt = ParseContinueStmt();
-  }else if (Peek(lexer::kw_return)) {
+  }else if (Peek(tok::kw_return)) {
     stmt = ParseReturnStmt();
-  }else if (Peek(lexer::l_brace)) {
+  }else if (Peek(tok::l_brace)) {
     stmt = ParseBlockStmt();
   }else{
-    //Expect(lexer::identifier);
+    //Expect(tok::identifier);
     stmt = ParseExprStmt();
   }
   return stmt;
 }
 
 std::unique_ptr<BlockStmt> Parser::ParseBlockStmt() {
-    assert(Match(lexer::l_brace));
+    assert(Match(tok::l_brace));
     std::vector<std::unique_ptr<Stmt>> stmts;
-    while (mTokCursor->GetTokenType() != lexer::r_brace) {
+    while (mTokCursor->GetTokenType() != tok::r_brace) {
       stmts.push_back(ParseStmt());
     }
-    Consume(lexer::r_brace);
+    Consume(tok::r_brace);
     return std::make_unique<BlockStmt>(std::move(stmts));
 }
 
 std::unique_ptr<IfStmt> Parser::ParseIfStmt() {
-  Consume(lexer::kw_if);
-  assert(Match(lexer::l_paren));
+  Consume(tok::kw_if);
+  assert(Match(tok::l_paren));
   std::unique_ptr<Expr> expr = ParseExpr();
-  assert(Match(lexer::r_paren));
+  assert(Match(tok::r_paren));
   std::unique_ptr<Stmt> thenStmt = ParseStmt();
-  if (Match(lexer::kw_else)) {
+  if (Match(tok::kw_else)) {
     return std::make_unique<IfStmt>(std::move(expr), std::move(thenStmt), ParseStmt());
   }else {
     return std::make_unique<IfStmt>(std::move(expr), std::move(thenStmt));
@@ -185,43 +185,43 @@ std::unique_ptr<IfStmt> Parser::ParseIfStmt() {
 }
 
 std::unique_ptr<WhileStmt> Parser::ParseWhileStmt() {
-  Consume(lexer::kw_while);
-  assert(Match(lexer::l_paren));
+  Consume(tok::kw_while);
+  assert(Match(tok::l_paren));
   auto expr = ParseExpr();
-  assert(Match(lexer::r_paren));
+  assert(Match(tok::r_paren));
   auto stmt = ParseStmt();
   return std::make_unique<WhileStmt>(std::move(expr), std::move(stmt));
 }
 
 std::unique_ptr<DoWhileStmt> Parser::ParseDoWhileStmt() {
-  Consume(lexer::kw_do);
+  Consume(tok::kw_do);
   auto stmt = ParseStmt();
-  assert(Match(lexer::kw_while));
-  assert(Match(lexer::l_paren));
+  assert(Match(tok::kw_while));
+  assert(Match(tok::l_paren));
   auto expr = ParseExpr();
-  assert(Match(lexer::r_paren));
-  assert(Match(lexer::semi));
+  assert(Match(tok::r_paren));
+  assert(Match(tok::semi));
   return std::make_unique<DoWhileStmt>(std::move(stmt), std::move(expr));
 }
 
 std::unique_ptr<ForStmt> Parser::ParseForStmt() {
-  Consume(lexer::kw_for);
-  assert(Match(lexer::l_paren));
+  Consume(tok::kw_for);
+  assert(Match(tok::l_paren));
   std::unique_ptr<Expr> initExpr=nullptr, controlExpr=nullptr, postExpr=nullptr;
-  if (!Peek(lexer::semi)) {
+  if (!Peek(tok::semi)) {
     initExpr = ParseExpr();
   }
-  assert(Match(lexer::semi));
+  assert(Match(tok::semi));
 
-  if (!Peek(lexer::semi)) {
+  if (!Peek(tok::semi)) {
     controlExpr = ParseExpr();
   }
-  assert(Match(lexer::semi));
+  assert(Match(tok::semi));
 
-  if (!Peek(lexer::r_paren)) {
+  if (!Peek(tok::r_paren)) {
     postExpr = ParseExpr();
   }
-  assert(Match(lexer::r_paren));
+  assert(Match(tok::r_paren));
   auto stmt = ParseStmt();
   return std::make_unique<ForStmt>(std::move(initExpr),
                                    std::move(controlExpr),
@@ -229,19 +229,19 @@ std::unique_ptr<ForStmt> Parser::ParseForStmt() {
 }
 
 std::unique_ptr<ForDeclarationStmt> Parser::ParseForDeclStmt() {
-  Consume(lexer::kw_for);
-  assert(Match(lexer::l_paren));
+  Consume(tok::kw_for);
+  assert(Match(tok::l_paren));
   assert(IsTypeName());
   std::unique_ptr<Declaration> initDecl = ParseDeclStmt();
   std::unique_ptr<Expr> controlExpr = nullptr, postExpr = nullptr;
-  if (!Peek(lexer::semi)) {
+  if (!Peek(tok::semi)) {
     controlExpr = ParseExpr();
   }
-  assert(Match(lexer::semi));
-  if (!Peek(lexer::r_paren)) {
+  assert(Match(tok::semi));
+  if (!Peek(tok::r_paren)) {
     postExpr = ParseExpr();
   }
-  assert(Match(lexer::r_paren));
+  assert(Match(tok::r_paren));
   auto stmt = ParseStmt();
   return std::make_unique<ForDeclarationStmt>(std::move(initDecl),
                                    std::move(controlExpr),
@@ -251,57 +251,57 @@ std::unique_ptr<ForDeclarationStmt> Parser::ParseForDeclStmt() {
 std::unique_ptr<Declaration> Parser::ParseDeclStmt() {
   assert(IsTypeName());
   auto ty = ParseType();
-  Expect(lexer::identifier);
+  Expect(tok::identifier);
   std::string name = std::get<std::string>(mTokCursor->GetTokenValue());
-  Consume(lexer::identifier);
-  if (Peek(lexer::equal)) {
-    Consume(lexer::equal);
+  Consume(tok::identifier);
+  if (Peek(tok::equal)) {
+    Consume(tok::equal);
     auto expr = ParseExpr();
-    assert(Match(lexer::semi));
+    assert(Match(tok::semi));
     return std::make_unique<Declaration>(std::move(ty), name, std::move(expr));
   }else {
-    assert(Match(lexer::semi));
+    assert(Match(tok::semi));
     return std::make_unique<Declaration>(std::move(ty), name);
   }
 }
 
 std::unique_ptr<BreakStmt> Parser::ParseBreakStmt() {
-    assert(Match(lexer::kw_break));
-    assert(Match(lexer::semi));
+    assert(Match(tok::kw_break));
+    assert(Match(tok::semi));
     return std::make_unique<BreakStmt>();
 }
 
 std::unique_ptr<ContinueStmt> Parser::ParseContinueStmt() {
-  assert(Match(lexer::kw_continue));
-  assert(Match(lexer::semi));
+  assert(Match(tok::kw_continue));
+  assert(Match(tok::semi));
   return std::make_unique<ContinueStmt>();
 }
 
 std::unique_ptr<ReturnStmt> Parser::ParseReturnStmt() {
-  assert(Match(lexer::kw_return));
-  if (Peek(lexer::semi)) {
+  assert(Match(tok::kw_return));
+  if (Peek(tok::semi)) {
     return std::make_unique<ReturnStmt>();
   }
 
   auto expr = ParseExpr();
-  assert(Match(lexer::semi));
+  assert(Match(tok::semi));
   return std::make_unique<ReturnStmt>(std::move(expr));
 }
 
 std::unique_ptr<ExprStmt> Parser::ParseExprStmt() {
-  if (Peek(lexer::semi)) {
+  if (Peek(tok::semi)) {
     return std::make_unique<ExprStmt>();
   }
   auto expr = ParseExpr();
-  assert(Match(lexer::semi));
+  assert(Match(tok::semi));
   return std::make_unique<ExprStmt>(std::move(expr));
 }
 
 std::unique_ptr<Expr> Parser::ParseExpr() {
   auto assign = ParseAssignExpr();
   std::vector<std::unique_ptr<AssignExpr>> assignExps;
-  while (Peek(lexer::comma)) {
-    Consume(lexer::comma);
+  while (Peek(tok::comma)) {
+    Consume(tok::comma);
     assignExps.push_back(ParseAssignExpr());
   }
   return std::make_unique<Expr>(std::move(assign), std::move(assignExps));
@@ -309,19 +309,19 @@ std::unique_ptr<Expr> Parser::ParseExpr() {
 
 std::unique_ptr<AssignExpr> Parser::ParseAssignExpr() {
   auto conditionExpr = ParseConditionalExpr();
-  lexer::TokenType tokenType = lexer::unknown;
+  tok::TokenKind tokenType = tok::unknown;
   switch (mTokCursor->GetTokenType()) {
-  case lexer::equal:
-  case lexer::plus_equal:
-  case lexer::star_equal:
-  case lexer::minus_equal:
-  case lexer::slash_equal:
-  case lexer::percent_equal:
-  case lexer::less_less_equal:
-  case lexer::greater_greater_equal:
-  case lexer::pipe_equal:
-  case lexer::amp_equal:
-  case lexer::caret_equal: {
+  case tok::equal:
+  case tok::plus_equal:
+  case tok::star_equal:
+  case tok::minus_equal:
+  case tok::slash_equal:
+  case tok::percent_equal:
+  case tok::less_less_equal:
+  case tok::greater_greater_equal:
+  case tok::pipe_equal:
+  case tok::amp_equal:
+  case tok::caret_equal: {
     tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     return std::make_unique<AssignExpr>(std::move(conditionExpr), tokenType, ParseAssignExpr());
@@ -333,10 +333,10 @@ std::unique_ptr<AssignExpr> Parser::ParseAssignExpr() {
 
 std::unique_ptr<ConditionalExpr> Parser::ParseConditionalExpr() {
   auto logOrExpr = ParseLogOrExpr();
-  if (Peek(lexer::question)) {
-    Consume(lexer::question);
+  if (Peek(tok::question)) {
+    Consume(tok::question);
     auto expr = ParseExpr();
-    assert(Match(lexer::colon));
+    assert(Match(tok::colon));
     auto conditionalExpr = ParseConditionalExpr();
     return std::make_unique<ConditionalExpr>(std::move(logOrExpr), std::move(expr), std::move(conditionalExpr));
   }else {
@@ -347,8 +347,8 @@ std::unique_ptr<ConditionalExpr> Parser::ParseConditionalExpr() {
 std::unique_ptr<LogOrExpr> Parser::ParseLogOrExpr() {
   auto expr = ParseLogAndExpr();
   std::vector<std::unique_ptr<LogAndExpr>> logAndExprArr;
-  while (Peek(lexer::pipe_pipe)) {
-    Consume(lexer::pipe_pipe);
+  while (Peek(tok::pipe_pipe)) {
+    Consume(tok::pipe_pipe);
     logAndExprArr.push_back(ParseLogAndExpr());
   }
   return std::make_unique<LogOrExpr>(std::move(expr), std::move(logAndExprArr));
@@ -357,8 +357,8 @@ std::unique_ptr<LogOrExpr> Parser::ParseLogOrExpr() {
 std::unique_ptr<LogAndExpr> Parser::ParseLogAndExpr() {
   auto expr = ParseBitOrExpr();
   std::vector<std::unique_ptr<BitOrExpr>> bitOrExprArr;
-  while (Peek(lexer::amp_amp)) {
-    Consume(lexer::amp_amp);
+  while (Peek(tok::amp_amp)) {
+    Consume(tok::amp_amp);
     bitOrExprArr.push_back(ParseBitOrExpr());
   }
   return std::make_unique<LogAndExpr>(std::move(expr), std::move(bitOrExprArr));
@@ -367,8 +367,8 @@ std::unique_ptr<LogAndExpr> Parser::ParseLogAndExpr() {
 std::unique_ptr<BitOrExpr> Parser::ParseBitOrExpr() {
   auto expr = ParseBitXorExpr();
   std::vector<std::unique_ptr<BitXorExpr>> bitXorExprArr;
-  while (Peek(lexer::pipe)) {
-    Consume(lexer::pipe);
+  while (Peek(tok::pipe)) {
+    Consume(tok::pipe);
     bitXorExprArr.push_back(ParseBitXorExpr());
   }
   return std::make_unique<BitOrExpr>(std::move(expr), std::move(bitXorExprArr));
@@ -377,8 +377,8 @@ std::unique_ptr<BitOrExpr> Parser::ParseBitOrExpr() {
 std::unique_ptr<BitXorExpr> Parser::ParseBitXorExpr() {
   auto expr = ParseBitAndExpr();
   std::vector<std::unique_ptr<BitAndExpr>> bitAndExprArr;
-  while (Peek(lexer::caret)) {
-    Consume(lexer::caret);
+  while (Peek(tok::caret)) {
+    Consume(tok::caret);
     bitAndExprArr.push_back(ParseBitAndExpr());
   }
   return std::make_unique<BitXorExpr>(std::move(expr), std::move(bitAndExprArr));
@@ -387,8 +387,8 @@ std::unique_ptr<BitXorExpr> Parser::ParseBitXorExpr() {
 std::unique_ptr<BitAndExpr> Parser::ParseBitAndExpr() {
   auto expr = ParseEqualExpr();
   std::vector<std::unique_ptr<EqualExpr>> equalExprArr;
-  while (Peek(lexer::amp)) {
-    Consume(lexer::amp);
+  while (Peek(tok::amp)) {
+    Consume(tok::amp);
     equalExprArr.push_back(ParseEqualExpr());
   }
   return std::make_unique<BitAndExpr>(std::move(expr), std::move(equalExprArr));
@@ -396,10 +396,10 @@ std::unique_ptr<BitAndExpr> Parser::ParseBitAndExpr() {
 
 std::unique_ptr<EqualExpr> Parser::ParseEqualExpr() {
   auto expr = ParseRelationalExpr();
-  std::vector<std::pair<lexer::TokenType, std::unique_ptr<RelationalExpr>>> relationalExprArr;
-  while(mTokCursor->GetTokenType() == lexer::equal_equal
-         ||mTokCursor->GetTokenType() == lexer::exclaim_equal) {
-    lexer::TokenType tokenType = mTokCursor->GetTokenType();
+  std::vector<std::pair<tok::TokenKind, std::unique_ptr<RelationalExpr>>> relationalExprArr;
+  while(mTokCursor->GetTokenType() == tok::equal_equal
+         ||mTokCursor->GetTokenType() == tok::exclaim_equal) {
+    tok::TokenKind tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     relationalExprArr.push_back({tokenType, ParseRelationalExpr()});
   }
@@ -408,10 +408,10 @@ std::unique_ptr<EqualExpr> Parser::ParseEqualExpr() {
 
 std::unique_ptr<RelationalExpr>  Parser::ParseRelationalExpr() {
   auto expr = ParseShiftExpr();
-  std::vector<std::pair<lexer::TokenType, std::unique_ptr<ShiftExpr>>> relationalExprArr;
-  while (mTokCursor->GetTokenType() == lexer::less || mTokCursor->GetTokenType() == lexer::less_equal
-         || mTokCursor->GetTokenType() == lexer::greater || mTokCursor->GetTokenType() == lexer::greater_equal) {
-    lexer::TokenType tokenType = mTokCursor->GetTokenType();
+  std::vector<std::pair<tok::TokenKind, std::unique_ptr<ShiftExpr>>> relationalExprArr;
+  while (mTokCursor->GetTokenType() == tok::less || mTokCursor->GetTokenType() == tok::less_equal
+         || mTokCursor->GetTokenType() == tok::greater || mTokCursor->GetTokenType() == tok::greater_equal) {
+    tok::TokenKind tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     relationalExprArr.push_back({tokenType, ParseShiftExpr()});
   }
@@ -420,9 +420,9 @@ std::unique_ptr<RelationalExpr>  Parser::ParseRelationalExpr() {
 
 std::unique_ptr<ShiftExpr> Parser::ParseShiftExpr() {
   auto expr = ParseAdditiveExpr();
-  std::vector<std::pair<lexer::TokenType, std::unique_ptr<AdditiveExpr>>> additiveExprArr;
-  while (mTokCursor->GetTokenType() == lexer::less_less || mTokCursor->GetTokenType() == lexer::greater_greater) {
-    lexer::TokenType tokenType = mTokCursor->GetTokenType();
+  std::vector<std::pair<tok::TokenKind, std::unique_ptr<AdditiveExpr>>> additiveExprArr;
+  while (mTokCursor->GetTokenType() == tok::less_less || mTokCursor->GetTokenType() == tok::greater_greater) {
+    tok::TokenKind tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     additiveExprArr.push_back({tokenType, ParseAdditiveExpr()});
   }
@@ -431,9 +431,9 @@ std::unique_ptr<ShiftExpr> Parser::ParseShiftExpr() {
 
 std::unique_ptr<AdditiveExpr> Parser::ParseAdditiveExpr() {
   auto expr = ParseMultiExpr();
-  std::vector<std::pair<lexer::TokenType, std::unique_ptr<MultiExpr>>> multiExprArr;
-  while (mTokCursor->GetTokenType() == lexer::plus || mTokCursor->GetTokenType() == lexer::minus) {
-    lexer::TokenType tokenType = mTokCursor->GetTokenType();
+  std::vector<std::pair<tok::TokenKind, std::unique_ptr<MultiExpr>>> multiExprArr;
+  while (mTokCursor->GetTokenType() == tok::plus || mTokCursor->GetTokenType() == tok::minus) {
+    tok::TokenKind tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     multiExprArr.push_back({tokenType, ParseMultiExpr()});
   }
@@ -442,9 +442,9 @@ std::unique_ptr<AdditiveExpr> Parser::ParseAdditiveExpr() {
 
 std::unique_ptr<MultiExpr> Parser::ParseMultiExpr() {
   auto expr = ParseCastExpr();
-  std::vector<std::pair<lexer::TokenType, std::unique_ptr<CastExpr>>> castExprArr;
-  while (mTokCursor->GetTokenType() == lexer::star || mTokCursor->GetTokenType() == lexer::slash || mTokCursor->GetTokenType() == lexer::percent) {
-    lexer::TokenType tokenType = mTokCursor->GetTokenType();
+  std::vector<std::pair<tok::TokenKind, std::unique_ptr<CastExpr>>> castExprArr;
+  while (mTokCursor->GetTokenType() == tok::star || mTokCursor->GetTokenType() == tok::slash || mTokCursor->GetTokenType() == tok::percent) {
+    tok::TokenKind tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     castExprArr.push_back({tokenType, ParseCastExpr()});
   }
@@ -453,11 +453,11 @@ std::unique_ptr<MultiExpr> Parser::ParseMultiExpr() {
 
 std::unique_ptr<CastExpr> Parser::ParseCastExpr() {
   TokIter start = mTokCursor;
-  if (Peek(lexer::l_paren)) {
+  if (Peek(tok::l_paren)) {
     ConsumeAny();
     if(IsTypeName()) {
       auto ty = ParseType();
-      assert(Match(lexer::r_paren));
+      assert(Match(tok::r_paren));
       return std::make_unique<CastExpr>(
           std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>(
               std::move(ty), ParseCastExpr()));
@@ -472,16 +472,16 @@ std::unique_ptr<CastExpr> Parser::ParseCastExpr() {
 
 std::unique_ptr<UnaryExpr> Parser::ParseUnaryExpr() {
   if (IsUnaryOp(mTokCursor->GetTokenType())) {
-    lexer::TokenType tokenType = mTokCursor->GetTokenType();
+    tok::TokenKind tokenType = mTokCursor->GetTokenType();
     ConsumeAny();
     auto expr = std::make_unique<UnaryExprUnaryOperator>(tokenType, ParseUnaryExpr());
     return std::make_unique<UnaryExpr>(std::move(expr));
-  }else if (Peek(lexer::kw_sizeof)) {
-    Consume(lexer::kw_sizeof);
-    if (Peek(lexer::l_paren)) {
-      Consume(lexer::l_paren);
+  }else if (Peek(tok::kw_sizeof)) {
+    Consume(tok::kw_sizeof);
+    if (Peek(tok::l_paren)) {
+      Consume(tok::l_paren);
       auto type = ParseType();
-      Expect(lexer::r_paren);
+      Expect(tok::r_paren);
       ConsumeAny();
       auto expr = std::make_unique<UnaryExprSizeOf>(std::move(type));
       return std::make_unique<UnaryExpr>(std::move(expr));
@@ -501,51 +501,51 @@ std::unique_ptr<PostFixExpr> Parser::ParsePostFixExpr()
   stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprPrimary>(ParsePrimaryExpr())));
   while (IsPostFixExpr(mTokCursor->GetTokenType())) {
     auto tokType = mTokCursor->GetTokenType();
-    if (tokType == lexer::l_square) {
+    if (tokType == tok::l_square) {
       assert(!stack.empty());
-      Consume(lexer::l_square);
+      Consume(tok::l_square);
       auto expr = ParseExpr();
-      assert(Match(lexer::r_square));
+      assert(Match(tok::r_square));
       auto postfixExpr = std::move(stack.top());
       stack.pop();
       stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprSubscript>(std::move(postfixExpr), std::move(expr))));
-    }else if (tokType == lexer::l_paren) {
-      Consume(lexer::l_paren);
+    }else if (tokType == tok::l_paren) {
+      Consume(tok::l_paren);
       std::vector<std::unique_ptr<AssignExpr>> params;
-      if (!Peek(lexer::r_paren)) {
+      if (!Peek(tok::r_paren)) {
         params.push_back(ParseAssignExpr());
       }
-      while (mTokCursor->GetTokenType() != lexer::r_paren) {
-        assert(Match(lexer::comma));
+      while (mTokCursor->GetTokenType() != tok::r_paren) {
+        assert(Match(tok::comma));
         params.push_back(ParseAssignExpr());
       }
-      Consume(lexer::r_paren);
+      Consume(tok::r_paren);
       auto postfixExpr = std::move(stack.top());
       stack.pop();
       stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprFuncCall>(std::move(postfixExpr), std::move(params))));
-    }else if (tokType == lexer::period) {
-      Consume(lexer::period);
-      Expect(lexer::identifier);
+    }else if (tokType == tok::period) {
+      Consume(tok::period);
+      Expect(tok::identifier);
       std::string identifier = std::get<std::string>(mTokCursor->GetTokenValue());
-      assert(Match(lexer::identifier));
+      assert(Match(tok::identifier));
       auto postfixExpr = std::move(stack.top());
       stack.pop();
       stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprDot>(std::move(postfixExpr), identifier)));
-    }else if (tokType == lexer::arrow) {
-      Consume(lexer::arrow);
-      Expect(lexer::identifier);
+    }else if (tokType == tok::arrow) {
+      Consume(tok::arrow);
+      Expect(tok::identifier);
       std::string identifier = std::get<std::string>(mTokCursor->GetTokenValue());
-      assert(Match(lexer::identifier));
+      assert(Match(tok::identifier));
       auto postfixExpr = std::move(stack.top());
       stack.pop();
       stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprArrow>(std::move(postfixExpr), identifier)));
-    }else if (tokType == lexer::plus_plus) {
-      Consume(lexer::plus_plus);
+    }else if (tokType == tok::plus_plus) {
+      Consume(tok::plus_plus);
       auto postfixExpr = std::move(stack.top());
       stack.pop();
       stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprIncrement>(std::move(postfixExpr))));
-    }else if (tokType == lexer::minus_minus) {
-      Consume(lexer::minus_minus);
+    }else if (tokType == tok::minus_minus) {
+      Consume(tok::minus_minus);
       auto postfixExpr = std::move(stack.top());
       stack.pop();
       stack.push(std::make_unique<PostFixExpr>(std::make_unique<PostFixExprDecrement>(std::move(postfixExpr))));
@@ -558,12 +558,12 @@ std::unique_ptr<PostFixExpr> Parser::ParsePostFixExpr()
 }
 
 std::unique_ptr<PrimaryExpr> Parser::ParsePrimaryExpr() {
-  if (Peek(lexer::identifier)) {
+  if (Peek(tok::identifier)) {
     std::string identifier = std::get<std::string>(mTokCursor->GetTokenValue());
-    Consume(lexer::identifier);
+    Consume(tok::identifier);
     auto expr = std::make_unique<PrimaryExprIdentifier>(identifier);
     return std::make_unique<PrimaryExpr>(std::move(expr));
-  }else if (Peek(lexer::char_constant) || Peek(lexer::numeric_constant) || Peek(lexer::string_literal)) {
+  }else if (Peek(tok::char_constant) || Peek(tok::numeric_constant) || Peek(tok::string_literal)) {
     auto expr = std::make_unique<PrimaryExprConstant>(std::visit(
         [](auto &&val) -> std::variant<int32_t, uint32_t, int64_t, uint64_t,
                                        float, double, std::string> {
@@ -578,10 +578,10 @@ std::unique_ptr<PrimaryExpr> Parser::ParsePrimaryExpr() {
     ConsumeAny();
     return std::make_unique<PrimaryExpr>(std::move(expr));
   }else {
-    Expect(lexer::l_paren);
-    Consume(lexer::l_paren);
+    Expect(tok::l_paren);
+    Consume(tok::l_paren);
     auto expr = ParseExpr();
-    assert(Match(lexer::r_paren));
+    assert(Match(tok::r_paren));
     auto primaryExprParent = std::make_unique<PrimaryExprParent>(std::move(expr));
     return std::make_unique<PrimaryExpr>(std::move(primaryExprParent));
   }
@@ -594,10 +594,10 @@ bool Parser::IsFunction() {
   while (IsTypeName()) {
     ++mTokCursor;
   }
-  assert(Match(lexer::identifier));
+  assert(Match(tok::identifier));
 
   bool isFunc = false;
-  if (Match(lexer::l_paren)) {
+  if (Match(tok::l_paren)) {
     isFunc = true;
   }
   mTokCursor = start;
@@ -605,16 +605,16 @@ bool Parser::IsFunction() {
 }
 
 bool Parser::IsTypeName() {
-  lexer::TokenType type = mTokCursor->GetTokenType();
-  return type == lexer::kw_void | type == lexer::kw_auto |
-         type == lexer::kw_char | type == lexer::kw_short |
-         type == lexer::kw_int | type == lexer::kw_long |
-         type == lexer::kw_float | type == lexer::kw_double |
-         type == lexer::kw_signed | type == lexer::kw_unsigned |
-         type == lexer::kw_const;
+  tok::TokenKind type = mTokCursor->GetTokenType();
+  return type == tok::kw_void | type == tok::kw_auto |
+         type == tok::kw_char | type == tok::kw_short |
+         type == tok::kw_int | type == tok::kw_long |
+         type == tok::kw_float | type == tok::kw_double |
+         type == tok::kw_signed | type == tok::kw_unsigned |
+         type == tok::kw_const;
 }
 
-bool Parser::Match(lexer::TokenType tokenType) {
+bool Parser::Match(tok::TokenKind tokenType) {
   if (mTokCursor->GetTokenType() == tokenType) {
     ++mTokCursor;
     return true;
@@ -622,14 +622,14 @@ bool Parser::Match(lexer::TokenType tokenType) {
   return false;
 }
 
-bool Parser::Expect(lexer::TokenType tokenType) {
+bool Parser::Expect(tok::TokenKind tokenType) {
   if (mTokCursor->GetTokenType() == tokenType)
     return true;
   assert(0);
   return false;
 }
 
-bool Parser::Consume(lexer::TokenType tokenType) {
+bool Parser::Consume(tok::TokenKind tokenType) {
   if (mTokCursor->GetTokenType() == tokenType) {
     ++mTokCursor;
     return true;
@@ -642,24 +642,24 @@ bool Parser::ConsumeAny() {
   ++mTokCursor;
   return true;
 }
-bool Parser::Peek(lexer::TokenType tokenType) {
+bool Parser::Peek(tok::TokenKind tokenType) {
   return mTokCursor->GetTokenType() == tokenType;
 }
 
-bool Parser::IsUnaryOp(lexer::TokenType tokenType) {
-  if (tokenType == lexer::amp || tokenType == lexer::star || tokenType == lexer::plus ||
-      tokenType == lexer::minus || tokenType == lexer::tilde || tokenType == lexer::exclaim
-      || tokenType == lexer::plus_plus || tokenType == lexer::minus_minus) {
+bool Parser::IsUnaryOp(tok::TokenKind tokenType) {
+  if (tokenType == tok::amp || tokenType == tok::star || tokenType == tok::plus ||
+      tokenType == tok::minus || tokenType == tok::tilde || tokenType == tok::exclaim
+      || tokenType == tok::plus_plus || tokenType == tok::minus_minus) {
     return true;
   }
   return false;
 }
 
-bool Parser::IsPostFixExpr(lexer::TokenType tokenType) {
-  return ( tokenType == lexer::l_paren || tokenType == lexer::l_square
-      || tokenType == lexer::period || tokenType == lexer::arrow
-      || tokenType == lexer::plus_plus || tokenType == lexer::minus_minus
-      || tokenType == lexer::identifier || tokenType == lexer::char_constant
-          || tokenType == lexer::numeric_constant);
+bool Parser::IsPostFixExpr(tok::TokenKind tokenType) {
+  return ( tokenType == tok::l_paren || tokenType == tok::l_square
+      || tokenType == tok::period || tokenType == tok::arrow
+      || tokenType == tok::plus_plus || tokenType == tok::minus_minus
+      || tokenType == tok::identifier || tokenType == tok::char_constant
+          || tokenType == tok::numeric_constant);
 }
 } // namespace lcc::parser

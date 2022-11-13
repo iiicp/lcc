@@ -13,10 +13,10 @@
 #define LCC_CODEGEN_H
 #include "Syntax.h"
 
-namespace lcc::codegen {
+namespace lcc {
 class CodeGen {
 public:
-  explicit CodeGen(std::unique_ptr<parser::Program> &&program,
+  explicit CodeGen(std::unique_ptr<Program> &&program,
                    lcc::CodeGenContext &context) {
     program->Codegen(context);
   };

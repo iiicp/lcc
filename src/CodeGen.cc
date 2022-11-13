@@ -10,7 +10,7 @@
  * Sign:     enjoy life
  ***********************************/
 #include "CodeGen.h"
-namespace lcc::parser{
+namespace lcc{
 namespace {
 template<typename ... Ts>
 struct Overload : Ts ... {
@@ -28,14 +28,14 @@ LLVMTypePtr PrimaryType::TypeGen(CodeGenContext &context) {
   int size = mTypes.size();
   assert(size>0);
   int cur = 0;
-  if (mTypes[cur] == lexer::TokenType::kw_const) {
+  if (mTypes[cur] == tok::kw_const) {
     cur++;
   }
   assert(cur < size);
-  if (mTypes[cur] == lexer::TokenType::kw_signed) {
+  if (mTypes[cur] == tok::kw_signed) {
     mSign = true;
     cur++;
-  }else if (mTypes[cur] == lexer::TokenType::kw_unsigned) {
+  }else if (mTypes[cur] == tok::kw_unsigned) {
     mSign = false;
     cur++;
   }
@@ -43,25 +43,25 @@ LLVMTypePtr PrimaryType::TypeGen(CodeGenContext &context) {
     return context.mIrBuilder.getInt32Ty();
   }
   switch (mTypes[cur]) {
-  case lexer::TokenType::kw_void:
+  case tok::kw_void:
     return context.mIrBuilder.getVoidTy();
-  case lexer::TokenType::kw_char:
+  case tok::kw_char:
     return context.mIrBuilder.getInt8Ty();
-  case lexer::TokenType::kw_short:
+  case tok::kw_short:
     return context.mIrBuilder.getInt16Ty();
-  case lexer::TokenType::kw_int:
+  case tok::kw_int:
     return context.mIrBuilder.getInt32Ty();
-  case lexer::TokenType::kw_long: {
-    if (cur < size && mTypes[cur+1] == lexer::TokenType::kw_long) {
+  case tok::kw_long: {
+    if (cur < size && mTypes[cur+1] == tok::kw_long) {
       ++cur;
       return context.mIrBuilder.getInt64Ty();
     } else {
       return context.mIrBuilder.getInt64Ty();
     }
   }
-  case lexer::TokenType::kw_float:
+  case tok::kw_float:
     return context.mIrBuilder.getFloatTy();
-  case lexer::TokenType::kw_double:
+  case tok::kw_double:
     return context.mIrBuilder.getDoubleTy();
   default:
     return nullptr;
@@ -260,9 +260,9 @@ NodeRetValue DoWhileStmt::Codegen(lcc::CodeGenContext &context) const {
 }
 
 namespace {
-void GenForIR(const lcc::parser::Expr *cond,
-              const lcc::parser::Expr *post,
-              const lcc::parser::Stmt *body,
+void GenForIR(const lcc::Expr *cond,
+              const lcc::Expr *post,
+              const lcc::Stmt *body,
               lcc::CodeGenContext &context) {
   auto *function = context.mCurrentFunc;
   auto *condBB = llvm::BasicBlock::Create(context.mContext,"",function);
@@ -352,7 +352,7 @@ NodeRetValue Expr::Codegen(lcc::CodeGenContext &context) const {
 }
 NodeRetValue AssignExpr::Codegen(lcc::CodeGenContext &context) const {
   auto [left, baseTy, sign] = mCondExpr->Codegen(context);
-  if (mTokType == lexer::unknown) {
+  if (mTokType == tok::unknown) {
     return {left, left->getType(), sign};
   }
   assert(llvm::isa<llvm::LoadInst>(left));
@@ -360,12 +360,12 @@ NodeRetValue AssignExpr::Codegen(lcc::CodeGenContext &context) const {
   auto* eleType = baseTy;
 
   switch (mTokType) {
-  case lexer::equal: {
+  case tok::equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     context.mIrBuilder.CreateStore(newValue, elePtr);
     break;
   }
-  case lexer::plus_equal: {
+  case tok::plus_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
@@ -376,7 +376,7 @@ NodeRetValue AssignExpr::Codegen(lcc::CodeGenContext &context) const {
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::slash_equal: {
+  case tok::slash_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
@@ -391,7 +391,7 @@ NodeRetValue AssignExpr::Codegen(lcc::CodeGenContext &context) const {
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::star_equal: {
+  case tok::star_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
@@ -402,7 +402,7 @@ NodeRetValue AssignExpr::Codegen(lcc::CodeGenContext &context) const {
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::minus_equal: {
+  case tok::minus_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     if (currentVal->getType()->isIntegerTy()) {
@@ -413,42 +413,42 @@ NodeRetValue AssignExpr::Codegen(lcc::CodeGenContext &context) const {
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::percent_equal: {
+  case tok::percent_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,elePtr);
     currentVal = context.mIrBuilder.CreateSRem(currentVal, newValue);
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::less_less_equal: {
+  case tok::less_less_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateShl(currentVal, newValue);
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::greater_greater_equal: {
+  case tok::greater_greater_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateAShr(currentVal, newValue);
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::amp_equal: {
+  case tok::amp_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateAdd(currentVal, newValue);
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::pipe_equal: {
+  case tok::pipe_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateOr(currentVal, newValue);
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     break;
   }
-  case lexer::caret_equal: {
+  case tok::caret_equal: {
     auto [newValue, _, newSign] = mAssignExpr->Codegen(context);
     llvm::Value* currentVal = context.mIrBuilder.CreateLoad(eleType,left);
     currentVal = context.mIrBuilder.CreateXor(currentVal, newValue);
@@ -604,7 +604,7 @@ NodeRetValue EqualExpr::Codegen(lcc::CodeGenContext &context) const {
   for (auto &[op, expr] : mOptRelationExps) {
     auto [right, _, rSign] = expr->Codegen(context);
     switch (op) {
-      case lexer::TokenType::equal_equal: {
+      case tok::equal_equal: {
         if (left->getType()->isIntegerTy()) {
           left = context.mIrBuilder.CreateICmpEQ(left, right);
         }else if (left->getType()->isFloatingPointTy()) {
@@ -612,7 +612,7 @@ NodeRetValue EqualExpr::Codegen(lcc::CodeGenContext &context) const {
         }
         break;
       }
-      case lexer::TokenType::exclaim_equal: {
+      case tok::exclaim_equal: {
         if (left->getType()->isIntegerTy()) {
           left = context.mIrBuilder.CreateICmpNE(left, right);
         }else if (left->getType()->isFloatingPointTy()) {
@@ -633,7 +633,7 @@ NodeRetValue RelationalExpr::Codegen(lcc::CodeGenContext &context) const {
   for (auto&[op, expr] : mOptShiftExps) {
     auto [right, _, rSign] = expr->Codegen(context);
     switch (op) {
-    case lexer::TokenType::less: {
+    case tok::less: {
       if (left->getType()->isIntegerTy()) {
         if (sign) {
           left = context.mIrBuilder.CreateICmpSLT(left, right);
@@ -645,7 +645,7 @@ NodeRetValue RelationalExpr::Codegen(lcc::CodeGenContext &context) const {
       }
       break;
     }
-    case lexer::TokenType::greater: {
+    case tok::greater: {
       if (left->getType()->isIntegerTy()) {
         if (sign) {
           left = context.mIrBuilder.CreateICmpSGT(left, right);
@@ -657,7 +657,7 @@ NodeRetValue RelationalExpr::Codegen(lcc::CodeGenContext &context) const {
       }
       break;
     }
-    case lexer::TokenType::less_equal: {
+    case tok::less_equal: {
       if (left->getType()->isIntegerTy()) {
         if (sign) {
           left = context.mIrBuilder.CreateICmpSLE(left, right);
@@ -669,7 +669,7 @@ NodeRetValue RelationalExpr::Codegen(lcc::CodeGenContext &context) const {
       }
       break;
     }
-    case lexer::TokenType::greater_equal: {
+    case tok::greater_equal: {
       if (left->getType()->isIntegerTy()) {
         if (sign) {
           left = context.mIrBuilder.CreateICmpSGE(left, right);
@@ -694,11 +694,11 @@ NodeRetValue ShiftExpr::Codegen(lcc::CodeGenContext &context) const {
   for (auto &[op, expr] : mOptAdditiveExps) {
     auto [right, _, rSign] = expr->Codegen(context);
     switch (op) {
-    case lexer::TokenType::less_less: {
+    case tok::less_less: {
       left = context.mIrBuilder.CreateShl(left, right);
       break;
     }
-    case lexer::TokenType::greater_greater: {
+    case tok::greater_greater: {
       left = context.mIrBuilder.CreateAShr(left, right);
       break;
     }
@@ -714,7 +714,7 @@ NodeRetValue AdditiveExpr::Codegen(lcc::CodeGenContext &context) const {
   for (auto &[op, expr] : mOptionalMultiExps) {
     auto [right, _, rSign] = expr->Codegen(context);
     switch (op) {
-    case lexer::TokenType::plus: {
+    case tok::plus: {
       if (left->getType()->isIntegerTy()) {
         left = context.mIrBuilder.CreateAdd(left, right);
       }else if (left->getType()->isFloatingPointTy()) {
@@ -722,7 +722,7 @@ NodeRetValue AdditiveExpr::Codegen(lcc::CodeGenContext &context) const {
       }
       break;
     }
-    case lexer::TokenType::minus: {
+    case tok::minus: {
       if (left->getType()->isIntegerTy())
         left = context.mIrBuilder.CreateSub(left, right);
       else if (left->getType()->isFloatingPointTy())
@@ -741,7 +741,7 @@ NodeRetValue MultiExpr::Codegen(lcc::CodeGenContext &context) const {
   for (auto &[op, expr] : mOptCastExps) {
     auto [right, _, rSign] = expr->Codegen(context);
     switch (op) {
-    case lexer::TokenType::star: {
+    case tok::star: {
       if (left->getType()->isIntegerTy()) {
         left = context.mIrBuilder.CreateMul(left, right);
       }else if (left->getType()->isFloatingPointTy()) {
@@ -749,7 +749,7 @@ NodeRetValue MultiExpr::Codegen(lcc::CodeGenContext &context) const {
       }
       break;
     }
-    case lexer::TokenType::slash: {
+    case tok::slash: {
       if (left->getType()->isIntegerTy()) {
         if (sign)
           left = context.mIrBuilder.CreateSDiv(left, right);
@@ -759,7 +759,7 @@ NodeRetValue MultiExpr::Codegen(lcc::CodeGenContext &context) const {
         left = context.mIrBuilder.CreateFDiv(left, right);
       break;
     }
-    case lexer::TokenType::percent: {
+    case tok::percent: {
       if (left->getType()->isIntegerTy()) {
         if (sign)
           left = context.mIrBuilder.CreateSRem(left, right);
@@ -807,30 +807,30 @@ NodeRetValue
 UnaryExprUnaryOperator::Codegen(lcc::CodeGenContext &context) const {
   auto [value, baseTy, sign] = mUnaryExpr->Codegen(context);
   switch (mTok) {
-  case lexer::amp: {
+  case tok::amp: {
     auto loadInst = llvm::cast<llvm::LoadInst>(value);
     assert(loadInst);
     return {loadInst->getPointerOperand(), baseTy, sign};
   }
-  case lexer::star: {
+  case tok::star: {
     assert(value->getType()->isPointerTy());
     return {context.mIrBuilder.CreateLoad(baseTy, value), baseTy, sign};
   }
-  case lexer::plus: {
+  case tok::plus: {
     return {value, value->getType(), sign};
   }
-  case lexer::minus: {
+  case tok::minus: {
     if (value->getType()->isIntegerTy()) {
       return {context.mIrBuilder.CreateNeg(value), value->getType(), true};
     }else {
       return {context.mIrBuilder.CreateFNeg(value), value->getType(), true};
     }
   }
-  case lexer::tilde: {
+  case tok::tilde: {
     assert(value->getType()->isIntegerTy());
     return {context.mIrBuilder.CreateNot(value),value->getType(), sign};
   }
-  case lexer::exclaim: {
+  case tok::exclaim: {
     if (value->getType()->isIntegerTy()) {
       value = context.mIrBuilder.CreateICmpNE(value, context.mIrBuilder.getInt32(0));
     }else if (value->getType()->isFloatingPointTy()) {
@@ -840,7 +840,7 @@ UnaryExprUnaryOperator::Codegen(lcc::CodeGenContext &context) const {
     }
     return {context.mIrBuilder.CreateZExt(context.mIrBuilder.CreateNot(value), context.mIrBuilder.getInt32Ty()), context.mIrBuilder.getInt32Ty(), sign};
   }
-  case lexer::plus_plus: {
+  case tok::plus_plus: {
     assert(llvm::isa<llvm::LoadInst>(value));
     auto* elePtr = llvm::cast<llvm::LoadInst>(value)->getPointerOperand();
     auto* eleType = baseTy;
@@ -853,7 +853,7 @@ UnaryExprUnaryOperator::Codegen(lcc::CodeGenContext &context) const {
     context.mIrBuilder.CreateStore(currentVal, elePtr);
     return {currentVal, currentVal->getType(), true};
   }
-  case lexer::minus_minus: {
+  case tok::minus_minus: {
     assert(llvm::isa<llvm::LoadInst>(value));
     auto* elePtr = llvm::cast<llvm::LoadInst>(value)->getPointerOperand();
     auto* eleType = baseTy;

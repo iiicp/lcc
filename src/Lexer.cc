@@ -11,13 +11,13 @@
 #include "Lexer.h"
 #include <iostream>
 #include <cassert>
-namespace lcc::lexer {
+namespace lcc {
 
 std::vector<Token> Lexer::Tokenize() {
   std::vector<Token> tokens;
   while (!IsEOF(mCursor)) {
     Token tok = GetNextToken();
-    if (tok.GetTokenType() != TokenType::eof)
+    if (tok.GetTokenType() != tok::eof)
       tokens.push_back(tok);
   }
   return std::move(tokens);
@@ -40,7 +40,7 @@ Token Lexer::GetNextToken() {
     while (!IsEOF(mCursor)) {
       ++mCursor;
     }
-    return Token{mLine, mColumn, TokenType::eof};
+    return Token{mLine, mColumn, tok::eof};
   }
 }
 
@@ -153,7 +153,7 @@ Token Lexer::ScanIdentifier() {
   if (mKeywordTypeMap.find(value) != mKeywordTypeMap.end()) {
     return Token{mLine, mColumn, mKeywordTypeMap[value], value};
   } else {
-    return Token{mLine, mColumn, identifier, value};
+    return Token{mLine, mColumn, tok::identifier, value};
   }
 }
 
@@ -183,7 +183,7 @@ Token Lexer::ScanCharacter() {
     assert(0);
   }
   ++mCursor;
-  return Token{mLine, mColumn, char_constant, ch};
+  return Token{mLine, mColumn, tok::char_constant, ch};
 }
 
 Token Lexer::ScanStringLiteral() {
@@ -201,7 +201,7 @@ Token Lexer::ScanStringLiteral() {
     }
   }
   ++mCursor;
-  return Token{mLine, mColumn, string_literal, value};
+  return Token{mLine, mColumn, tok::string_literal, value};
 }
 
 Token Lexer::ScanNumeric() {
@@ -249,13 +249,13 @@ Token Lexer::ScanIntegerNumeric(int base) {
   }
   IntegerType type = ScanIntegerSuffix();
   if (type == IntegerType::U) {
-    return Token{mLine, mColumn, numeric_constant, (uint32_t)value};
+    return Token{mLine, mColumn, tok::numeric_constant, (uint32_t)value};
   } else if (type == IntegerType::UL || type == IntegerType::ULL) {
-    return Token{mLine, mColumn, numeric_constant, (uint64_t)value};
+    return Token{mLine, mColumn, tok::numeric_constant, (uint64_t)value};
   } else if (type == IntegerType::L || type == IntegerType::LL) {
-    return Token{mLine, mColumn, numeric_constant, (int64_t)value};
+    return Token{mLine, mColumn, tok::numeric_constant, (int64_t)value};
   } else {
-    return Token{mLine, mColumn, numeric_constant, (int32_t)value};
+    return Token{mLine, mColumn, tok::numeric_constant, (int32_t)value};
   }
 }
 
@@ -268,12 +268,12 @@ Token Lexer::ScanFloatNumeric() {
   mCursor = (uint8_t *)end;
   if (*mCursor == 'f' || *mCursor == 'F') {
     ++mCursor;
-    return Token{mLine, mColumn, numeric_constant, (float)value};
+    return Token{mLine, mColumn, tok::numeric_constant, (float)value};
   } else if (*mCursor == 'L' || *mCursor == 'l') {
     ++mCursor;
-    return Token{mLine, mColumn, numeric_constant, value};
+    return Token{mLine, mColumn, tok::numeric_constant, value};
   } else {
-    return Token{mLine, mColumn, numeric_constant, value};
+    return Token{mLine, mColumn, tok::numeric_constant, value};
   }
 }
 
@@ -379,35 +379,35 @@ int32_t Lexer::ScanEscapeChar() {
 }
 
 Token Lexer::ScanPunctuator() {
-  TokenType type = unknown;
+  tok::TokenKind type = tok::unknown;
   switch (*mCursor) {
   case '[': {
-    type = l_square;
+    type = tok::l_square;
     ++mCursor;
     break;
   }
   case ']': {
-    type = r_square;
+    type = tok::r_square;
     ++mCursor;
     break;
   }
   case '(': {
-    type = l_paren;
+    type = tok::l_paren;
     ++mCursor;
     break;
   }
   case ')': {
-    type = r_paren;
+    type = tok::r_paren;
     ++mCursor;
     break;
   }
   case '{': {
-    type = l_brace;
+    type = tok::l_brace;
     ++mCursor;
     break;
   }
   case '}': {
-    type = r_brace;
+    type = tok::r_brace;
     ++mCursor;
     break;
   }
@@ -415,9 +415,9 @@ Token Lexer::ScanPunctuator() {
     mCursor++;
     if (*mCursor == '.' && !IsEOF(mCursor + 1) && mCursor[1] == '.') {
       mCursor += 2;
-      type = ellipsis;
+      type = tok::ellipsis;
     } else {
-      type = period;
+      type = tok::period;
     }
     break;
   }
@@ -425,12 +425,12 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '&') {
       ++mCursor;
-      type = amp_amp;
+      type = tok::amp_amp;
     } else if (*mCursor == '=') {
       ++mCursor;
-      type = amp_equal;
+      type = tok::amp_equal;
     } else {
-      type = amp;
+      type = tok::amp;
     }
     break;
   }
@@ -438,9 +438,9 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '=') {
       ++mCursor;
-      type = star_equal;
+      type = tok::star_equal;
     } else {
-      type = star;
+      type = tok::star;
     }
     break;
   }
@@ -448,12 +448,12 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '+') {
       ++mCursor;
-      type = plus_plus;
+      type = tok::plus_plus;
     } else if (*mCursor == '=') {
       ++mCursor;
-      type = plus_equal;
+      type = tok::plus_equal;
     } else {
-      type = plus;
+      type = tok::plus;
     }
     break;
   }
@@ -461,30 +461,30 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '>') {
       ++mCursor;
-      type = arrow;
+      type = tok::arrow;
     } else if (*mCursor == '-') {
       ++mCursor;
-      type = minus_minus;
+      type = tok::minus_minus;
     } else if (*mCursor == '=') {
       ++mCursor;
-      type = minus_equal;
+      type = tok::minus_equal;
     } else {
-      type = minus;
+      type = tok::minus;
     }
     break;
   }
   case '~': {
     ++mCursor;
-    type = tilde;
+    type = tok::tilde;
     break;
   }
   case '!': {
     ++mCursor;
     if (*mCursor == '=') {
       ++mCursor;
-      type = exclaim_equal;
+      type = tok::exclaim_equal;
     } else {
-      type = exclaim;
+      type = tok::exclaim;
     }
     break;
   }
@@ -492,9 +492,9 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '=') {
       ++mCursor;
-      type = slash_equal;
+      type = tok::slash_equal;
     } else {
-      type = slash;
+      type = tok::slash;
     }
     break;
   }
@@ -502,9 +502,9 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '=') {
       ++mCursor;
-      type = percent_equal;
+      type = tok::percent_equal;
     } else {
-      type = percent;
+      type = tok::percent;
     }
     break;
   }
@@ -514,15 +514,15 @@ Token Lexer::ScanPunctuator() {
       ++mCursor;
       if (*mCursor == '=') {
         ++mCursor;
-        type = less_less_equal;
+        type = tok::less_less_equal;
       } else {
-        type = less_less;
+        type = tok::less_less;
       }
     } else if (*mCursor == '=') {
       ++mCursor;
-      type = less_equal;
+      type = tok::less_equal;
     } else {
-      type = less;
+      type = tok::less;
     }
     break;
   }
@@ -532,15 +532,15 @@ Token Lexer::ScanPunctuator() {
       ++mCursor;
       if (*mCursor == '=') {
         ++mCursor;
-        type = greater_greater_equal;
+        type = tok::greater_greater_equal;
       } else {
-        type = greater_greater;
+        type = tok::greater_greater;
       }
     } else if (*mCursor == '=') {
       ++mCursor;
-      type = greater_equal;
+      type = tok::greater_equal;
     } else {
-      type = greater;
+      type = tok::greater;
     }
     break;
   }
@@ -548,9 +548,9 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '=') {
       ++mCursor;
-      type = caret_equal;
+      type = tok::caret_equal;
     } else {
-      type = caret;
+      type = tok::caret;
     }
     break;
   }
@@ -558,42 +558,42 @@ Token Lexer::ScanPunctuator() {
     ++mCursor;
     if (*mCursor == '|') {
       ++mCursor;
-      type = pipe_pipe;
+      type = tok::pipe_pipe;
     } else if (*mCursor == '=') {
       ++mCursor;
-      type = pipe_equal;
+      type = tok::pipe_equal;
     } else {
-      type = pipe;
+      type = tok::pipe;
     }
     break;
   }
   case '?': {
     ++mCursor;
-    type = question;
+    type = tok::question;
     break;
   }
   case ':': {
     ++mCursor;
-    type = colon;
+    type = tok::colon;
     break;
   }
   case ';': {
     ++mCursor;
-    type = semi;
+    type = tok::semi;
     break;
   }
   case ',': {
     ++mCursor;
-    type = comma;
+    type = tok::comma;
     break;
   }
   case '=': {
     ++mCursor;
     if (*mCursor == '=') {
       ++mCursor;
-      type = equal_equal;
+      type = tok::equal_equal;
     } else {
-      type = equal;
+      type = tok::equal;
     }
     break;
   }
@@ -602,22 +602,22 @@ Token Lexer::ScanPunctuator() {
 }
 
 void Lexer::InitKeyWordTypeMap() {
-  mKeywordTypeMap = {{"auto", kw_auto},         {"break", kw_break},
-                     {"case", kw_case},         {"char", kw_char},
-                     {"const", kw_const},       {"continue", kw_continue},
-                     {"default", kw_default},   {"do", kw_do},
-                     {"double", kw_double},     {"else", kw_else},
-                     {"enum", kw_enum},         {"extern", kw_extern},
-                     {"float", kw_float},       {"for", kw_for},
-                     {"goto", kw_goto},         {"if", kw_if},
-                     {"inline", kw_inline},     {"int", kw_int},
-                     {"long", kw_long},         {"register", kw_register},
-                     {"restrict", kw_restrict}, {"return", kw_return},
-                     {"short", kw_short},       {"signed", kw_signed},
-                     {"sizeof", kw_sizeof},     {"static", kw_static},
-                     {"struct", kw_struct},     {"switch", kw_switch},
-                     {"typedef", kw_typedef},   {"union", kw_union},
-                     {"unsigned", kw_unsigned}, {"void", kw_void},
-                     {"volatile", kw_volatile}, {"while", kw_while}};
+  mKeywordTypeMap = {{"auto", tok::kw_auto},         {"break", tok::kw_break},
+                     {"case", tok::kw_case},         {"char", tok::kw_char},
+                     {"const", tok::kw_const},       {"continue", tok::kw_continue},
+                     {"default", tok::kw_default},   {"do", tok::kw_do},
+                     {"double", tok::kw_double},     {"else", tok::kw_else},
+                     {"enum", tok::kw_enum},         {"extern", tok::kw_extern},
+                     {"float", tok::kw_float},       {"for", tok::kw_for},
+                     {"goto", tok::kw_goto},         {"if", tok::kw_if},
+                     {"inline", tok::kw_inline},     {"int", tok::kw_int},
+                     {"long", tok::kw_long},         {"register", tok::kw_register},
+                     {"restrict", tok::kw_restrict}, {"return", tok::kw_return},
+                     {"short", tok::kw_short},       {"signed", tok::kw_signed},
+                     {"sizeof", tok::kw_sizeof},     {"static", tok::kw_static},
+                     {"struct", tok::kw_struct},     {"switch", tok::kw_switch},
+                     {"typedef", tok::kw_typedef},   {"union", tok::kw_union},
+                     {"unsigned", tok::kw_unsigned}, {"void", tok::kw_void},
+                     {"volatile", tok::kw_volatile}, {"while", tok::kw_while}};
 }
 } // namespace lcc::lexer

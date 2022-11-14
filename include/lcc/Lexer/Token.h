@@ -10,13 +10,13 @@
 
 #ifndef LCC_TOKEN_H
 #define LCC_TOKEN_H
+#include "lcc/Basic/TokenKinds.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Support/SMLoc.h"
 #include <cstdint>
 #include <string>
 #include <variant>
-#include "llvm/Support/SMLoc.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Twine.h"
-#include "TokenKinds.h"
 namespace lcc{
 class Token {
   friend class Lexer;

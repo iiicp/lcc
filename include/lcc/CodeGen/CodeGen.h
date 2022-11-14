@@ -11,7 +11,7 @@
  ***********************************/
 #ifndef LCC_CODEGEN_H
 #define LCC_CODEGEN_H
-#include "Syntax.h"
+#include "lcc/AST/Syntax.h"
 
 namespace lcc {
 class CodeGen {

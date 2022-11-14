@@ -8,7 +8,7 @@
  * Date:     2022/10/11
  ***********************************/
 
-#include "Token.h"
+#include "lcc/Lexer/Token.h"
 namespace lcc {
 
 std::string Token::GetTokenSpelling() const {
@@ -32,4 +32,4 @@ std::string Token::GetTokenSpelling() const {
     return "unknown";
   }
 }
-} // namespace lcc::lexer
+} // namespace lcc

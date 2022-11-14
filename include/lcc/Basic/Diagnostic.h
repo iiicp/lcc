@@ -22,7 +22,7 @@ namespace lcc {
 namespace diag {
 enum {
 #define DIAG(ID, Level, Msg) ID,
-#include "Diagnostic.def"
+#include "lcc/Basic/Diagnostic.def"
 };
 } // namespace diag
 

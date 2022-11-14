@@ -16,7 +16,7 @@ namespace lcc {
 namespace tok {
 enum TokenKind : unsigned short {
 #define TOK(X) X,
-#include "TokenKinds.def"
+#include "lcc/Basic/TokenKinds.def"
   NUM_TOKENS
 };
 

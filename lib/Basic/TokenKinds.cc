@@ -10,16 +10,15 @@
  * Sign:     enjoy life
  ***********************************/
 
-#include "TokenKinds.h"
+#include "lcc/Basic/TokenKinds.h"
 
 using namespace lcc;
 
-static const char * const TokNames[] = {
+static const char *const TokNames[] = {
 #define TOK(ID) #ID,
 #define KEYWORD(ID, FLAG) #ID,
-#include "TokenKinds.def"
-    nullptr
-};
+#include "lcc/Basic/TokenKinds.def"
+    nullptr};
 
 const char *tok::getTokenName(TokenKind Kind) {
   if (Kind < tok::NUM_TOKENS)
@@ -29,18 +28,24 @@ const char *tok::getTokenName(TokenKind Kind) {
 
 const char *tok::getPunctuatorSpelling(TokenKind Kind) {
   switch (Kind) {
-#define PUNCTUATOR(ID, SP) case ID: return SP;
-#include "TokenKinds.def"
-  default: break;
+#define PUNCTUATOR(ID, SP)                                                     \
+  case ID:                                                                     \
+    return SP;
+#include "lcc/Basic/TokenKinds.def"
+  default:
+    break;
   }
   return nullptr;
 }
 
 const char *tok::getKeywordSpelling(TokenKind Kind) {
   switch (Kind) {
-#define KEYWORD(ID, FLAG) case kw_ ## ID: return #ID;
-#include "TokenKinds.def"
-  default: break;
+#define KEYWORD(ID, FLAG)                                                      \
+  case kw_##ID:                                                                \
+    return #ID;
+#include "lcc/Basic/TokenKinds.def"
+  default:
+    break;
   }
   return nullptr;
 }

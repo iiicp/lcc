@@ -9,7 +9,7 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#include "Syntax.h"
+#include "lcc/AST/Syntax.h"
 
 namespace lcc {
 PrimaryType::PrimaryType(std::vector<tok::TokenKind> &&types) noexcept
@@ -104,43 +104,47 @@ CastExpr::CastExpr(Variant &&unaryOrCast) noexcept
     : mVariant(std::move(unaryOrCast)) {}
 
 UnaryExpr::UnaryExpr(Variant &&variant) noexcept
-: mVariant(std::move(variant)) {}
-
-UnaryExprSizeOf::UnaryExprSizeOf(Variant &&variant) noexcept
-: mUnaryOrType(std::move(variant)) {}
-
-UnaryExprPostFixExpr::UnaryExprPostFixExpr(std::unique_ptr<PostFixExpr> && postExpr) noexcept
-: mPostExpr(std::move(postExpr)) {}
-
-UnaryExprUnaryOperator::UnaryExprUnaryOperator(
-    tok::TokenKind tokTy,
-    std::unique_ptr<UnaryExpr> && unaryExpr) noexcept
-: mTok(tokTy), mUnaryExpr(std::move(unaryExpr)) {}
-
-PostFixExpr::PostFixExpr(Variant && variant) noexcept
     : mVariant(std::move(variant)) {}
 
-PostFixExprDecrement::PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept
-: mPostFixExpr(std::move(postFixExpr)) {}
+UnaryExprSizeOf::UnaryExprSizeOf(Variant &&variant) noexcept
+    : mUnaryOrType(std::move(variant)) {}
 
-PostFixExprIncrement::PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept
-: mPostFixExpr(std::move(postFixExpr)) {}
+UnaryExprPostFixExpr::UnaryExprPostFixExpr(
+    std::unique_ptr<PostFixExpr> &&postExpr) noexcept
+    : mPostExpr(std::move(postExpr)) {}
 
-PostFixExprArrow::PostFixExprArrow(std::unique_ptr<PostFixExpr> && postFixExpr,
-                 std::string identifier) noexcept
-: mPostFixExpr(std::move(postFixExpr)), mIdentifier(identifier) {}
+UnaryExprUnaryOperator::UnaryExprUnaryOperator(
+    tok::TokenKind tokTy, std::unique_ptr<UnaryExpr> &&unaryExpr) noexcept
+    : mTok(tokTy), mUnaryExpr(std::move(unaryExpr)) {}
 
-PostFixExprDot::PostFixExprDot(std::unique_ptr<PostFixExpr> && postFixExpr,
-               std::string identifier) noexcept
+PostFixExpr::PostFixExpr(Variant &&variant) noexcept
+    : mVariant(std::move(variant)) {}
+
+PostFixExprDecrement::PostFixExprDecrement(
+    std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept
+    : mPostFixExpr(std::move(postFixExpr)) {}
+
+PostFixExprIncrement::PostFixExprIncrement(
+    std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept
+    : mPostFixExpr(std::move(postFixExpr)) {}
+
+PostFixExprArrow::PostFixExprArrow(std::unique_ptr<PostFixExpr> &&postFixExpr,
+                                   std::string identifier) noexcept
     : mPostFixExpr(std::move(postFixExpr)), mIdentifier(identifier) {}
 
-PostFixExprFuncCall::PostFixExprFuncCall(std::unique_ptr<PostFixExpr> && postFixExpr,
-                    std::vector<std::unique_ptr<AssignExpr>> && optParams) noexcept
-: mPostFixExpr(std::move(postFixExpr)), mOptParams(std::move(optParams)) {}
+PostFixExprDot::PostFixExprDot(std::unique_ptr<PostFixExpr> &&postFixExpr,
+                               std::string identifier) noexcept
+    : mPostFixExpr(std::move(postFixExpr)), mIdentifier(identifier) {}
 
-PostFixExprSubscript::PostFixExprSubscript(std::unique_ptr<PostFixExpr> && postFixExpr,
-                    std::unique_ptr<Expr> && expr) noexcept
-: mPostFixExpr(std::move(postFixExpr)), mExpr(std::move(expr)) {}
+PostFixExprFuncCall::PostFixExprFuncCall(
+    std::unique_ptr<PostFixExpr> &&postFixExpr,
+    std::vector<std::unique_ptr<AssignExpr>> &&optParams) noexcept
+    : mPostFixExpr(std::move(postFixExpr)), mOptParams(std::move(optParams)) {}
+
+PostFixExprSubscript::PostFixExprSubscript(
+    std::unique_ptr<PostFixExpr> &&postFixExpr,
+    std::unique_ptr<Expr> &&expr) noexcept
+    : mPostFixExpr(std::move(postFixExpr)), mExpr(std::move(expr)) {}
 
 ExprStmt::ExprStmt(std::unique_ptr<Expr> &&optExpr) noexcept
     : mOptExpr(std::move(optExpr)) {}
@@ -150,20 +154,20 @@ IfStmt::IfStmt(std::unique_ptr<Expr> &&expr, std::unique_ptr<Stmt> &&thenStmt,
     : mExpr(std::move(expr)), mThenStmt(std::move(thenStmt)),
       mOptElseStmt(std::move(optElseStmt)) {}
 
-PostFixExprPrimary::PostFixExprPrimary(std::unique_ptr<PrimaryExpr> && primaryExpr) noexcept
-: mPrimaryExpr(std::move(primaryExpr)) {}
+PostFixExprPrimary::PostFixExprPrimary(
+    std::unique_ptr<PrimaryExpr> &&primaryExpr) noexcept
+    : mPrimaryExpr(std::move(primaryExpr)) {}
 
 PrimaryExpr::PrimaryExpr(Variant &&variant) noexcept
-: mVariant(std::move(variant)) {}
+    : mVariant(std::move(variant)) {}
 
-PrimaryExprParent::PrimaryExprParent(std::unique_ptr<Expr> && expr) noexcept
-: mExpr(std::move(expr)) {}
+PrimaryExprParent::PrimaryExprParent(std::unique_ptr<Expr> &&expr) noexcept
+    : mExpr(std::move(expr)) {}
 
 PrimaryExprIdentifier::PrimaryExprIdentifier(std::string identifier)
-: mIdentifier(identifier) {}
+    : mIdentifier(identifier) {}
 
-PrimaryExprConstant::PrimaryExprConstant(Variant variant)
-: mVariant(variant) {}
+PrimaryExprConstant::PrimaryExprConstant(Variant variant) : mVariant(variant) {}
 
 DoWhileStmt::DoWhileStmt(std::unique_ptr<Stmt> &&stmt,
                          std::unique_ptr<Expr> &&expr) noexcept
@@ -211,4 +215,4 @@ GlobalDecl::GlobalDecl(std::unique_ptr<Type> &&type, std::string name,
 Program::Program(
     std::vector<std::unique_ptr<ExternalDeclaration>> &&externalDecl) noexcept
     : mExternalDecl(std::move(externalDecl)) {}
-} // namespace lcc::parser
+} // namespace lcc

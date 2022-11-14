@@ -10,9 +10,9 @@
 
 #ifndef LCC_PARSER_H
 #define LCC_PARSER_H
+#include "lcc/AST/Syntax.h"
+#include "lcc/Lexer/Token.h"
 #include <vector>
-#include "Token.h"
-#include "Syntax.h"
 namespace lcc {
 class Parser {
 private:

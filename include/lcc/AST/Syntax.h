@@ -11,8 +11,8 @@
  ***********************************/
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
-#include "CodeGenContext.h"
-#include "Token.h"
+#include "lcc/CodeGen/CodeGenContext.h"
+#include "lcc/Lexer/Token.h"
 #include <string>
 #include <variant>
 #include <vector>

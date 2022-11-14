@@ -9,21 +9,20 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#include "Diagnostic.h"
+#include "lcc/Basic/Diagnostic.h"
 using namespace lcc;
 namespace {
 const char *DiagnosticText[] = {
 #define DIAG(ID, Level, Msg) Msg,
-#include "Diagnostic.def"
+#include "lcc/Basic/Diagnostic.def"
 };
 llvm::SourceMgr::DiagKind DiagnosticKind[] = {
 #define DIAG(ID, Level, Msg) llvm::SourceMgr::DK_##Level,
-#include "Diagnostic.def"
+#include "lcc/Basic/Diagnostic.def"
 };
 } // namespace
 
-const char *
-DiagnosticsEngine::getDiagnosticText(unsigned DiagID) {
+const char *DiagnosticsEngine::getDiagnosticText(unsigned DiagID) {
   return DiagnosticText[DiagID];
 }
 

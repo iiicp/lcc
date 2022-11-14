@@ -11,12 +11,12 @@
 #ifndef LCC_LEXER_H
 #define LCC_LEXER_H
 
+#include "lcc/Basic/Diagnostic.h"
 #include "Token.h"
-#include <vector>
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
-#include "Diagnostic.h"
+#include "llvm/Support/SourceMgr.h"
+#include <vector>
 namespace lcc {
 class Lexer {
 private:

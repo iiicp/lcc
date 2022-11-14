@@ -8,9 +8,9 @@
  * Date:     2022/10/11
  ***********************************/
 
-#include "Lexer.h"
-#include <iostream>
+#include "lcc/Lexer/Lexer.h"
 #include <cassert>
+#include <iostream>
 namespace lcc {
 
 namespace charinfo {
@@ -112,20 +112,20 @@ void Lexer::SkipWhiteSpace() {
 
 void Lexer::SkipComment() {
   if (*CurPtr == '/' && CurPtr[1] == '/') {
-      CurPtr += 2;
-      while (*CurPtr && *CurPtr != '\n') {
-        ++CurPtr;
-      }
+    CurPtr += 2;
+    while (*CurPtr && *CurPtr != '\n') {
+      ++CurPtr;
+    }
   } else if (*CurPtr == '/' && CurPtr[1] == '*') {
-      CurPtr += 2;
-      while (CurPtr[0] != '*' || CurPtr[1] != '/') {
-        if (!CurPtr[0] || !CurPtr[1]) {
-          Diags.report(getLoc(), diag::err_unterminated_block_comment);
-          return;
-        }
-        ++CurPtr;
+    CurPtr += 2;
+    while (CurPtr[0] != '*' || CurPtr[1] != '/') {
+      if (!CurPtr[0] || !CurPtr[1]) {
+        Diags.report(getLoc(), diag::err_unterminated_block_comment);
+        return;
       }
-      CurPtr += 2;
+      ++CurPtr;
+    }
+    CurPtr += 2;
   }
 }
 
@@ -135,14 +135,14 @@ void Lexer::LexIdentifier(Token &Result) {
   while (charinfo::isIdentifierBody(*End)) {
     ++End;
   }
-  llvm::StringRef Name(Start, End-Start);
+  llvm::StringRef Name(Start, End - Start);
   formToken(Result, End, getKeyword(Name, tok::identifier));
 }
 
 void Lexer::LexCharacter(Token &Result) {
   const char *End = CurPtr + 1;
   if (*End == '\'') {
-    Diags.report(getLoc(),diag::err_empty_char_constant);
+    Diags.report(getLoc(), diag::err_empty_char_constant);
     formToken(Result, End, tok::char_constant);
     return;
   } else if (*End == '\n' || !*End) {
@@ -159,7 +159,7 @@ void Lexer::LexCharacter(Token &Result) {
   if (*End != '\'') {
     Diags.report(getLoc(), diag::err_unterminated_char_constant);
     formToken(Result, End, tok::char_constant);
-  }else {
+  } else {
     ++End;
     formToken(Result, End, tok::char_constant);
   }
@@ -181,7 +181,8 @@ void Lexer::LexStringLiteral(Token &Result) {
   }
   // skip "
   ++End;
-  formToken(Result, End, tok::string_literal, llvm::StringRef(CurPtr, End-Start));
+  formToken(Result, End, tok::string_literal,
+            llvm::StringRef(CurPtr, End - Start));
 }
 
 void Lexer::LexNumeric(Token &Result) {
@@ -365,7 +366,7 @@ void Lexer::LexPunctuator(Token &Result) {
 
 void Lexer::addKeywords() {
 #define KEYWORD(NAME, FLAGS) addKeyword(llvm::StringRef(#NAME), tok::kw_##NAME);
-#include "TokenKinds.def"
+#include "../../include/lcc/Basic/TokenKinds.def"
 }
 
 void Lexer::addKeyword(llvm::StringRef Keyword, tok::TokenKind TokenCode) {
@@ -373,19 +374,21 @@ void Lexer::addKeyword(llvm::StringRef Keyword, tok::TokenKind TokenCode) {
 }
 
 tok::TokenKind Lexer::getKeyword(llvm::StringRef Name,
-                          tok::TokenKind DefaultTokenCode) {
+                                 tok::TokenKind DefaultTokenCode) {
   auto Result = HashTable.find(Name);
   if (Result != HashTable.end())
     return Result->second;
   return DefaultTokenCode;
 }
 
-void Lexer::formToken(Token &Result, const char *TokEnd, tok::TokenKind Kind, Token::Variant Value) {
+void Lexer::formToken(Token &Result, const char *TokEnd, tok::TokenKind Kind,
+                      Token::Variant Value) {
   size_t TokLen = TokEnd - CurPtr;
   Result.Ptr = CurPtr;
   Result.Length = TokLen;
   Result.Kind = Kind;
   Result.Loc = llvm::SMLoc::getFromPointer(CurPtr);
   Result.Value = Value;
+  CurPtr = TokEnd;
 }
-} // namespace lcc::lexer
+} // namespace lcc

@@ -17,7 +17,7 @@ namespace lcc {
 class CodeGen {
 public:
   explicit CodeGen(std::unique_ptr<Program> &&program,
-                   lcc::CodeGenContext &context) {
+                   CodeGenContext &context) {
     program->Codegen(context);
   };
 };

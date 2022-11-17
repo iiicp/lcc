@@ -1,6 +1,7 @@
 #include "lcc/CodeGen/CodeGen.h"
 #include "lcc/Lexer/Lexer.h"
 #include "lcc/Parser/Parser.h"
+#include "lcc/Basic/Version.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -8,7 +9,7 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-  std::cout << "Hello, lcc!" << std::endl;
+  std::cout << "Hello, lcc!  " << lcc::getLccVersion() << std::endl;
 
   if (argc < 2) {
     std::cout << "please input file!" << std::endl;
@@ -31,10 +32,11 @@ int main(int argc, char *argv[]) {
 
   lcc::Lexer lex(SrcMgr, Diags);
   auto tokens = lex.Tokenize();
-  //    for (auto &tok : tokens) {
-  //        std::cout << tok.getLocation();
-  //        std::cout << tok.GetTokenSpelling() << std::endl;
-  //    }
+//      for (auto &tok : tokens) {
+//          auto pair = SrcMgr.getLineAndColumn(tok.getLocation(), SrcMgr.getMainFileID());
+//          std::cout << pair.first << ", " << pair.second << " ";
+//          std::cout << tok.GetTokenSpelling() << std::endl;
+//      }
 
   lcc::Parser parser(std::move(tokens));
   auto program = parser.ParseProgram();

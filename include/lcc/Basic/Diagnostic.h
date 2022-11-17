@@ -12,6 +12,7 @@
 #ifndef LCC_DIAGNOSTIC_H
 #define LCC_DIAGNOSTIC_H
 
+#include "lcc/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/SMLoc.h"
@@ -28,14 +29,14 @@ enum {
 
 class DiagnosticsEngine {
   static const char *getDiagnosticText(unsigned DiagID);
-  static llvm::SourceMgr::DiagKind
+  static SourceMgr::DiagKind
   getDiagnosticKind(unsigned DiagID);
 
-  llvm::SourceMgr &SrcMgr;
+  SourceMgr &SrcMgr;
   unsigned NumErrors;
 
 public:
-  DiagnosticsEngine(llvm::SourceMgr &SrcMgr)
+  DiagnosticsEngine(SourceMgr &SrcMgr)
       : SrcMgr(SrcMgr), NumErrors(0) {}
 
   unsigned numErrors() { return NumErrors; }
@@ -47,7 +48,7 @@ public:
         llvm::formatv(getDiagnosticText(DiagID),
                       std::forward<Args>(Arguments)...)
             .str();
-    llvm::SourceMgr::DiagKind Kind = getDiagnosticKind(DiagID);
+    SourceMgr::DiagKind Kind = getDiagnosticKind(DiagID);
     SrcMgr.PrintMessage(Loc, Kind, Msg);
     NumErrors += (Kind == llvm::SourceMgr::DK_Error);
   }

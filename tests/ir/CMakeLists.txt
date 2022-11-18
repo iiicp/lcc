@@ -58,3 +58,6 @@ target_link_libraries(c_fun_fib ${llvm_all})
 
 add_executable(c_while c_while.cpp)
 target_link_libraries(c_while ${llvm_all})
+
+add_executable(c_blockaddress c_blockaddress.cc)
+target_link_libraries(c_blockaddress ${llvm_all})

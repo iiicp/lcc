@@ -2,7 +2,8 @@
 #define DIAG(ID, Level, Msg)
 #endif
 DIAG(err_unterminated_block_comment, Error, "unterminated */ comment")
-DIAG(err_empty_char_constant, Error, "empty '' constant")
-DIAG(err_unterminated_char_constant, Error, "unterminated ' char constant")
-DIAG(err_unterminated_string_constant, Error, "unterminated \" constant")
+DIAG(err_empty_char_literal, Error, "empty char literal")
+DIAG(err_unclosed_char_literal, Error, "unclosed char literal")
+DIAG(err_unclosed_string_literal, Error, "unclosed string literal")
+DIAG(warning_skip_unknown_char, Warning, "skip unknown char")
 #undef DIAG

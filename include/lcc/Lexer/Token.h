@@ -31,16 +31,9 @@ public:
   tok::TokenKind getKind() const {return Kind;}
   void setKind(tok::TokenKind K) {Kind = K;}
 
-  llvm::SMLoc getLocation() const {
-    return Loc;
-  }
-  size_t getLength() const {
-    return Length;
-  }
-
-  Variant getTokenValue() const {
-    return Value;
-  }
+  llvm::SMLoc getSMLoc() const { return Loc; }
+  size_t getLength() const { return Length; }
+  Variant getTokenValue() const { return Value; }
 
   /// is/isNot - Predicates to check if this token is a
   /// specific kind, as in "if (Tok.is(tok::l_brace))

@@ -32,12 +32,14 @@ int main(int argc, char *argv[]) {
 
   lcc::Lexer lex(SrcMgr, Diags);
   auto tokens = lex.Tokenize();
-//      for (auto &tok : tokens) {
-//          auto pair = SrcMgr.getLineAndColumn(tok.getLocation(), SrcMgr.getMainFileID());
-//          std::cout << pair.first << ", " << pair.second << " ";
-//          std::cout << tok.GetTokenSpelling() << std::endl;
-//      }
-
+//  for (auto &tok : tokens) {
+//      auto pair = SrcMgr.getLineAndColumn(tok.getSMLoc(), SrcMgr.getMainFileID());
+//      std::cout << pair.first << ", " << pair.second << " ";
+//      std::cout << tok.GetTokenSpelling() << std::endl;
+//  }
+  if (Diags.numErrors() != 0) {
+    return 0;
+  }
   lcc::Parser parser(std::move(tokens));
   auto program = parser.ParseProgram();
 

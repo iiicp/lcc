@@ -12,7 +12,7 @@
 #define LCC_LEXER_H
 
 #include "lcc/Basic/Diagnostic.h"
-#include "Token.h"
+#include "lcc/Lexer/Token.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SourceMgr.h"
@@ -23,7 +23,6 @@ private:
   llvm::SourceMgr &SrcMgr;
   DiagnosticsEngine &Diags;
   const char *CurPtr;
-  uint8_t *mLineHead;
   const char *BufferStart;
   const char *BufferEnd;
   llvm::StringRef CurBuf;
@@ -32,7 +31,7 @@ private:
 public:
   Lexer(llvm::SourceMgr &SrcMgr, DiagnosticsEngine &Diags)
       : SrcMgr(SrcMgr), Diags(Diags) {
-    CurBuf = SrcMgr.getMemoryBuffer(SrcMgr.getMainFileID())->getBuffer();
+    CurBuf = this->SrcMgr.getMemoryBuffer(SrcMgr.getMainFileID())->getBuffer();
     CurPtr = CurBuf.begin();
     BufferStart = CurBuf.begin();
     BufferEnd = CurBuf.end();
@@ -43,16 +42,15 @@ public:
 
 private:
   void next(Token &Result);
-  llvm::SMLoc getLoc() { return llvm::SMLoc::getFromPointer(CurPtr); }
+  llvm::SMLoc getSMLoc() { return llvm::SMLoc::getFromPointer(CurPtr); }
 
   void SkipWhiteSpace();
-  void SkipComment();
   void LexIdentifier(Token &Result);
   void LexNumeric(Token &Result);
   void LexPunctuator(Token &Result);
   void LexCharacter(Token &Result);
   void LexStringLiteral(Token &Result);
-  void ScanEscapeChar(const char *&Ptr);
+  int ScanEscapeChar(const char *&Ptr);
 
   void addKeywords();
   void addKeyword(llvm::StringRef Keyword, tok::TokenKind TokenCode);

@@ -84,8 +84,6 @@ std::vector<Token> Lexer::Tokenize() {
 
 void Lexer::next(Token &Result) {
   SkipWhiteSpace();
-  SkipComment();
-
   if (charinfo::isIdentifierHead(*CurPtr)) {
     LexIdentifier(Result);
   } else if (charinfo::isNumericHead(*CurPtr, CurPtr[1])) { // .1f
@@ -97,35 +95,45 @@ void Lexer::next(Token &Result) {
   } else if (charinfo::isStringHead(*CurPtr)) {
     LexStringLiteral(Result);
   } else {
-    while (!*CurPtr) {
+    while (*CurPtr != '\0') {
       ++CurPtr;
+      Diags.report(getSMLoc(), diag::warning_skip_unknown_char);
     }
     Result.setKind(tok::eof);
   }
 }
 
 void Lexer::SkipWhiteSpace() {
-  while (*CurPtr && charinfo::isWhitespace(*CurPtr)) {
-    ++CurPtr;
-  }
-}
-
-void Lexer::SkipComment() {
-  if (*CurPtr == '/' && CurPtr[1] == '/') {
-    CurPtr += 2;
-    while (*CurPtr && *CurPtr != '\n') {
-      ++CurPtr;
-    }
-  } else if (*CurPtr == '/' && CurPtr[1] == '*') {
-    CurPtr += 2;
-    while (CurPtr[0] != '*' || CurPtr[1] != '/') {
-      if (!CurPtr[0] || !CurPtr[1]) {
-        Diags.report(getLoc(), diag::err_unterminated_block_comment);
+  char ch = *CurPtr;
+  while (charinfo::isWhitespace(ch) || ch == '/') {
+    switch (ch) {
+    case '/': {
+      if (CurPtr[1] != '/' && CurPtr[1] != '*')
         return;
-      }
       ++CurPtr;
+      if (*CurPtr == '/') {
+        while (*CurPtr != '\n' && *CurPtr != '\0') {
+          ++CurPtr;
+        }
+      } else {
+        ++CurPtr;
+        while (CurPtr[0] != '*' || CurPtr[1] != '/') {
+          if (CurPtr[0] == '\0' || CurPtr[1] == '\0') {
+            Diags.report(getSMLoc(), diag::err_unterminated_block_comment);
+            return;
+          }
+          ++CurPtr;
+        }
+        CurPtr += 2;
+      }
+      break;
     }
-    CurPtr += 2;
+    default: {
+      ++CurPtr;
+      break;
+    }
+    }
+    ch = *CurPtr;
   }
 }
 
@@ -141,28 +149,34 @@ void Lexer::LexIdentifier(Token &Result) {
 
 void Lexer::LexCharacter(Token &Result) {
   const char *End = CurPtr + 1;
+
+  if (*End == '\0') {
+    Diags.report(getSMLoc(), diag::err_unclosed_char_literal);
+    formToken(Result, End, tok::char_constant);
+    return;
+  }
+
   if (*End == '\'') {
-    Diags.report(getLoc(), diag::err_empty_char_constant);
-    formToken(Result, End, tok::char_constant);
-    return;
-  } else if (*End == '\n' || !*End) {
-    Diags.report(getLoc(), diag::err_unterminated_char_constant);
-    formToken(Result, End, tok::char_constant);
-    return;
-  } else {
-    if (*End == '\\') {
-      ScanEscapeChar(End);
-    } else {
-      ++End;
-    }
-  }
-  if (*End != '\'') {
-    Diags.report(getLoc(), diag::err_unterminated_char_constant);
-    formToken(Result, End, tok::char_constant);
-  } else {
     ++End;
+    Diags.report(getSMLoc(), diag::err_empty_char_literal);
     formToken(Result, End, tok::char_constant);
+    return;
   }
+
+  int c;
+  if (*End == '\\') {
+    c = ScanEscapeChar(End);
+  }else {
+    c = *End++;
+  }
+
+  if (*End != '\'') {
+    Diags.report(getSMLoc(), diag::err_unclosed_char_literal);
+    formToken(Result, End, tok::char_constant);
+    return;
+  }
+  ++End;
+  formToken(Result, End, tok::char_constant, c);
 }
 
 void Lexer::LexStringLiteral(Token &Result) {
@@ -170,8 +184,8 @@ void Lexer::LexStringLiteral(Token &Result) {
   const char *End = CurPtr + 1;
   std::string value;
   while (*End != '"') {
-    if (*End == '\n' || !*End) {
-      Diags.report(getLoc(), diag::err_unterminated_string_constant);
+    if (*End == '\n' || *End == '\0') {
+      Diags.report(getSMLoc(), diag::err_unclosed_string_literal);
       return;
     } else if (*End == '\\') {
       ScanEscapeChar(End);
@@ -195,24 +209,32 @@ void Lexer::LexNumeric(Token &Result) {
   formToken(Result, End, tok::numeric_constant, value);
 }
 
-void Lexer::ScanEscapeChar(const char *&Ptr) {
-  ++Ptr;
+int Lexer::ScanEscapeChar(const char *&Ptr) {
+  Ptr += 2;
   switch (*Ptr) {
   case 'a':
+    return '\a';
   case 'b':
+    return '\b';
   case 't':
+    return '\t';
   case 'v':
+    return '\v';
   case 'r':
+    return '\r';
   case 'f':
+    return '\f';
   case 'n':
+    return '\n';
   case '\'':
+    return '\'';
   case '\"':
-  case '\\': {
-    ++Ptr;
-    break;
+    return '\"';
+  case '\\':
+    return '\\';
+  default: {
+    return *(Ptr - 1);
   }
-  default:
-    break;
   }
 }
 

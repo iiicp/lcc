@@ -31,7 +31,7 @@ std::string Token::GetTokenSpelling() const {
           using T = std::decay_t<decltype(Value)>;
           if constexpr (std::is_same<T, std::monostate>::value) {
             return "";
-          } else if constexpr (std::is_same<T, std::monostate>::value) {
+          } else if constexpr (std::is_same<T, std::string>::value) {
             return Value;
           } else {
             std::ostringstream os;

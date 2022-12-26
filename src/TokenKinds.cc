@@ -16,7 +16,7 @@ using namespace lcc;
 
 static const char * const TokNames[] = {
 #define TOK(ID) #ID,
-#define KEYWORD(ID, FLAG) #ID,
+#define KEYWORD(ID) #ID,
 #include "TokenKinds.def"
     nullptr
 };
@@ -38,7 +38,7 @@ const char *tok::getPunctuatorSpelling(TokenKind Kind) {
 
 const char *tok::getKeywordSpelling(TokenKind Kind) {
   switch (Kind) {
-#define KEYWORD(ID, FLAG) case kw_ ## ID: return #ID;
+#define KEYWORD(ID) case kw_ ## ID: return #ID;
 #include "TokenKinds.def"
   default: break;
   }

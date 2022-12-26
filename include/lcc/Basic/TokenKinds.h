@@ -9,8 +9,8 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_TOKENKINDS_H
-#define LCC_TOKENKINDS_H
+#ifndef LCC_TOKEN_KIND_H
+#define LCC_TOKEN_KIND_H
 
 namespace lcc {
 namespace tok {
@@ -26,4 +26,4 @@ const char *getKeywordSpelling(TokenKind Kind);
 } // tok
 }
 
-#endif // LCC_TOKENKINDS_H
+#endif // LCC_TOKEN_KIND_H

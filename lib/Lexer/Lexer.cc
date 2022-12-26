@@ -387,8 +387,8 @@ void Lexer::LexPunctuator(Token &Result) {
 }
 
 void Lexer::addKeywords() {
-#define KEYWORD(NAME, FLAGS) addKeyword(llvm::StringRef(#NAME), tok::kw_##NAME);
-#include "../../include/lcc/Basic/TokenKinds.def"
+#define KEYWORD(NAME) addKeyword(llvm::StringRef(#NAME), tok::kw_##NAME);
+#include "lcc/Basic/TokenKinds.def"
 }
 
 void Lexer::addKeyword(llvm::StringRef Keyword, tok::TokenKind TokenCode) {

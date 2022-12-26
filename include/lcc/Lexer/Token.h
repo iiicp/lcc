@@ -22,6 +22,13 @@ class Token {
   friend class Lexer;
   using Variant = std::variant<std::monostate,int32_t,uint32_t,int64_t,uint64_t,float,double,llvm::StringRef>;
 private:
+  bool LeadingWhiteSpace;
+  std::uint32_t MacroId;
+
+  std::string PPValue;
+  std::uint64_t CharSpaceOffset;
+  std::uint64_t CharSpaceLength;
+
   tok::TokenKind Kind;
   llvm::SMLoc Loc;
   const char *Ptr;

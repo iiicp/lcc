@@ -10,12 +10,22 @@
 #define KEYWORD(X) TOK(kw_##X)
 #endif
 
+#ifndef PPWORD
+#define PPWORD(X) TOK(pp_##X)
+#endif
+
 TOK(unknown) // not a token
 TOK(eof)     // end of file
 TOK(identifier)
 TOK(char_constant)
 TOK(string_literal)
 TOK(numeric_constant)
+
+PPWORD(newline)
+PPWORD(number)
+PPWORD(backslash)
+PPWORD(hash)
+PPWORD(hashhash)
 
 PUNCTUATOR(l_square, "[")
 PUNCTUATOR(r_square, "]")
@@ -100,6 +110,7 @@ KEYWORD(void)
 KEYWORD(volatile)
 KEYWORD(while)
 
+#undef PPWORD
 #undef KEYWORD
 #undef PUNCTUATOR
 #undef TOK

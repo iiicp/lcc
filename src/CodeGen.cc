@@ -999,28 +999,15 @@ PrimaryExprIdentifier::Codegen(lcc::CodeGenContext &context) const {
   return {context.mIrBuilder.CreateLoad(baseTy, value), baseTy, sign};
 }
 NodeRetValue PrimaryExprConstant::Codegen(lcc::CodeGenContext &context) const {
+  // llvm::APSInt, llvm::APFloat, std::string
   return std::visit(
       Overload{
-          [&context](int32_t value) -> NodeRetValue {
-            return {context.mIrBuilder.getInt32(value), context.mIrBuilder.getInt32Ty(), true};
+          [&context](llvm::APSInt value) -> NodeRetValue {
+            return {llvm::ConstantInt::get(context.mIrBuilder.getInt32Ty(), value), context.mIrBuilder.getInt32Ty(), true};
           },
-          [&context](int64_t value) -> NodeRetValue {
-            return {context.mIrBuilder.getInt64(value), context.mIrBuilder.getInt64Ty(), true};
-          },
-          [&context](uint32_t value) -> NodeRetValue {
-            return {context.mIrBuilder.getInt32(value), context.mIrBuilder.getInt32Ty(), false};
-          },
-          [&context](uint64_t value) -> NodeRetValue {
-            return {context.mIrBuilder.getInt64(value), context.mIrBuilder.getInt64Ty(), false};
-          },
-          [&context](float value) -> NodeRetValue {
+          [&context](llvm::APFloat value) -> NodeRetValue {
             return {
                 llvm::ConstantFP::get(context.mIrBuilder.getFloatTy(), value), context.mIrBuilder.getFloatTy(),
-                true};
-          },
-          [&context](double value) -> NodeRetValue {
-            return {
-                llvm::ConstantFP::get(context.mIrBuilder.getDoubleTy(), value), context.mIrBuilder.getDoubleTy(),
                 true};
           },
           [&context](const std::string &value) -> NodeRetValue {

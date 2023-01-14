@@ -10,19 +10,19 @@
 
 #ifndef LCC_PARSER_H
 #define LCC_PARSER_H
-#include <vector>
 #include "Token.h"
 #include "Syntax.h"
+#include <vector>
 namespace lcc {
 class Parser {
 private:
-  std::vector<Token> mTokens;
-  using TokIter = std::vector<Token>::const_iterator;
+  std::vector<CToken> mTokens;
+  using TokIter = std::vector<CToken>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
 
 public:
-  explicit Parser(std::vector<Token> && tokens): mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()), mTokEnd(mTokens.cend()) {}
+  explicit Parser(std::vector<CToken> && tokens): mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()), mTokEnd(mTokens.cend()) {}
   std::unique_ptr<Program> ParseProgram();
 
 private:

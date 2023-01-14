@@ -11,8 +11,8 @@
  ***********************************/
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
-#include "CodeGenContext.h"
 #include "Token.h"
+#include "CodeGenContext.h"
 #include <string>
 #include <variant>
 #include <vector>
@@ -413,7 +413,7 @@ public:
 };
 
 class PrimaryExprConstant final : public Node {
-  using Variant = std::variant<int32_t, uint32_t, int64_t, uint64_t, float, double, std::string>;
+  using Variant = std::variant<llvm::APSInt, llvm::APFloat, std::string>;
 private:
   Variant mVariant;
 public:

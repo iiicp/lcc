@@ -1,5 +1,5 @@
 /***********************************
- * File:     Token.cc
+ * File:     CToken.cc
  *
  * Author:   蔡鹏
  *
@@ -9,41 +9,22 @@
  ***********************************/
 
 #include "Token.h"
+#include "SourceObject.h"
 #include <sstream>
+#include <string_view>
 namespace lcc {
 
-std::string Token::GetTokenSpelling() const {
-  const char *punctuator = getPunctuatorSpelling(mType);
-  if (punctuator) {
-    return punctuator;
-  }
-  const char *keyword = getKeywordSpelling(mType);
-  if (keyword) {
-    return keyword;
-  }
-  switch (mType) {
-  case tok::identifier:
-  case tok::char_constant:
-  case tok::string_literal:
-  case tok::numeric_constant:
-    return std::visit(
-        [](auto &&Value) -> std::string {
-          using T = std::decay_t<decltype(Value)>;
-          if constexpr (std::is_same<T, std::monostate>::value) {
-            return "";
-          } else if constexpr (std::is_same<T, std::string>::value) {
-            return Value;
-          } else {
-            std::ostringstream os;
-            os << Value;
-            return os.str();
-          }
-        },
-        mValue);
-  case tok::eof:
-    return "eof";
-  default:
-    return "unknown";
-  }
+std::string_view TokenBase::getRepresentation(const SourceInterface & sourceObject) const {
+    auto sv = std::string_view(sourceObject.getFiles()[mFileId].source);
+    return sv.substr(mOffset, mLength);
+}
+
+uint32_t TokenBase::getLine(const SourceInterface & sourceObject) const {
+    return sourceObject.getLineNumber(mFileId, mOffset);
+}
+
+uint32_t TokenBase::getColumn(const SourceInterface & sourceObject) const {
+  auto line = sourceObject.getLineNumber(mFileId, mOffset);
+  return mOffset - sourceObject.getLineStartOffset(mFileId, line) + 1;
 }
 } // namespace lcc::lexer

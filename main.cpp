@@ -29,13 +29,11 @@ int main(int argc, char *argv[]) {
     file.seekg(0,std::ios_base::beg);
     file.read(source.data(),source.size());
 
-    lcc::Lexer lex(reinterpret_cast<uint8_t *>(source.data()), source.size());
-    auto tokens = lex.Tokenize();
-//    for (auto &tok : tokens) {
-//        std::cout << tok.GetLine() << ":" << tok.GetColumn() << " ";
-//        std::cout << tok.GetTokenSpelling() << std::endl;
-//    }
-
+    auto tokens = lcc::tokenize(source);
+    for (auto &tok : tokens.data()) {
+        std::cout << "(" << tok.getLine(tokens) << "," << tok.getColumn(tokens) << ", " << tok.getValue() << ")" << std::endl;
+    }
+#if 0
     lcc::Parser parser(std::move(tokens));
     auto program = parser.ParseProgram();
 
@@ -57,5 +55,6 @@ int main(int argc, char *argv[]) {
       std::cout << ((int(*)())address)() << std::endl;
     }
     llvm::llvm_shutdown();
+#endif
     return 0;
 }

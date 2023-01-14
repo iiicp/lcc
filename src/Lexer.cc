@@ -9,558 +9,308 @@
  ***********************************/
 
 #include "Lexer.h"
-#include <iostream>
+#include "Utilities.h"
 #include <cassert>
+#include <iostream>
+#include <sstream>
+#include <unordered_map>
+
 namespace lcc {
+enum class State {
+  Start,
+  CharacterLiteral,
+  StringLiteral,
+  Identifier,
+  Number,
+  Punctuator,
+  LineComment,
+  BlockComment,
+  AfterInclude
+};
 
-std::vector<Token> Lexer::Tokenize() {
-  std::vector<Token> tokens;
-  while (!IsEOF(mCursor)) {
-    Token tok = GetNextToken();
-    if (tok.GetTokenType() != tok::eof)
-      tokens.push_back(tok);
-  }
-  return std::move(tokens);
-}
-
-Token Lexer::GetNextToken() {
-  ScanWhiteSpace();
-  mColumn = mCursor - mLineHead + 1;
-  if (IsLetter()) {
-    return ScanIdentifier();
-  } else if (IsNumericStart()) { // .1f
-    return ScanNumeric();
-  } else if (IsPunctuatorStart()) {
-    return ScanPunctuator();
-  } else if (IsCharStart()) {
-    return ScanCharacter();
-  } else if (IsStringStart()) {
-    return ScanStringLiteral();
-  } else {
-    while (!IsEOF(mCursor)) {
-      ++mCursor;
-    }
-    return Token{mLine, mColumn, tok::eof};
-  }
+bool IsLetter(char ch) {
+  return (ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_');
 }
 
-bool Lexer::IsEOF(uint8_t *CharPtr) const {
-  return (*CharPtr == '\0' && CharPtr == mSrcEnd);
+bool IsWhiteSpace(char ch) {
+  return (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r' || ch == '\f' ||
+          ch == '\v');
 }
 
-bool Lexer::IsLetter() const {
-  uint8_t ch = *mCursor;
-  return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || (ch == '_');
-}
-bool Lexer::IsDigit() const {
-  uint8_t ch = *mCursor;
-  return '0' <= ch && ch <= '9';
-}
-bool Lexer::IsHexDigit() const {
-  uint8_t ch = *mCursor;
-  return IsDigit() || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F';
-}
-bool Lexer::IsOctDigit() const {
-  uint8_t ch = *mCursor;
-  return '0' <= ch && ch <= '7';
-}
+bool IsDigit(char ch) { return ch >= '0' && ch <= '9'; }
 
-bool Lexer::IsXDigit(int base) const {
-  if (base == 8) {
-    return IsOctDigit();
-  } else if (base == 16) {
-    return IsHexDigit();
-  } else {
-    return IsDigit();
-  }
-}
-
-bool Lexer::IsDigit(uint8_t *CharPtr) const {
-  uint8_t ch = *CharPtr;
-  return '0' << ch && ch <= '9';
-}
-bool Lexer::IsLetterOrDigit() const { return IsLetter() || IsDigit(); }
-
-bool Lexer::IsPunctuatorStart() const {
-  uint8_t ch = *mCursor;
+bool IsPunctuation(char ch) {
   return ch == '[' || ch == ']' || ch == '(' || ch == ')' || ch == '{' ||
          ch == '}' || ch == '.' || ch == '&' || ch == '*' || ch == '+' ||
          ch == '-' || ch == '~' || ch == '!' || ch == '/' || ch == '%' ||
          ch == '<' || ch == '>' || ch == '^' || ch == '|' || ch == '?' ||
-         ch == ':' || ch == ';' || ch == '=' || ch == ',';
+         ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
 }
 
-bool Lexer::IsNumericStart() const {
-  return IsDigit() || (*mCursor == '.' && IsDigit(mCursor + 1));
-}
-
-bool Lexer::IsCharStart() const { return *mCursor == '\''; }
-
-bool Lexer::IsStringStart() const { return *mCursor == '"'; }
-
-void Lexer::ScanWhiteSpace() {
-  char ch = *mCursor;
-  while (ch == ' ' || ch == '\t' || ch == '\v' || ch == '\f' || ch == '\r' ||
-         ch == '\n' || ch == '/' || ch == '#') {
-    switch (ch) {
-    case '\n': {
-      mLine++;
-      mLineHead = ++mCursor;
-      break;
-    }
-    case '/': {
-      if (mCursor[1] != '/' && mCursor[1] != '*')
-        return;
-      ++mCursor;
-      if (*mCursor == '/') {
-        while (*mCursor != '\n' && !IsEOF(mCursor)) {
-          ++mCursor;
-        }
-      } else {
-        ++mCursor;
-        while (mCursor[0] != '*' || mCursor[1] != '/') {
-          if (*mCursor == '\n') {
-            ++mLine;
-            mLineHead = ++mCursor;
-          } else if (IsEOF(mCursor) || IsEOF(mCursor + 1)) {
-            std::cerr << "miss */"
-                      << "line: " << mLine << ", col: " << mCursor - mLineHead
-                      << std::endl;
-            return;
-          } else {
-            ++mCursor;
-          }
-        }
-        mCursor += 2;
-      }
-      break;
-    }
-    default: {
-      ++mCursor;
-      break;
-    }
-    }
-    ch = *mCursor;
+int32_t TokenStringToCharConstant(const std::string &tokenString) {
+  if (tokenString.empty()) {
+    throw std::runtime_error("Character constant can't be empty");
   }
-}
-
-Token Lexer::ScanIdentifier() {
-  uint8_t *b = mCursor++;
-  while (IsLetterOrDigit()) {
-    ++mCursor;
+  if (tokenString.size() == 1) {
+    return tokenString[0];
   }
-  std::string value(b, mCursor);
-  if (mKeywordTypeMap.find(value) != mKeywordTypeMap.end()) {
-    return Token{mLine, mColumn, mKeywordTypeMap[value], value};
-  } else {
-    return Token{mLine, mColumn, tok::identifier, value};
+  if (tokenString == "\\'") {
+    return '\'';
   }
-}
-
-Token Lexer::ScanCharacter() {
-  ++mCursor;
-  int32_t ch;
-  if (*mCursor == '\'') {
-    std::cerr << "empty character '"
-              << "line: " << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    assert(0);
-  } else if (*mCursor == '\n' || IsEOF(mCursor)) {
-    std::cerr << "empty character, miss '"
-              << "line: " << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    assert(0);
-  } else {
-    if (*mCursor == '\\') {
-      ch = ScanEscapeChar();
-    } else {
-      ch = *mCursor++;
-    }
+  if (tokenString == "\\\"") {
+    return '"';
   }
-  if (*mCursor != '\'') {
-    std::cerr << "unclosed '" << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    assert(0);
+  if (tokenString == "\\?") {
+    return '\?';
   }
-  ++mCursor;
-  return Token{mLine, mColumn, tok::char_constant, ch};
-}
-
-Token Lexer::ScanStringLiteral() {
-  ++mCursor;
-  std::string value;
-  while (*mCursor != '"') {
-    if (*mCursor == '\n' || IsEOF(mCursor)) {
-      std::cerr << "legal str " << mLine << ", col: " << mCursor - mLineHead
-                << std::endl;
-      assert(0);
-    } else if (*mCursor == '\\') {
-      value += (char)ScanEscapeChar();
-    } else {
-      value += (char)*mCursor++;
-    }
+  // todo
+  if (tokenString == "\\\\") {
+    return '\\';
   }
-  ++mCursor;
-  return Token{mLine, mColumn, tok::string_literal, value};
-}
-
-Token Lexer::ScanNumeric() {
-  uint8_t *start = mCursor;
-  int base = 10;
-
-  if (*mCursor == '.') {
-    return ScanFloatNumeric();
-  }
-
-  if (*mCursor == '0') {
-    base = 8;
-    mCursor++;
-    if (*mCursor == 'x' || *mCursor == 'X') {
-      base = 16;
-      mCursor++;
-    }
-  }
-
-  while (IsXDigit(base)) {
-    ++mCursor;
-  }
-
-  if (*mCursor == '.' || *mCursor == 'E' || *mCursor == 'e') {
-    if (base == 8) {
-      std::cerr << "no oct float " << mLine << ", col: " << mCursor - mLineHead
-                << std::endl;
-      assert(0);
-    }
-    mCursor = start;
-    return ScanFloatNumeric();
-  }
-
-  mCursor = start;
-  return ScanIntegerNumeric(base);
-}
-
-Token Lexer::ScanIntegerNumeric(int base) {
-  if (base == 16) {
-    mCursor += 2;
-  }
-  uint64_t value = (*mCursor++ - '0');
-  while (IsXDigit(base)) {
-    value = value * base + (*mCursor++ - '0');
-  }
-  IntegerType type = ScanIntegerSuffix();
-  if (type == IntegerType::U) {
-    return Token{mLine, mColumn, tok::numeric_constant, (uint32_t)value};
-  } else if (type == IntegerType::UL || type == IntegerType::ULL) {
-    return Token{mLine, mColumn, tok::numeric_constant, (uint64_t)value};
-  } else if (type == IntegerType::L || type == IntegerType::LL) {
-    return Token{mLine, mColumn, tok::numeric_constant, (int64_t)value};
-  } else {
-    return Token{mLine, mColumn, tok::numeric_constant, (int32_t)value};
-  }
-}
-
-Token Lexer::ScanFloatNumeric() {
-  const char *start = (const char *)mCursor;
-  char *end = nullptr;
-  double value = strtod(start, &end);
-  if (end == nullptr)
-    assert(0);
-  mCursor = (uint8_t *)end;
-  if (*mCursor == 'f' || *mCursor == 'F') {
-    ++mCursor;
-    return Token{mLine, mColumn, tok::numeric_constant, (float)value};
-  } else if (*mCursor == 'L' || *mCursor == 'l') {
-    ++mCursor;
-    return Token{mLine, mColumn, tok::numeric_constant, value};
-  } else {
-    return Token{mLine, mColumn, tok::numeric_constant, value};
-  }
-}
-
-IntegerType Lexer::ScanIntegerSuffix() {
-  if (*mCursor == 'u' || *mCursor == 'U') {
-    ++mCursor;
-    if (*mCursor == 'l' || *mCursor == 'L') {
-      ++mCursor;
-      if (*mCursor == 'L' || *mCursor == 'L') {
-        ++mCursor;
-        return IntegerType::ULL;
-      } else {
-        return IntegerType::UL;
-      }
-    } else {
-      return IntegerType::U;
-    }
-  } else if (*mCursor == 'l' || *mCursor == 'L') {
-    ++mCursor;
-    if (*mCursor == 'l' || *mCursor == 'L') {
-      ++mCursor;
-      if (*mCursor == 'u' || *mCursor == 'U') {
-        ++mCursor;
-        return IntegerType::ULL;
-      } else {
-        return IntegerType::LL;
-      }
-    } else {
-      return IntegerType::L;
-    }
-  } else {
-    return IntegerType::Default;
-  }
-};
-
-int32_t Lexer::ScanEscapeChar() {
-  ++mCursor;
-  int32_t ch;
-  switch (*mCursor++) {
-  case 'a':
+  if (tokenString == "\\a") {
     return '\a';
-  case 'b':
+  }
+  if (tokenString == "\\b") {
     return '\b';
-  case 't':
-    return '\t';
-  case 'v':
-    return '\v';
-  case 'r':
-    return '\r';
-  case 'f':
+  }
+  if (tokenString == "\\f") {
     return '\f';
-  case 'n':
+  }
+  if (tokenString == "\\n") {
     return '\n';
-  case '\'':
-  case '\"':
-  case '\?':
-  case '\\':
-    return *(mCursor - 1);
-  case 'x': {
-    if (!IsHexDigit()) {
-      std::cerr << "warning: miss hexdigit "
-                << "line: " << mLine << ", col: " << mCursor - mLineHead
-                << std::endl;
-      return 'x';
-    }
-    ch = *mCursor++;
-    // \xffa
-    // (f*16+f)*16+a
-    while (IsHexDigit()) {
-      if ('a' <= *mCursor && *mCursor <= 'f') {
-        ch = (ch << 4) + (*mCursor - 'a') + 10;
-      } else if ('A' <= *mCursor && *mCursor <= 'F') {
-        ch = (ch << 4) + (*mCursor - 'A') + 10;
-      } else {
-        ch = (ch << 4) + (*mCursor - '0');
+  }
+  if (tokenString == "\\r") {
+    return '\r';
+  }
+  if (tokenString == "\\t") {
+    return '\t';
+  }
+  if (tokenString == "\\v") {
+    return '\v';
+  }
+
+  if (tokenString.starts_with('\\')) {
+    if (tokenString[1] == 'x') {
+      if (tokenString.size() <= 2) {
+        throw std::runtime_error("At least one hexadecimal digit required");
       }
-    }
-    return ch;
-  }
-  case 0:
-  case 1:
-  case 2:
-  case 3:
-  case 4:
-  case 5:
-  case 6:
-  case 7: {
-    ch = *mCursor++;
-    if (IsOctDigit()) {
-      ch = (ch << 3) + *mCursor++ - '0';
-      if (IsOctDigit()) {
-        ch = (ch << 3) + *mCursor++ - '0';
+      std::istringstream ss(tokenString.substr(2, tokenString.size() - 2));
+      int32_t number;
+      if (!(ss >> std::hex >> number)) {
+        throw std::runtime_error("Failed to convert " + ss.str() +
+                                 " to hex character");
       }
+      if (number > std::numeric_limits<uint8_t>::max()) {
+        throw std::runtime_error(
+            "Character constant is not allowed to have a value higher than the "
+            "maximum value of unsigned char");
+      }
+      return number;
+    } else {
+      if (tokenString.size() <= 1) {
+        throw std::runtime_error("At least one octal digit required");
+      }
+      std::istringstream ss(tokenString.substr(1, tokenString.size() - 1));
+      int32_t number;
+      if (!(ss >> std::oct >> number)) {
+        throw std::runtime_error("Failed to convert " + ss.str() +
+                                 " to octal character");
+      }
+      if (number > std::numeric_limits<uint8_t>::max()) {
+        throw std::runtime_error(
+            "Character constant is not allowed to have a value higher than the "
+            "maximum value of unsigned char");
+      }
+      return number;
     }
-    return ch;
   }
-  default:
-    std::cerr << "warning illegal escape: " << *(mCursor - 1)
-              << "line: " << mLine << ", col: " << mCursor - mLineHead
-              << std::endl;
-    return *(mCursor - 1);
-  }
+  throw std::runtime_error("Incorrect sequence for character literal: " +
+                           tokenString);
 }
 
-Token Lexer::ScanPunctuator() {
+tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
+                                char nnChar) {
   tok::TokenKind type = tok::unknown;
-  switch (*mCursor) {
+  switch (curChar) {
   case '[': {
     type = tok::l_square;
-    ++mCursor;
+    ++pos;
     break;
   }
   case ']': {
     type = tok::r_square;
-    ++mCursor;
+    ++pos;
     break;
   }
   case '(': {
     type = tok::l_paren;
-    ++mCursor;
+    ++pos;
     break;
   }
   case ')': {
     type = tok::r_paren;
-    ++mCursor;
+    ++pos;
     break;
   }
   case '{': {
     type = tok::l_brace;
-    ++mCursor;
+    ++pos;
     break;
   }
   case '}': {
     type = tok::r_brace;
-    ++mCursor;
+    ++pos;
     break;
   }
   case '.': {
-    mCursor++;
-    if (*mCursor == '.' && !IsEOF(mCursor + 1) && mCursor[1] == '.') {
-      mCursor += 2;
+    if (nextChar == '.' && nnChar == '.') {
+      pos += 3;
       type = tok::ellipsis;
     } else {
+      ++pos;
       type = tok::period;
     }
     break;
   }
   case '&': {
-    ++mCursor;
-    if (*mCursor == '&') {
-      ++mCursor;
+    if (nextChar == '&') {
+      pos += 2;
       type = tok::amp_amp;
-    } else if (*mCursor == '=') {
-      ++mCursor;
+    } else if (nextChar == '=') {
+      pos += 2;
       type = tok::amp_equal;
     } else {
+      ++pos;
       type = tok::amp;
     }
     break;
   }
   case '*': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
+    if (nextChar == '=') {
+      pos += 2;
       type = tok::star_equal;
     } else {
+      ++pos;
       type = tok::star;
     }
     break;
   }
   case '+': {
-    ++mCursor;
-    if (*mCursor == '+') {
-      ++mCursor;
+    if (nextChar == '+') {
+      pos += 2;
       type = tok::plus_plus;
-    } else if (*mCursor == '=') {
-      ++mCursor;
+    } else if (nextChar == '=') {
+      pos += 2;
       type = tok::plus_equal;
     } else {
+      ++pos;
       type = tok::plus;
     }
     break;
   }
   case '-': {
-    ++mCursor;
-    if (*mCursor == '>') {
-      ++mCursor;
+    if (nextChar == '>') {
+      pos += 2;
       type = tok::arrow;
-    } else if (*mCursor == '-') {
-      ++mCursor;
+    } else if (nextChar == '-') {
+      pos += 2;
       type = tok::minus_minus;
-    } else if (*mCursor == '=') {
-      ++mCursor;
+    } else if (nextChar == '=') {
+      pos += 2;
       type = tok::minus_equal;
     } else {
+      ++pos;
       type = tok::minus;
     }
     break;
   }
   case '~': {
-    ++mCursor;
+    ++pos;
     type = tok::tilde;
     break;
   }
   case '!': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
+    if (nextChar == '=') {
+      pos += 2;
       type = tok::exclaim_equal;
     } else {
+      ++pos;
       type = tok::exclaim;
     }
     break;
   }
   case '/': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
+    if (nextChar == '=') {
+      pos += 2;
       type = tok::slash_equal;
     } else {
+      ++pos;
       type = tok::slash;
     }
     break;
   }
   case '%': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
+    if (nextChar == '=') {
+      pos += 2;
       type = tok::percent_equal;
     } else {
+      ++pos;
       type = tok::percent;
     }
     break;
   }
   case '<': {
-    ++mCursor;
-    if (*mCursor == '<') {
-      ++mCursor;
-      if (*mCursor == '=') {
-        ++mCursor;
+    if (nextChar == '<') {
+      if (nnChar == '=') {
+        pos += 3;
         type = tok::less_less_equal;
       } else {
+        pos += 2;
         type = tok::less_less;
       }
-    } else if (*mCursor == '=') {
-      ++mCursor;
+    } else if (nextChar == '=') {
+      pos += 2;
       type = tok::less_equal;
     } else {
+      ++pos;
       type = tok::less;
     }
     break;
   }
   case '>': {
-    ++mCursor;
-    if (*mCursor == '>') {
-      ++mCursor;
-      if (*mCursor == '=') {
-        ++mCursor;
+    if (nextChar == '>') {
+      if (nnChar == '=') {
+        pos += 3;
         type = tok::greater_greater_equal;
       } else {
+        pos += 2;
         type = tok::greater_greater;
       }
-    } else if (*mCursor == '=') {
-      ++mCursor;
+    } else if (nextChar == '=') {
+      pos += 2;
       type = tok::greater_equal;
     } else {
+      ++pos;
       type = tok::greater;
     }
     break;
   }
   case '^': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
+    if (nextChar == '=') {
+      pos += 2;
       type = tok::caret_equal;
     } else {
+      ++pos;
       type = tok::caret;
     }
     break;
   }
   case '|': {
-    ++mCursor;
-    if (*mCursor == '|') {
-      ++mCursor;
+    if (nextChar == '|') {
+      pos += 2;
       type = tok::pipe_pipe;
-    } else if (*mCursor == '=') {
-      ++mCursor;
+    } else if (nextChar == '=') {
+      pos += 2;
       type = tok::pipe_equal;
     } else {
       type = tok::pipe;
@@ -568,56 +318,323 @@ Token Lexer::ScanPunctuator() {
     break;
   }
   case '?': {
-    ++mCursor;
+    ++pos;
     type = tok::question;
     break;
   }
   case ':': {
-    ++mCursor;
+    ++pos;
     type = tok::colon;
     break;
   }
   case ';': {
-    ++mCursor;
+    ++pos;
     type = tok::semi;
     break;
   }
   case ',': {
-    ++mCursor;
+    ++pos;
     type = tok::comma;
     break;
   }
   case '=': {
-    ++mCursor;
-    if (*mCursor == '=') {
-      ++mCursor;
+    if (nextChar == '=') {
+      pos += 2;
       type = tok::equal_equal;
     } else {
+      ++pos;
       type = tok::equal;
     }
     break;
   }
+  case '#': {
+    if (nextChar == '#') {
+      pos += 2;
+      type = tok::pp_hashhash;
+    } else {
+      ++pos;
+      type = tok::pp_hash;
+    }
+    break;
   }
-  return Token{mLine, mColumn, type};
+  }
+  return type;
 }
 
-void Lexer::InitKeyWordTypeMap() {
-  mKeywordTypeMap = {{"auto", tok::kw_auto},         {"break", tok::kw_break},
-                     {"case", tok::kw_case},         {"char", tok::kw_char},
-                     {"const", tok::kw_const},       {"continue", tok::kw_continue},
-                     {"default", tok::kw_default},   {"do", tok::kw_do},
-                     {"double", tok::kw_double},     {"else", tok::kw_else},
-                     {"enum", tok::kw_enum},         {"extern", tok::kw_extern},
-                     {"float", tok::kw_float},       {"for", tok::kw_for},
-                     {"goto", tok::kw_goto},         {"if", tok::kw_if},
-                     {"inline", tok::kw_inline},     {"int", tok::kw_int},
-                     {"long", tok::kw_long},         {"register", tok::kw_register},
-                     {"restrict", tok::kw_restrict}, {"return", tok::kw_return},
-                     {"short", tok::kw_short},       {"signed", tok::kw_signed},
-                     {"sizeof", tok::kw_sizeof},     {"static", tok::kw_static},
-                     {"struct", tok::kw_struct},     {"switch", tok::kw_switch},
-                     {"typedef", tok::kw_typedef},   {"union", tok::kw_union},
-                     {"unsigned", tok::kw_unsigned}, {"void", tok::kw_void},
-                     {"volatile", tok::kw_volatile}, {"while", tok::kw_while}};
+tok::TokenKind GetKeywordTokenType(const std::string &characters) {
+  static std::unordered_map<std::string, tok::TokenKind> hashTable = {
+      {"auto", tok::kw_auto},
+      {"double", tok::kw_double},
+      {"int", tok::kw_int},
+      {"struct", tok::kw_struct},
+      {"break", tok::kw_break},
+      {"else", tok::kw_else},
+      {"long", tok::kw_long},
+      {"switch", tok::kw_switch},
+      {"case", tok::kw_case},
+      {"enum", tok::kw_enum},
+      {"register", tok::kw_register},
+      {"typedef", tok::kw_typedef},
+      {"char", tok::kw_char},
+      {"extern", tok::kw_extern},
+      {"return", tok::kw_return},
+      {"union", tok::kw_union},
+      {"const", tok::kw_const},
+      {"float", tok::kw_float},
+      {"short", tok::kw_short},
+      {"unsigned", tok::kw_unsigned},
+      {"continue", tok::kw_continue},
+      {"for", tok::kw_for},
+      {"signed", tok::kw_signed},
+      {"default", tok::kw_default},
+      {"goto", tok::kw_goto},
+      {"sizeof", tok::kw_sizeof},
+      {"volatile", tok::kw_volatile},
+      {"do", tok::kw_do},
+      {"if", tok::kw_if},
+      {"static", tok::kw_static},
+      {"while", tok::kw_while},
+      {"void", tok::kw_void},
+      {"restrict", tok::kw_restrict},
+      {"inline", tok::kw_inline}};
+  if (hashTable.find(characters) != hashTable.end()) {
+    return hashTable[characters];
+  }
+  return tok::identifier;
 }
-} // namespace lcc::lexer
+
+PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
+
+  /// check BOM header
+  constexpr static std::string_view UTF8_BOM = "\xef\xbb\xbf";
+  if (sourceCode.size() >= 3 && sourceCode.substr(0, 3) == UTF8_BOM) {
+    sourceCode = sourceCode.substr(3);
+  }
+
+  /// compatible with windows
+  {
+    std::string::size_type pos = 0;
+    while ((pos = sourceCode.find("\r\n", pos)) != sourceCode.npos) {
+      sourceCode.erase(pos, 1);
+    }
+  }
+  sourceCode.shrink_to_fit();
+
+  /// calculate start offset per line
+  uint32_t offset = 0;
+  std::vector<uint32_t> lineStartOffset = {offset};
+  for (auto &ch : sourceCode) {
+    offset++;
+    if (ch == '\n') {
+      lineStartOffset.push_back(offset);
+    }
+  }
+  lineStartOffset.push_back(offset + 1);
+  lineStartOffset.shrink_to_fit();
+
+  /// variables used each time
+  std::vector<PPToken> results;
+  offset = 0;
+  uint32_t tokenStartOffset = 0;
+  bool leadingWhiteSpace = false;
+
+  char delimiter;
+  std::string characters;
+  State state = State::Start;
+
+  auto InsertToken = [&](uint32_t start, uint32_t end, tok::TokenKind tokenKind,
+                         std::string value = {}) {
+    auto &newToken = results.emplace_back(tokenKind, start, end - start, 0, 0,
+                                          std::move(value));
+    newToken.setLeadingWhitespace(leadingWhiteSpace);
+    leadingWhiteSpace = false;
+    characters.clear();
+  };
+
+  while (offset < sourceCode.size()) {
+    char curChar = (offset < sourceCode.size() ? sourceCode[offset] : ' ');
+    std::string debugStr = sourceCode.substr(offset);
+    char nextChar =
+        (offset < sourceCode.size() - 1) ? sourceCode[offset + 1] : '\0';
+
+    switch (state) {
+    case State::Start: {
+      if (IsLetter(curChar)) {
+        state = State::Identifier;
+        tokenStartOffset = offset;
+        break;
+      }
+      if (IsDigit(curChar) || (curChar == '.' && IsDigit(nextChar))) {
+        state = State::Number;
+        tokenStartOffset = offset;
+        break;
+      }
+      if (curChar == '\'') {
+        state = State::CharacterLiteral;
+        tokenStartOffset = offset++;
+        break;
+      }
+      if (curChar == '"') {
+        if (results.size() >= 2 &&
+            results[results.size() - 2].getTokenKind() == tok::pp_hash &&
+            results[results.size() - 1].getTokenKind() == tok::identifier &&
+            results[results.size() - 1].getValue() == "include") {
+          state = State::AfterInclude;
+          delimiter = '"';
+          tokenStartOffset = offset++;
+        } else {
+          state = State::StringLiteral;
+          tokenStartOffset = offset++;
+        }
+        break;
+      }
+      if (curChar == '\\') {
+        InsertToken(offset, offset + 1, tok::pp_backslash);
+        offset++;
+        break;
+      }
+      if (curChar == '\n') {
+        InsertToken(offset, offset + 1, tok::pp_newline);
+        offset++;
+        break;
+      }
+      if (curChar == '/' && nextChar == '/') {
+        state = State::LineComment;
+        offset += 2;
+        break;
+      }
+      if (curChar == '/' && nextChar == '*') {
+        state = State::BlockComment;
+        offset += 2;
+        break;
+      }
+      /// Line comments and block comments need to be processed first
+      if (IsPunctuation(curChar)) {
+        if (curChar == '<' && results.size() >= 2 &&
+            results[results.size() - 2].getTokenKind() == tok::pp_hash &&
+            results[results.size() - 1].getTokenKind() == tok::identifier &&
+            results[results.size() - 1].getValue() == "include") {
+          state = State::AfterInclude;
+          delimiter = '>';
+          tokenStartOffset = offset++;
+        } else {
+          state = State::Punctuator;
+          tokenStartOffset = offset;
+        }
+        break;
+      }
+      /// last process
+      if (IsWhiteSpace(curChar)) {
+        leadingWhiteSpace = true;
+        offset++;
+        break;
+      }
+      LCC_ASSERT(0 && "illegal ch");
+      break;
+    }
+    case State::CharacterLiteral: {
+      if (curChar == '\'' &&
+          (characters.empty() || !characters.ends_with('\\'))) {
+        state = State::Start;
+        InsertToken(tokenStartOffset, offset, tok::char_constant, characters);
+      } else {
+        characters += curChar;
+      }
+      offset++;
+      break;
+    }
+    case State::StringLiteral: {
+      if (curChar == '"' &&
+          (characters.empty() || !characters.ends_with('\\'))) {
+        state = State::Start;
+        InsertToken(tokenStartOffset, offset, tok::string_literal, characters);
+      } else {
+        characters += curChar;
+      }
+      offset++;
+      break;
+    }
+    case State::Identifier: {
+      if (IsLetter(curChar) || IsDigit(curChar)) {
+        characters += curChar;
+        offset++;
+      } else {
+        state = State::Start;
+        InsertToken(tokenStartOffset, offset, tok::identifier, characters);
+      }
+      break;
+    }
+    case State::Number: {
+      constexpr std::uint8_t toLower = 32;
+      if (characters.empty()) {
+        characters += curChar;
+        offset++;
+      } else {
+        if ((curChar != 'e' && curChar != 'E') &&
+            (curChar != 'p' && curChar != 'P') &&
+            (curChar != 'f' && curChar != 'F') &&
+            (curChar != 'u' && curChar != 'U') &&
+            (curChar != 'l' && curChar != 'L') && !IsDigit(curChar) &&
+            (curChar != '.') &&
+            (((characters.back() | toLower) != 'e' &&
+              (characters.back() | toLower) != 'p') ||
+             (curChar != '+' && curChar != '-'))) {
+          InsertToken(tokenStartOffset, offset, tok::pp_number, characters);
+          state = State::Start;
+        } else {
+          characters += curChar;
+          offset++;
+        }
+        break;
+      }
+      break;
+    }
+    case State::Punctuator: {
+      char nnChar =
+          (offset < sourceCode.size() - 2) ? sourceCode[offset + 2] : '\0';
+      tok::TokenKind tk = ParsePunctuation(offset, curChar, nextChar, nnChar);
+      LCC_ASSERT(tk != tok::unknown);
+      InsertToken(tokenStartOffset, offset, tk);
+      state = State::Start;
+      break;
+    }
+    case State::LineComment: {
+      if (curChar == '\n') {
+        state = State::Start;
+      } else {
+        offset++;
+      }
+      break;
+    }
+    case State::BlockComment: {
+      if (curChar == '*' && nextChar == '/') {
+        state = State::Start;
+        leadingWhiteSpace = true;
+        offset += 2;
+      } else {
+        offset++;
+      }
+      break;
+    }
+    case State::AfterInclude: {
+      if (curChar != delimiter && curChar != '\n') {
+        characters += curChar;
+        offset++;
+        break;
+      }
+      /// curChar is delimiter
+      if (curChar != '\n') {
+        InsertToken(tokenStartOffset, offset++, tok::string_literal,
+                    characters);
+        state = State::Start;
+        break;
+      }
+      LCC_ASSERT(0);
+    }
+    }
+  }
+  return PPTokens(std::move(results),
+                  {Source::File{std::string(sourcePath), std::move(sourceCode),
+                                std::move(lineStartOffset)}});
+}
+} // namespace lcc

@@ -1,5 +1,5 @@
 /***********************************
- * File:     Token.h
+ * File:     CToken.h
  *
  * Author:   蔡鹏
  *
@@ -10,36 +10,123 @@
 
 #ifndef LCC_TOKEN_H
 #define LCC_TOKEN_H
+
+#include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/APFloat.h"
+
+#include "SourceInterface.h"
+#include "TokenKinds.h"
 #include <cstdint>
 #include <string>
 #include <variant>
-#include "TokenKinds.h"
 namespace lcc{
-class Token {
-  using TokenValue =
-      std::variant<std::monostate, int32_t, uint32_t, int64_t, uint64_t,
-                   float, double, std::string>;
+class TokenBase {
+protected:
+  bool mLeadingWhiteSpace;
+  tok::TokenKind mTokenKind;
+  uint32_t mMacroId;
+  uint32_t mFileId;
+  uint32_t mOffset; // byte offset
+  uint32_t mLength;
 
-private:
-  uint64_t mLine;
-  uint64_t mColumn;
-  tok::TokenKind mType;
-  TokenValue mValue;
+  TokenBase() = default;
+
+  TokenBase(tok::TokenKind tokenKind, uint32_t offset, uint32_t length,
+            uint32_t fileId, uint32_t macroId)
+      : mLeadingWhiteSpace(false), mTokenKind(tokenKind), mOffset(offset),
+        mLength(length), mFileId(fileId), mMacroId(macroId) {}
 
 public:
-  explicit Token(uint64_t Line, uint64_t Column, tok::TokenKind Type)
-      : mLine(Line), mColumn(Column), mType(Type) {}
-  template <typename T>
-  explicit Token(uint64_t Line, uint64_t Column, tok::TokenKind Type, T &&Value)
-      : mLine(Line), mColumn(Column), mType(Type),
-        mValue(std::forward<T>(Value)) {}
-  [[nodiscard]] uint64_t GetLine() const { return mLine; }
-  [[nodiscard]] uint64_t GetColumn() const { return mColumn; }
-  [[nodiscard]] tok::TokenKind GetTokenType() const { return mType; }
-  [[nodiscard]] const TokenValue &GetTokenValue() const { return mValue; }
+  std::string_view getRepresentation(const SourceInterface & sourceObject) const;
+  uint32_t getLine(const SourceInterface & sourceObject) const;
+  uint32_t getColumn(const SourceInterface & sourceObject) const;
 
-  std::string GetTokenSpelling() const;
+  tok::TokenKind getTokenKind() const {
+    return mTokenKind;
+  }
+  uint32_t getOffset() const {
+    return mOffset;
+  }
+  uint32_t getLength() const {
+    return mLength;
+  }
+  uint32_t getFileId() const {
+    return mFileId;
+  }
+  void setFileId(uint32_t fileId) {
+    mFileId = fileId;
+  }
+  bool hasLeadingWhitespace() const {
+    return mLeadingWhiteSpace;
+  }
+  void setLeadingWhitespace(bool leadingWhitespace) {
+    mLeadingWhiteSpace = leadingWhitespace;
+  }
+  uint32_t getMacroId() const {
+    return mMacroId;
+  }
+  void setMacroId(uint32_t macroId) {
+    mMacroId = macroId;
+  }
+  bool isMacroInserted() const {
+    return static_cast<bool>(mMacroId);
+  }
+};
+
+class PPToken final : public TokenBase {
+  std::string mValue;
+public:
+  PPToken(tok::TokenKind tokenKind, uint32_t offset, uint32_t length,
+          uint32_t fileId, uint32_t macroId = 0, std::string_view value = {})
+      : TokenBase(tokenKind, offset, length, fileId, macroId),
+        mValue(value.begin(), value.end()) {}
+  std::string_view getValue() const {
+    return mValue;
+  }
+};
+
+class CToken final : public TokenBase {
+  using TokenValue =
+      std::variant<std::monostate, llvm::APSInt, llvm::APFloat, std::string>;
+public:
+  enum NumType : uint8_t
+  {
+    None,
+    Int,
+    UnsignedInt,
+    Long,
+    UnsignedLong,
+    LongLong,
+    UnsignedLongLong,
+    Float,
+    Double,
+    LongDouble
+  };
+private:
+  TokenValue mValue;
+  NumType mType;
+
+public:
+  using ValueType = TokenValue;
+  explicit CToken(tok::TokenKind tokenKind, uint32_t offset, uint32_t length,
+                  uint32_t fileId, uint32_t macroId, ValueType value = std::monostate{}, NumType type = NumType::None)
+      : TokenBase(tokenKind, offset, length, fileId, macroId), mValue(std::move(value)), mType(type) {}
+
+  const ValueType &getValue() const {
+    return mValue;
+  }
+
+  void setValue(const ValueType& value) {
+    mValue = value;
+  }
+
+  NumType getNumType() const {
+    return mType;
+  }
+  void setNumType(NumType type) {
+    mType = type;
+  }
 };
 } // namespace lcc::lexer
 
-#endif // LCC_TOKEN_H
+#endif // LCC_CTOKEN_H

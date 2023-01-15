@@ -29,7 +29,7 @@ enum class State {
 };
 
 bool IsLetter(char ch) {
-  return (ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_');
+  return ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_');
 }
 
 bool IsWhiteSpace(char ch) {
@@ -47,85 +47,54 @@ bool IsPunctuation(char ch) {
          ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
 }
 
-int32_t TokenStringToCharConstant(const std::string &tokenString) {
-  if (tokenString.empty()) {
-    throw std::runtime_error("Character constant can't be empty");
+std::uint32_t escapeCharToValue(char escape) {
+  switch (escape) {
+  case '\\' : return '\\';
+  case '\'': return '\'';
+  case '"': return '"';
+  case 'a': return '\a';
+  case 'b': return '\b';
+  case 'f': return '\f';
+  case 'n': return '\n';
+  case 'r': return '\r';
+  case 't': return '\t';
+  case 'v': return '\v';
+  case '?': return '\?';
+  case ' ':
+    LCC_ASSERT(0 && "expected character after backslash");
+    break;
+  default:
+    LCC_ASSERT(0 && "invalid escape sequence");
+    break;
   }
-  if (tokenString.size() == 1) {
-    return tokenString[0];
-  }
-  if (tokenString == "\\'") {
-    return '\'';
-  }
-  if (tokenString == "\\\"") {
-    return '"';
-  }
-  if (tokenString == "\\?") {
-    return '\?';
-  }
-  // todo
-  if (tokenString == "\\\\") {
-    return '\\';
-  }
-  if (tokenString == "\\a") {
-    return '\a';
-  }
-  if (tokenString == "\\b") {
-    return '\b';
-  }
-  if (tokenString == "\\f") {
-    return '\f';
-  }
-  if (tokenString == "\\n") {
-    return '\n';
-  }
-  if (tokenString == "\\r") {
-    return '\r';
-  }
-  if (tokenString == "\\t") {
-    return '\t';
-  }
-  if (tokenString == "\\v") {
-    return '\v';
-  }
+  return 0;
+}
 
-  if (tokenString.starts_with('\\')) {
-    if (tokenString[1] == 'x') {
-      if (tokenString.size() <= 2) {
-        throw std::runtime_error("At least one hexadecimal digit required");
-      }
-      std::istringstream ss(tokenString.substr(2, tokenString.size() - 2));
-      int32_t number;
-      if (!(ss >> std::hex >> number)) {
-        throw std::runtime_error("Failed to convert " + ss.str() +
-                                 " to hex character");
-      }
-      if (number > std::numeric_limits<uint8_t>::max()) {
-        throw std::runtime_error(
-            "Character constant is not allowed to have a value higher than the "
-            "maximum value of unsigned char");
-      }
-      return number;
-    } else {
-      if (tokenString.size() <= 1) {
-        throw std::runtime_error("At least one octal digit required");
-      }
-      std::istringstream ss(tokenString.substr(1, tokenString.size() - 1));
-      int32_t number;
-      if (!(ss >> std::oct >> number)) {
-        throw std::runtime_error("Failed to convert " + ss.str() +
-                                 " to octal character");
-      }
-      if (number > std::numeric_limits<uint8_t>::max()) {
-        throw std::runtime_error(
-            "Character constant is not allowed to have a value higher than the "
-            "maximum value of unsigned char");
-      }
-      return number;
+std::vector<char> processCharacters(std::string_view characters, tok::TokenKind kind) {
+  std::vector<char> result;
+  result.resize(characters.size());
+  int offset = 0;
+  while (offset < characters.size()) {
+    char ch = characters[offset];
+    if (ch == '\n') {
+      if (kind == tok::char_constant)
+        LCC_ASSERT(0 && "newline in character literal");
+      else
+        LCC_ASSERT(0 && "newline in string literal");
     }
+    if (ch != '\\') {
+      result.push_back(ch);
+      offset++;
+      continue;
+    }
+    if (offset + 1 == characters.size()) {
+      break;
+    }
+    auto character = escapeCharToValue(characters[offset + 1]);
+    result.push_back(character);
+    offset += 2;
   }
-  throw std::runtime_error("Incorrect sequence for character literal: " +
-                           tokenString);
+  return result;
 }
 
 tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
@@ -361,8 +330,8 @@ tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
   return type;
 }
 
-tok::TokenKind GetKeywordTokenType(const std::string &characters) {
-  static std::unordered_map<std::string, tok::TokenKind> hashTable = {
+tok::TokenKind GetKeywordTokenType(std::string_view characters) {
+  static std::unordered_map<std::string_view, tok::TokenKind> hashTable = {
       {"auto", tok::kw_auto},
       {"double", tok::kw_double},
       {"int", tok::kw_int},
@@ -636,5 +605,50 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
   return PPTokens(std::move(results),
                   {Source::File{std::string(sourcePath), std::move(sourceCode),
                                 std::move(lineStartOffset)}});
+}
+
+CTokens toCTokens(PPTokens && ppTokens) {
+  std::vector<CToken> result;
+  for (auto &iter : ppTokens.data()) {
+    switch (iter.getTokenKind()) {
+    case tok::pp_hash:
+    case tok::pp_hashhash:
+    case tok::pp_backslash:
+      LCC_ASSERT(0 && "illegal token kind");
+      break;
+    case tok::pp_newline:
+      break;
+    case tok::identifier:
+      result.emplace_back(GetKeywordTokenType(iter.getValue()),
+                          iter.getOffset(), iter.getLength(), iter.getFileId(),
+                          iter.getMacroId(), lcc::to_string(iter.getValue()));
+      break;
+    case tok::pp_number:
+      break;
+    case tok::string_literal:
+      break;
+    case tok::char_constant: {
+      auto chars = processCharacters(iter.getValue(), tok::char_constant);
+      if (chars.empty()) {
+        LCC_ASSERT(0 && "character literal cannot be empty");
+        break;
+      }
+      if (chars.size() > 1) {
+        LCC_ASSERT(0 && "character literal size more than 1");
+        break;
+      }
+      result.emplace_back(
+          tok::char_constant, iter.getOffset(), iter.getLength(),
+          iter.getFileId(), iter.getMacroId(),
+          llvm::APSInt(llvm::APInt(4 * 8, chars[0], true), false), CToken::Int);
+      break;
+    }
+    default:
+      result.emplace_back(iter.getTokenKind(), iter.getOffset(), iter.getLength(),
+                          iter.getFileId(), iter.getMacroId());
+    }
+  }
+  result.shrink_to_fit();
+  return CTokens(std::move(result), {ppTokens.getFiles().begin(), ppTokens.getFiles().end()});
 }
 } // namespace lcc

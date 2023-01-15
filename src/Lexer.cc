@@ -97,6 +97,12 @@ std::vector<char> processCharacters(std::string_view characters, tok::TokenKind 
   return result;
 }
 
+CToken ParseStringLiteral(const PPToken& ppToken) {
+  std::vector<char> chars = processCharacters(ppToken.getValue(), tok::string_literal);
+  return CToken(tok::string_literal, ppToken.getOffset(), ppToken.getLength(), ppToken.getFileId(),
+                ppToken.getMacroId(), std::string(chars.begin(), chars.end()));
+}
+
 tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
                                 char nnChar) {
   tok::TokenKind type = tok::unknown;
@@ -625,8 +631,11 @@ CTokens toCTokens(PPTokens && ppTokens) {
       break;
     case tok::pp_number:
       break;
-    case tok::string_literal:
+    case tok::string_literal: {
+      auto cToken = ParseStringLiteral(iter);
+      result.push_back(std::move(cToken));
       break;
+    }
     case tok::char_constant: {
       auto chars = processCharacters(iter.getValue(), tok::char_constant);
       if (chars.empty()) {

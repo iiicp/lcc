@@ -15,13 +15,26 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <charconv>
+#include <optional>
 
 #include <llvm/Support/Error.h>
 
+constexpr auto UTF32_MAX = 0x10FFFF;
+
 namespace lcc {
-namespace lex_util {
+namespace util {
 bool IsLetter(char ch) {
-  return ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_');
+  if (ch == '_') {
+    return true;
+  }
+  if (ch >= 'a' && ch <= 'z') {
+    return true;
+  }
+  if (ch >= 'A' && ch <= 'Z') {
+    return true;
+  }
+  return false;
 }
 
 bool IsWhiteSpace(char ch) {
@@ -30,6 +43,8 @@ bool IsWhiteSpace(char ch) {
 }
 
 bool IsDigit(char ch) { return ch >= '0' && ch <= '9'; }
+
+bool IsOctDigit(char ch) {return ch >= '0' && ch <= '7';}
 
 bool IsHexDigit(char ch) {
   return IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
@@ -42,7 +57,15 @@ bool IsPunctuation(char ch) {
          ch == '<' || ch == '>' || ch == '^' || ch == '|' || ch == '?' ||
          ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
 }
-} // namespace lex_util
+
+std::uint32_t octalToValue(std::string_view value)
+{
+  std::uint32_t result;
+  auto errors = std::from_chars(value.data(), value.data() + value.size(), result, 8);
+  LCC_ASSERT(errors.ec == std::errc{});
+  return result;
+}
+} // namespace util
 
 enum class State {
   Start,
@@ -56,7 +79,7 @@ enum class State {
   AfterInclude
 };
 
-std::uint32_t escapeCharToValue(char escape) {
+std::optional<std::uint32_t> escapeCharToValue(char escape) {
   switch (escape) {
   case '\\':
     return '\\';
@@ -81,49 +104,104 @@ std::uint32_t escapeCharToValue(char escape) {
   case '?':
     return '\?';
   case ' ':
-    LCC_ASSERT(0 && "expected character after backslash");
+//    LCC_ASSERT(0 && "expected character after backslash");
+    return {};
     break;
   default:
-    LCC_ASSERT(0 && "invalid escape sequence");
+//    LCC_ASSERT(0 && "invalid escape sequence");
+    return {};
     break;
   }
   return 0;
 }
 
-std::vector<char> processCharacters(std::string_view characters,
-                                    tok::TokenKind kind) {
+std::optional<std::vector<char>> processCharacters(std::string_view characters) {
   std::vector<char> result;
   result.resize(characters.size());
-  int offset = 0;
+  int offset = 0, resultStart = 0;
   while (offset < characters.size()) {
     char ch = characters[offset];
     if (ch == '\n') {
-      if (kind == tok::char_constant)
-        LCC_ASSERT(0 && "newline in character literal");
-      else
-        LCC_ASSERT(0 && "newline in string literal");
+        return {};
     }
     if (ch != '\\') {
       result.push_back(ch);
+      resultStart++;
       offset++;
       continue;
     }
     if (offset + 1 == characters.size()) {
       break;
     }
-    auto character = escapeCharToValue(characters[offset + 1]);
-    result.push_back(character);
-    offset += 2;
+    if (characters[offset+1] == 'x') {
+      offset += 2;
+      int lastHex = offset;
+      while (lastHex < characters.size()) {
+        if (util::IsHexDigit(characters[lastHex])) {
+          lastHex++;
+          continue;
+        }
+        break;
+      }
+      if (offset == lastHex) {
+        /// error at least one hexadecimal digit required
+        return {};
+      }
+
+      llvm::APInt input;
+      llvm::StringRef(characters.data()+offset, lastHex-offset).getAsInteger(16, input);
+      auto value = input.getZExtValue();
+      result.push_back(value);
+      resultStart++;
+      offset = lastHex;
+      break;
+    }
+    /// '\0' is octal char
+    else if (util::IsDigit(characters[offset+1])) {
+      offset++;
+      int start = offset;
+      /// first octal char must be oct char
+      if (!util::IsOctDigit(characters[offset])) {
+        return {};
+      }
+      /// first octal char
+      if (util::IsOctDigit(characters[offset])) {
+        offset++;
+      }
+      /// second octal char
+      if (util::IsOctDigit(characters[offset])) {
+        offset++;
+      }
+      /// third octal char
+      if (util::IsOctDigit(characters[offset])) {
+        offset++;
+      }
+      auto value = util::octalToValue(characters.substr(start, offset-start));
+      result.push_back((char)value);
+      resultStart++;
+      break;
+    }else {
+      auto character = escapeCharToValue(characters[offset + 1]);
+      if (!character) {
+        return {};
+      }
+      result.push_back((char)character.value());
+      resultStart++;
+      offset += 2;
+    }
   }
+  result.resize(resultStart);
   return result;
 }
 
-CToken ParseStringLiteral(const PPToken &ppToken) {
-  std::vector<char> chars =
-      processCharacters(ppToken.getValue(), tok::string_literal);
+CToken ParseStringLiteral(const PPToken &ppToken, const SourceInterface &interface) {
+  auto chars = processCharacters(ppToken.getValue());
+  if (!chars) {
+    logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "parse string literal error");
+  }
   return CToken(tok::string_literal, ppToken.getOffset(), ppToken.getLength(),
                 ppToken.getFileId(), ppToken.getMacroId(),
-                std::string(chars.begin(), chars.end()));
+                std::string(chars.value().begin(), chars.value().end()));
 }
 
 template <class T, class... Args>
@@ -154,7 +232,7 @@ castInteger(std::uint64_t integer,
     }
   }
   if constexpr (sizeof...(Args) != 0) {
-    std::array<CToken::NumType, sizeof...(Args)> second;
+    std::array<CToken::NumType, sizeof...(Args)> second{};
     std::copy(types.begin() + 1, types.end(), second.begin());
     return castInteger<Args...>(integer, second);
   } else {
@@ -181,14 +259,15 @@ int c = 0x123lu;
 float a1 = 0x.ffp-3;
  */
 std::pair<CToken::ValueType, CToken::NumType>
-ParseNumber(std::string_view character) {
+ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
+  std::string_view character = ppToken.getValue();
   const char *begin = character.begin(), *end = character.end();
   LCC_ASSERT(std::distance(begin, end) >= 1);
   /// If the number is just "0x", treat the x as a suffix instead of as a hex
   /// prefix
   bool isHex = character.size() > 2 &&
                (character.starts_with("0x") || character.starts_with("0X")) &&
-               lex_util::IsHexDigit(character[2]);
+               util::IsHexDigit(character[2]);
   std::vector<char> charSet{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   if (isHex) {
     charSet = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
@@ -225,10 +304,10 @@ ParseNumber(std::string_view character) {
     suffixBegin = std::find_if(suffixBegin, end, searchFunction);
     /// first character must be digit
     if (prev == suffixBegin) {
-      LCC_ASSERT(0 && "expected digits after exponent");
+      logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "expected digits after exponent");
     }
   } else if (isHex && isFloat) {
-    LCC_ASSERT(0 && "binary floating point must contain exponent");
+    logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "binary floating point must contain exponent");
   }
 
   bool isHexOrOctal = isHex;
@@ -237,7 +316,7 @@ ParseNumber(std::string_view character) {
     size_t len = std::distance(begin, suffixBegin);
     for (int i = 0; i < len; ++i) {
       if (character[i] >= '8') {
-        LCC_ASSERT(0 && "invalid octal character");
+        logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "invalid octal character");
       }
     }
   }
@@ -257,7 +336,7 @@ ParseNumber(std::string_view character) {
         std::find(variants.begin(), variants.end(), suffix) != variants.end();
   }
   if (!valid) {
-    LCC_ASSERT(0 && "invalid literal suffix");
+    logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "invalid literal suffix");
   }
 
   if (!isFloat) {
@@ -268,7 +347,7 @@ ParseNumber(std::string_view character) {
     llvm::APInt test;
     llvm::StringRef(begin, suffixBegin - begin).getAsInteger(0, test);
     if (test.getActiveBits() > (unsignedConsidered ? 64u : 63u)) {
-      LCC_ASSERT(0 && "integer value too big to be representable");
+      logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "integer value too big to be representable");
     }
     auto integer = test.getZExtValue();
     if (suffix.empty()) {
@@ -582,6 +661,8 @@ tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
     }
     break;
   }
+  default:
+    return type;
   }
   return type;
 }
@@ -684,13 +765,13 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
 
     switch (state) {
     case State::Start: {
-      if (lex_util::IsLetter(curChar)) {
+      if (util::IsLetter(curChar)) {
         state = State::Identifier;
         tokenStartOffset = offset;
         break;
       }
-      if (lex_util::IsDigit(curChar) ||
-          (curChar == '.' && lex_util::IsDigit(nextChar))) {
+      if (util::IsDigit(curChar) ||
+          (curChar == '.' && util::IsDigit(nextChar))) {
         state = State::Number;
         tokenStartOffset = offset;
         break;
@@ -735,7 +816,7 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
         break;
       }
       /// Line comments and block comments need to be processed first
-      if (lex_util::IsPunctuation(curChar)) {
+      if (util::IsPunctuation(curChar)) {
         if (curChar == '<' && results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
@@ -750,12 +831,14 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
         break;
       }
       /// last process
-      if (lex_util::IsWhiteSpace(curChar)) {
+      if (util::IsWhiteSpace(curChar)) {
         leadingWhiteSpace = true;
         offset++;
         break;
       }
-      LCC_ASSERT(0 && "illegal ch");
+      std::cerr << "offset: " << tokenStartOffset
+                << ", illegal char: " << curChar << std::endl;
+      LCC_ASSERT(0);
       break;
     }
     case State::CharacterLiteral: {
@@ -781,7 +864,7 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
       break;
     }
     case State::Identifier: {
-      if (lex_util::IsLetter(curChar) || lex_util::IsDigit(curChar)) {
+      if (util::IsLetter(curChar) || util::IsDigit(curChar)) {
         characters += curChar;
         offset++;
       } else {
@@ -800,7 +883,7 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
             (curChar != 'p' && curChar != 'P') &&
             (curChar != 'f' && curChar != 'F') &&
             (curChar != 'u' && curChar != 'U') &&
-            (curChar != 'l' && curChar != 'L') && !lex_util::IsDigit(curChar) &&
+            (curChar != 'l' && curChar != 'L') && !util::IsDigit(curChar) &&
             (curChar != '.') &&
             (((characters.back() | toLower) != 'e' &&
               (characters.back() | toLower) != 'p') ||
@@ -855,6 +938,8 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
         state = State::Start;
         break;
       }
+      std::cerr << "offset: " << tokenStartOffset
+                << ", illegal newline in after include" << std::endl;
       LCC_ASSERT(0);
     }
     }
@@ -871,7 +956,7 @@ CTokens toCTokens(PPTokens &&ppTokens) {
     case tok::pp_hash:
     case tok::pp_hashhash:
     case tok::pp_backslash:
-      LCC_ASSERT(0 && "illegal token kind");
+      logErr(iter.getLine(ppTokens), iter.getColumn(ppTokens), "illegal token kind in c token");
       break;
     case tok::pp_newline:
       break;
@@ -882,31 +967,35 @@ CTokens toCTokens(PPTokens &&ppTokens) {
       break;
     }
     case tok::pp_number: {
-      auto number = ParseNumber(iter.getValue());
+      auto number = ParseNumber(iter, ppTokens);
       result.emplace_back(tok::numeric_constant, iter.getOffset(),
                           iter.getLength(), iter.getFileId(), iter.getMacroId(),
                           std::move(number.first), number.second);
       break;
     }
     case tok::string_literal: {
-      auto cToken = ParseStringLiteral(iter);
+      auto cToken = ParseStringLiteral(iter, ppTokens);
       result.push_back(std::move(cToken));
       break;
     }
     case tok::char_constant: {
-      auto chars = processCharacters(iter.getValue(), tok::char_constant);
-      if (chars.empty()) {
-        LCC_ASSERT(0 && "character literal cannot be empty");
+      auto chars = processCharacters(iter.getValue());
+      if (!chars) {
+        logErr(iter.getLine(ppTokens), iter.getLine(ppTokens), "process char constant error");
         break;
       }
-      if (chars.size() > 1) {
-        LCC_ASSERT(0 && "character literal size more than 1");
+      if (chars.value().empty()) {
+        logErr(iter.getLine(ppTokens), iter.getColumn(ppTokens), "character literal cannot be empty");
+        break;
+      }
+      if (chars.value().size() > 1) {
+        logErr(iter.getLine(ppTokens), iter.getColumn(ppTokens), "character literal size more than 1");
         break;
       }
       result.emplace_back(
           tok::char_constant, iter.getOffset(), iter.getLength(),
           iter.getFileId(), iter.getMacroId(),
-          llvm::APSInt(llvm::APInt(4 * 8, chars[0], true), false), CToken::Int);
+          llvm::APSInt(llvm::APInt(4 * 8, chars.value()[0], true), false), CToken::Int);
       break;
     }
     default:

@@ -58,6 +58,8 @@ inline std::string to_string(std::string_view stringView)
 {
   return std::string(stringView.begin(), stringView.end());
 }
+
+void logErr(int32_t row, int32_t col, std::string msg);
 }
 
 #endif // LCC_UTILITIES_H

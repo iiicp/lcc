@@ -29,9 +29,15 @@ int main(int argc, char *argv[]) {
     file.seekg(0,std::ios_base::beg);
     file.read(source.data(),source.size());
 
-    auto tokens = lcc::tokenize(source);
-    for (auto &tok : tokens.data()) {
-        std::cout << "(" << tok.getLine(tokens) << "," << tok.getColumn(tokens) << ", " << tok.getValue() << ")" << std::endl;
+    auto ppTokens = lcc::tokenize(source);
+    for (auto &tok : ppTokens.data()) {
+        std::cout << "(" << tok.getLine(ppTokens) << "," << tok.getColumn(ppTokens) << ", " << tok.getValue() << ")" << std::endl;
+    }
+    std::cout << "ctoken begin" << std::endl;
+    auto ctokens = lcc::toCTokens(std::move(ppTokens));
+    std::cout << "ctoken" << std::endl;
+    for (auto &tok : ctokens.data()) {
+      std::cout << "(" << tok.getLine(ctokens) << "," << tok.getColumn(ctokens) << ")" << std::endl;
     }
 #if 0
     lcc::Parser parser(std::move(tokens));

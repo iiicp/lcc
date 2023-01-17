@@ -1,10 +1,9 @@
-\n
 //#define NAMESIZE 31
 //
-#define DOUBLE(x) \
-    (2 * (x))
-#include <stdio.h>
-#include "string.h"
+//#define DOUBLE(x) (2 * (x))
+//#include <stdio.h>
+//#include "string.h"
+char c = '\xf8';
 
 typedef struct TreeNode
 {

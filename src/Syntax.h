@@ -11,53 +11,27 @@
  ***********************************/
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
-#include "Token.h"
 #include "CodeGenContext.h"
+#include "Lexer.h"
+#include "SourceInterface.h"
+#include "Token.h"
 #include <string>
 #include <variant>
 #include <vector>
 namespace lcc {
-class Type {
-public:
-  Type() = default;
-  virtual ~Type() = default;
-  virtual bool IsSigned() const = 0;
-  virtual bool IsVoid() const = 0;
-  virtual LLVMTypePtr TypeGen(CodeGenContext &context) = 0;
-};
-
-class PrimaryType final : public Type {
-public:
-  std::vector<tok::TokenKind> mTypes;
-  bool mSign{true};
-  bool mVoid{false};
-public:
-  explicit PrimaryType(std::vector<tok::TokenKind> &&types) noexcept;
-  bool IsSigned() const override;
-  bool IsVoid() const override;
-  LLVMTypePtr TypeGen(CodeGenContext &context) override;
-};
-
-class PointerType final : public Type {
-public:
-  std::unique_ptr<Type> mType;
-
-public:
-  explicit PointerType(std::unique_ptr<Type> &&type) noexcept;
-  bool IsSigned() const override;
-  bool IsVoid() const override;
-  LLVMTypePtr TypeGen(CodeGenContext &context) override;
-};
-
 class Node {
+private:
+  const SourceInterface &mSourceInterface;
+  const CToken &mTok;
+
 public:
-  Node() = default;
+  Node(const SourceInterface &interface, const CToken &curToken)
+      : mSourceInterface(interface), mTok(curToken){};
   virtual ~Node() = default;
-  Node(const Node &) = delete;
-  Node &operator=(const Node &) = delete;
+  Node(const Node &) = default;
+  Node &operator=(const Node &) = default;
   Node(Node &&) = default;
   Node &operator=(Node &&) = default;
-  virtual NodeRetValue Codegen(CodeGenContext &context) const = 0;
 };
 
 class PrimaryExprIdentifier;
@@ -89,417 +63,582 @@ class LogAndExpr;
 class LogOrExpr;
 class ConditionalExpr;
 class AssignExpr;
+class AssignExprAssign;
 class Expr;
+
+class GotoStmt;
+class LabelStmt;
 class ExprStmt;
 class IfStmt;
 class DoWhileStmt;
 class WhileStmt;
-class ForStmt;
+class SwitchStmt;
+class CaseStmt;
+class DefaultStmt;
 class Declaration;
 class ForDeclarationStmt;
+class ForStmt;
 class BreakStmt;
 class ContinueStmt;
 class ReturnStmt;
+class BlockItem;
 class BlockStmt;
 class Stmt;
-class Function;
-class GlobalDecl;
+class InitializerList;
+class Initializer;
+
+class FunctionDefinition;
 class ExternalDeclaration;
-class Program;
+class TranslationUnit;
+class TypeName;
+class Declarator;
+class EnumDeclaration;
+class EnumSpecifier;
+class StructOrUnionSpecifier;
+class TypeSpecifier;
+class DirectDeclarator;
+class DirectDeclaratorNoStaticOrAsterisk;
+class DirectDeclaratorStatic;
+class DirectDeclaratorAsterisk;
+class DirectDeclaratorParentheseParameters;
+class DirectDeclaratorParentheseIdentifiers;
+class AbstractDeclarator;
+class DirectAbstractDeclarator;
+class DirectAbstractDeclaratorParameterTypeList;
+class DirectAbstractDeclaratorAssignmentExpression;
+class Pointer;
+class ParameterTypeList;
+class ParameterList;
 
 class Expr final : public Node {
 private:
-  std::unique_ptr<AssignExpr> mAssignExpr;
-  std::vector<std::unique_ptr<AssignExpr>> mOptAssignExps;
+  std::vector<AssignExpr> mAssignExpressions;
 
 public:
-  explicit Expr(
-      std::unique_ptr<AssignExpr> &&assignExpr,
-      std::vector<std::unique_ptr<AssignExpr>> &&optAssignExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  Expr(const SourceInterface &interface, const CToken &curToken,
+       std::vector<AssignExpr> assignExpressions);
+  const std::vector<AssignExpr> &getAssignExpressions() const;
 };
 
-class ConstantExpr final : public Node {
+class PrimaryExprIdentifier final : public Node {
+private:
+  std::string mIdentifier;
+
 public:
-  using ConstantValue = std::variant<int32_t, uint32_t, int64_t, uint64_t,
-                                     float, double, std::string>;
+  PrimaryExprIdentifier(const SourceInterface &interface,
+                        const CToken &curToken, std::string identifier);
+  const std::string &getIdentifier() const;
+};
+
+class PrimaryExprConstant final : public Node {
+  using Variant = std::variant<llvm::APSInt, llvm::APFloat, std::string>;
 
 private:
-  ConstantValue mValue;
-
-public:
-  explicit ConstantExpr(ConstantValue &value);
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class AssignExpr final : public Node {
-private:
-  std::unique_ptr<ConditionalExpr> mCondExpr;
-  tok::TokenKind mTokType;
-  std::unique_ptr<AssignExpr> mAssignExpr;
-
-public:
-  explicit AssignExpr(
-      std::unique_ptr<ConditionalExpr> &&condExpr,
-      tok::TokenKind tokenType = tok::unknown,
-      std::unique_ptr<AssignExpr> &&assignExpr = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class ConditionalExpr final : public Node {
-private:
-  std::unique_ptr<LogOrExpr> mLogOrExpr;
-  std::unique_ptr<Expr> mOptExpr;
-  std::unique_ptr<ConditionalExpr> mOptCondExpr;
-
-public:
-  explicit ConditionalExpr(
-      std::unique_ptr<LogOrExpr> &&logOrExpr,
-      std::unique_ptr<Expr> &&optExpr = nullptr,
-      std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class LogOrExpr final : public Node {
-private:
-  std::unique_ptr<LogAndExpr> mLogAndExpr;
-  std::vector<std::unique_ptr<LogAndExpr>> mOptLogAndExps;
-
-public:
-  explicit LogOrExpr(
-      std::unique_ptr<LogAndExpr> &&logAndExpr,
-      std::vector<std::unique_ptr<LogAndExpr>> &&optLogAndExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class LogAndExpr final : public Node {
-private:
-  std::unique_ptr<BitOrExpr> mBitOrExpr;
-  std::vector<std::unique_ptr<BitOrExpr>> mOptBitOrExps;
-
-public:
-  explicit LogAndExpr(
-      std::unique_ptr<BitOrExpr> &&bitOrExpr,
-      std::vector<std::unique_ptr<BitOrExpr>> &&optBitOrExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class BitOrExpr final : public Node {
-private:
-  std::unique_ptr<BitXorExpr> mBitXorExpr;
-  std::vector<std::unique_ptr<BitXorExpr>> mOptBitXorExps;
-
-public:
-  explicit BitOrExpr(
-      std::unique_ptr<BitXorExpr> &&bitXorExpr,
-      std::vector<std::unique_ptr<BitXorExpr>> &&optBitXorExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class BitXorExpr final : public Node {
-private:
-  std::unique_ptr<BitAndExpr> mBitAndExpr;
-  std::vector<std::unique_ptr<BitAndExpr>> mOptBitAndExps;
-
-public:
-  explicit BitXorExpr(
-      std::unique_ptr<BitAndExpr> &&bitAndExpr,
-      std::vector<std::unique_ptr<BitAndExpr>> &&optBitAndExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class BitAndExpr final : public Node {
-private:
-  std::unique_ptr<EqualExpr> mEqualExpr;
-  std::vector<std::unique_ptr<EqualExpr>> mOptEqualExps;
-
-public:
-  explicit BitAndExpr(
-      std::unique_ptr<EqualExpr> &&equalExpr,
-      std::vector<std::unique_ptr<EqualExpr>> &&optEqualExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class EqualExpr final : public Node {
-private:
-  std::unique_ptr<RelationalExpr> mRelationalExpr;
-  std::vector<std::pair<tok::TokenKind,std::unique_ptr<RelationalExpr>>> mOptRelationExps;
-
-public:
-  explicit EqualExpr(
-      std::unique_ptr<RelationalExpr> &&relationalExpr,
-      std::vector<std::pair<tok::TokenKind, std::unique_ptr<RelationalExpr>>>
-          &&optRelationalExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class RelationalExpr final : public Node {
-private:
-  std::unique_ptr<ShiftExpr> mShiftExpr;
-  std::vector<std::pair<tok::TokenKind,std::unique_ptr<ShiftExpr>>> mOptShiftExps;
-
-public:
-  explicit RelationalExpr(
-      std::unique_ptr<ShiftExpr> &&shiftExpr,
-      std::vector<std::pair<tok::TokenKind, std::unique_ptr<ShiftExpr>>>
-          &&optShiftExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class ShiftExpr final : public Node {
-private:
-  std::unique_ptr<AdditiveExpr> mAdditiveExpr;
-  std::vector<std::pair<tok::TokenKind, std::unique_ptr<AdditiveExpr>>> mOptAdditiveExps;
-
-public:
-  explicit ShiftExpr(
-      std::unique_ptr<AdditiveExpr> &&additiveExpr,
-      std::vector<std::pair<tok::TokenKind, std::unique_ptr<AdditiveExpr>>>
-          &&optAdditiveExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class AdditiveExpr final : public Node {
-private:
-  std::unique_ptr<MultiExpr> mMultiExpr;
-  std::vector<std::pair<tok::TokenKind, std::unique_ptr<MultiExpr>>> mOptionalMultiExps;
-
-public:
-  explicit AdditiveExpr(
-      std::unique_ptr<MultiExpr> &&multiExpr,
-      std::vector<std::pair<tok::TokenKind, std::unique_ptr<MultiExpr>>>
-          &&optionalMultiExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class MultiExpr final : public Node {
-private:
-  std::unique_ptr<CastExpr> mCastExpr;
-  std::vector<std::pair<tok::TokenKind, std::unique_ptr<CastExpr>>> mOptCastExps;
-
-public:
-  explicit MultiExpr(
-      std::unique_ptr<CastExpr> &&castExpr,
-      std::vector<std::pair<tok::TokenKind, std::unique_ptr<CastExpr>>> &&optCastExps) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-
-class CastExpr final : public Node {
-  using Variant = std::variant<std::unique_ptr<UnaryExpr>,
-                               std::pair<std::unique_ptr<Type>, std::unique_ptr<CastExpr>>>;
-public:
   Variant mVariant;
+
 public:
-  explicit CastExpr(Variant &&unaryOrCast) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  PrimaryExprConstant(const SourceInterface &interface, const CToken &curToken,
+                      Variant variant);
+  const Variant &getValue() const;
 };
 
-class UnaryExprUnaryOperator final : public Node {
+class PrimaryExprParent final : public Node {
 private:
-  tok::TokenKind mTok;
-  std::unique_ptr<UnaryExpr> mUnaryExpr;
+  Expr mExpr;
+
 public:
-  explicit UnaryExprUnaryOperator(
-      tok::TokenKind tokTy,
-      std::unique_ptr<UnaryExpr> && unaryExpr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PrimaryExprParent(const SourceInterface &interface, const CToken &curToken,
+                    Expr &&expr);
+  const Expr &getExpr() const;
 };
 
-class UnaryExprPostFixExpr final : public Node {
+class PrimaryExpr final : public Node {
 private:
-  std::unique_ptr<PostFixExpr> mPostExpr;
-public:
-  explicit UnaryExprPostFixExpr(std::unique_ptr<PostFixExpr> && postExpr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
-};
-
-class UnaryExprSizeOf final : public Node {
-  using Variant = std::variant<std::unique_ptr<UnaryExpr>, std::shared_ptr<Type>>;
-  Variant mUnaryOrType;
-public:
-    explicit UnaryExprSizeOf(Variant &&variant) noexcept;
-    NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
-};
-
-class UnaryExpr final : public Node {
-  using Variant = std::variant<
-      std::unique_ptr<UnaryExprPostFixExpr>,
-      std::unique_ptr<UnaryExprUnaryOperator>,
-      std::unique_ptr<UnaryExprSizeOf>>;
+  using Variant = std::variant<PrimaryExprConstant, PrimaryExprIdentifier,
+                               PrimaryExprParent>;
   Variant mVariant;
+
 public:
-  explicit UnaryExpr(Variant &&variant) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  PrimaryExpr(const SourceInterface &interface, const CToken &curToken,
+              Variant &&variant);
+
+  const Variant &getVariant() const;
 };
 
 class PostFixExprPrimary final : public Node {
 private:
-  std::unique_ptr<PrimaryExpr> mPrimaryExpr;
+  PrimaryExpr mPrimaryExpr;
+
 public:
-  explicit PostFixExprPrimary(std::unique_ptr<PrimaryExpr> && primaryExpr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprPrimary(const SourceInterface &interface, const CToken &curToken,
+                     PrimaryExpr &&primaryExpr);
+
+  const PostFixExprPrimary &getPrimaryExpr() const;
 };
 
 class PostFixExprSubscript final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
-  std::unique_ptr<Expr> mExpr;
+  Expr mExpr;
+
 public:
-  explicit PostFixExprSubscript(std::unique_ptr<PostFixExpr> && postFixExpr,
-                               std::unique_ptr<Expr> && expr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprSubscript(const SourceInterface &interface, const CToken &curToken,
+                       std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr);
+
+  const PostFixExpr &getPostFixExpr() const;
+  const Expr &getExpr() const;
 };
 
 class PostFixExprDot final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
   std::string mIdentifier;
+
 public:
-  explicit PostFixExprDot(std::unique_ptr<PostFixExpr> && postFixExpr,
-                          std::string identifier) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprDot(const SourceInterface &interface, const CToken &curToken,
+                 std::unique_ptr<PostFixExpr> &&postFixExpr,
+                 std::string identifier);
+
+  const PostFixExpr &getPostFixExpr() const;
+  const std::string &getIdentifier() const;
 };
 
 class PostFixExprArrow final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
   std::string mIdentifier;
+
 public:
-  explicit PostFixExprArrow(std::unique_ptr<PostFixExpr> && postFixExpr,
-                            std::string identifier) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprArrow(const SourceInterface &interface, const CToken &curToken,
+                   std::unique_ptr<PostFixExpr> &&postFixExpr,
+                   std::string identifier);
+  const PostFixExpr &getPostFixExpr() const;
+  const std::string &getIdentifier() const;
 };
 
 class PostFixExprFuncCall final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
   std::vector<std::unique_ptr<AssignExpr>> mOptParams;
+
 public:
-  explicit PostFixExprFuncCall(std::unique_ptr<PostFixExpr> && postFixExpr,
-                               std::vector<std::unique_ptr<AssignExpr>> && optParams) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprFuncCall(const SourceInterface &interface, const CToken &curToken,
+                      std::unique_ptr<PostFixExpr> &&postFixExpr,
+                      std::vector<std::unique_ptr<AssignExpr>> &&optParams);
+
+  const PostFixExpr &getPostFixExpr() const;
+  const std::vector<std::unique_ptr<AssignExpr>> &getOptionalAssignExpressions;
 };
 
 class PostFixExprIncrement final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
+
 public:
-  explicit PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprIncrement(const SourceInterface &interface, const CToken &curToken,
+                       std::unique_ptr<PostFixExpr> &&postFixExpr);
+  const PostFixExpr &getPostFixExpr() const;
 };
 
 class PostFixExprDecrement final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
+
 public:
-  explicit PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  PostFixExprDecrement(const SourceInterface &interface, const CToken &curToken,
+                       std::unique_ptr<PostFixExpr> &&postFixExpr);
+  const PostFixExpr &getPostFixExpr() const;
 };
 
 class PostFixExpr final : public Node {
-  using Variant = std::variant<
-        std::unique_ptr<PostFixExprPrimary>,
-        std::unique_ptr<PostFixExprSubscript>,
-        std::unique_ptr<PostFixExprDot>,
-        std::unique_ptr<PostFixExprArrow>,
-        std::unique_ptr<PostFixExprFuncCall>,
-        std::unique_ptr<PostFixExprIncrement>,
-        std::unique_ptr<PostFixExprDecrement>>;
+  using Variant =
+      std::variant<PostFixExprPrimary, PostFixExprSubscript, PostFixExprDot,
+                   PostFixExprArrow, PostFixExprFuncCall, PostFixExprIncrement,
+                   PostFixExprDecrement>;
   Variant mVariant;
+
 public:
-  explicit PostFixExpr(Variant && variant) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  PostFixExpr(const SourceInterface &interface, const CToken &curToken,
+              Variant &&variant);
+  const Variant &getVariant() const;
 };
 
-class PrimaryExprConstant final : public Node {
-  using Variant = std::variant<llvm::APSInt, llvm::APFloat, std::string>;
+class UnaryExprUnaryOperator final : public Node {
 private:
+  tok::TokenKind mTok;
+  std::unique_ptr<UnaryExpr> mUnaryExpr;
+
+public:
+  UnaryExprUnaryOperator(const SourceInterface &interface,
+                         const CToken &curToken,
+                         std::unique_ptr<UnaryExpr> &&unaryExpr);
+
+  tok::TokenKind getOperator() const;
+  const UnaryExpr &getUnaryExpr() const;
+};
+
+class UnaryExprPostFixExpr final : public Node {
+private:
+  PostFixExpr mPostExpr;
+
+public:
+  UnaryExprPostFixExpr(const SourceInterface &interface, const CToken &curToken,
+                       std::unique_ptr<PostFixExpr> &&postExpr);
+
+  const PostFixExpr &getPostExpr() const;
+};
+
+class UnaryExprSizeOf final : public Node {
+  using Variant =
+      std::variant<std::unique_ptr<UnaryExpr>, std::unique_ptr<TypeName>>;
+  Variant mUnaryOrType;
+
+public:
+  UnaryExprSizeOf(const SourceInterface &interface, const CToken &curToken,
+                  Variant &&variant);
+
+  const Variant &getVariant() const;
+};
+
+class UnaryExpr final : public Node {
+  using Variant = std::variant<UnaryExprPostFixExpr, UnaryExprUnaryOperator,
+                               UnaryExprSizeOf>;
   Variant mVariant;
+
 public:
-  explicit PrimaryExprConstant(Variant variant);
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  UnaryExpr(const SourceInterface &interface, const CToken &curToken,
+            Variant &&variant);
+
+  const Variant &getVariant() const;
 };
 
-class PrimaryExprIdentifier final : public Node {
+class AssignExprAssign final : public Node {
 private:
-  std::string mIdentifier;
+  UnaryExpr mUnaryExpr;
+  tok::TokenKind mOperator;
+  std::unique_ptr<AssignExpr> mAssignExpr;
+
 public:
-  explicit PrimaryExprIdentifier(std::string identifier);
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  AssignExprAssign(const SourceInterface &interface, const CToken &curToken,
+                   UnaryExpr &&unaryExpr,
+                   std::unique_ptr<AssignExpr> &&assignExpr);
+
+  const UnaryExpr &getUnaryExpr() const;
+  const AssignExpr &getAssignExpr() const;
 };
 
-class PrimaryExprParent final : public Node {
+enum class TypeQualifier { Const, Restrict, Volatile };
+
+using SpecifierQualifier = std::variant<TypeQualifier, TypeSpecifier>;
+
+class TypeName final : public Node {
 private:
-  std::unique_ptr<Expr> mExpr;
+  std::vector<SpecifierQualifier> mSpecifierQualifiers;
+  std::unique_ptr<AbstractDeclarator> mAbstractDeclarator;
+
 public:
-  explicit PrimaryExprParent(std::unique_ptr<Expr> && expr) noexcept;
-  NodeRetValue Codegen(lcc::CodeGenContext &context) const override;
+  TypeName(const SourceInterface &interface, const CToken &curToken,
+           std::vector<SpecifierQualifier> &&specifierQualifiers,
+           std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
+
+  const std::vector<SpecifierQualifier> &getSpecifierQualifiers() const;
+
+  const AbstractDeclarator *getAbstractDeclarator() const;
 };
 
-class PrimaryExpr final : public Node {
-private:
-  using Variant = std::variant<
-        std::unique_ptr<PrimaryExprConstant>,
-        std::unique_ptr<PrimaryExprIdentifier>,
-        std::unique_ptr<PrimaryExprParent>>;
+class CastExpr final : public Node {
+  using Variant =
+      std::variant<UnaryExpr, std::pair<TypeName, std::unique_ptr<CastExpr>>>;
+
+public:
   Variant mVariant;
+
 public:
-  explicit PrimaryExpr(Variant &&variant) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  CastExpr(const SourceInterface &interface, const CToken &curToken,
+           Variant &&unaryOrCast);
+
+  const Variant &getVariant() const;
 };
 
-class Stmt : public Node {
+class MultiExpr final : public Node {
+private:
+  CastExpr mCastExpr;
+  std::vector<std::pair<tok::TokenKind, CastExpr>> mOptCastExps;
+
 public:
-  Stmt() = default;
-  virtual ~Stmt() = default;
+  explicit MultiExpr(
+      SourceInterface &interface, const CToken &curToken, CastExpr &&castExpr,
+      std::vector<std::pair<tok::TokenKind, CastExpr>> &&optCastExps);
+  const CastExpr &getCastExpr() const;
+  const std::vector<std::pair<tok::TokenKind, CastExpr>> &
+  getOptionalCastExpr() const;
 };
 
-class ExprStmt final : public Stmt {
+class AdditiveExpr final : public Node {
+private:
+  MultiExpr mMultiExpr;
+  std::vector<std::pair<tok::TokenKind, MultiExpr>> mOptionalMultiExpr;
+
+public:
+  AdditiveExpr(
+      SourceInterface &interface, const CToken &curToken, MultiExpr &&multiExpr,
+      std::vector<std::pair<tok::TokenKind, MultiExpr>> &&optionalMultiExps);
+  const MultiExpr &getMultiExpr() const;
+  const std::vector<std::pair<tok::TokenKind, MultiExpr>> &
+  getOptionalMultiExpr() const;
+};
+
+class ShiftExpr final : public Node {
+private:
+  AdditiveExpr mAdditiveExpr;
+  std::vector<std::pair<tok::TokenKind, AdditiveExpr>> mOptAdditiveExps;
+
+public:
+  ShiftExpr(
+      SourceInterface &interface, const CToken &curToken,
+      AdditiveExpr &&additiveExpr,
+      std::vector<std::pair<tok::TokenKind, AdditiveExpr>> &&optAdditiveExps);
+  const AdditiveExpr &getAdditiveExpr() const;
+  const std::vector<std::pair<tok::TokenKind, AdditiveExpr>> &
+  getOptAdditiveExps() const;
+};
+
+class RelationalExpr final : public Node {
+private:
+  ShiftExpr mShiftExpr;
+  std::vector<std::pair<tok::TokenKind, ShiftExpr>> mOptShiftExps;
+
+public:
+  RelationalExpr(
+      SourceInterface &interface, const CToken &curToken, ShiftExpr &&shiftExpr,
+      std::vector<std::pair<tok::TokenKind, ShiftExpr>> &&optShiftExps);
+  const ShiftExpr &getShiftExpr() const;
+  const std::vector<std::pair<tok::TokenKind, ShiftExpr>> &
+  getOptionalShiftExpressions() const;
+  ;
+};
+
+class EqualExpr final : public Node {
+private:
+  RelationalExpr mRelationalExpr;
+  std::vector<std::pair<tok::TokenKind, RelationalExpr>> mOptRelationExps;
+
+public:
+  EqualExpr(SourceInterface &interface, const CToken &curToken,
+            RelationalExpr &&relationalExpr,
+            std::vector<std::pair<tok::TokenKind, RelationalExpr>>
+                &&optRelationalExps);
+  const RelationalExpr &getRelationalExpr() const;
+
+  const std::vector<std::pair<tok::TokenKind, RelationalExpr>> &
+  getOptionalRelationalExpr() const;
+};
+
+class BitAndExpr final : public Node {
+private:
+  EqualExpr mEqualExpr;
+  std::vector<EqualExpr> mOptEqualExps;
+
+public:
+  BitAndExpr(SourceInterface &interface, const CToken &curToken,
+             EqualExpr &&equalExpr, std::vector<EqualExpr> &&optEqualExps);
+  const EqualExpr &getEqualExpr() const;
+
+  const std::vector<EqualExpr> &getOptionalEqualExpr() const;
+};
+
+class BitXorExpr final : public Node {
+private:
+  BitAndExpr mBitAndExpr;
+  std::vector<BitAndExpr> mOptBitAndExps;
+
+public:
+  BitXorExpr(SourceInterface &interface, const CToken &curToken,
+             BitAndExpr &&bitAndExpr, std::vector<BitAndExpr> &&optBitAndExps);
+  const BitAndExpr &getBitAndExpr() const;
+  const std::vector<BitAndExpr> &getOptionalBitAndExpressions() const;
+};
+
+class BitOrExpr final : public Node {
+private:
+  BitXorExpr mBitXorExpr;
+  std::vector<BitXorExpr> mOptBitXorExps;
+
+public:
+  BitOrExpr(SourceInterface &interface, const CToken &curToken,
+            BitXorExpr &&bitXorExpr, std::vector<BitXorExpr> &&optBitXorExps);
+  const BitXorExpr &getBitXorExpression() const;
+
+  const std::vector<BitXorExpr> &getOptionalBitXorExpressions() const;
+};
+
+class LogAndExpr final : public Node {
+private:
+  BitOrExpr mBitOrExpr;
+  std::vector<BitOrExpr> mOptBitOrExps;
+
+public:
+  LogAndExpr(SourceInterface &interface, const CToken &curToken,
+             BitOrExpr &&bitOrExpr, std::vector<BitOrExpr> &&optBitOrExps);
+  const BitOrExpr &getBitOrExpression() const;
+  const std::vector<BitOrExpr> &getOptionalBitOrExpressions() const;
+};
+
+class LogOrExpr final : public Node {
+private:
+  LogAndExpr mLogAndExpr;
+  std::vector<LogAndExpr> mOptLogAndExps;
+
+public:
+  LogOrExpr(SourceInterface &interface, const CToken &curToken,
+            LogAndExpr &&logAndExpr, std::vector<LogAndExpr> &&optLogAndExps);
+  const LogOrExpr &getAndExpression() const;
+
+  const std::vector<LogOrExpr> &getOptionalAndExpressions() const;
+};
+
+class ConditionalExpr final : public Node {
+private:
+  LogOrExpr mLogOrExpr;
+  std::unique_ptr<Expr> mOptExpr;
+  std::unique_ptr<ConditionalExpr> mOptCondExpr;
+
+public:
+  explicit ConditionalExpr(
+      SourceInterface &interface, const CToken &curToken, LogOrExpr &&logOrExpr,
+      std::unique_ptr<Expr> &&optExpr = nullptr,
+      std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr);
+  const LogOrExpr &getLogicalOrExpression() const;
+  const Expr *getOptionalExpression() const;
+  const ConditionalExpr *getOptionalConditionalExpression() const;
+};
+
+class AssignExpr final : public Node {
+private:
+  std::variant<AssignExprAssign, ConditionalExpr> mVariant;
+  std::unique_ptr<ConditionalExpr> mCondExpr;
+  tok::TokenKind mTokType;
+  std::unique_ptr<AssignExpr> mAssignExpr;
+
+public:
+  AssignExpr(SourceInterface &interface, const CToken &curToken,
+             std::variant<AssignExprAssign, ConditionalExpr> &&variant);
+
+  const std::variant<AssignExprAssign, ConditionalExpr> &getVariant() const;
+};
+
+class ExprStmt final : public Node {
 private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  explicit ExprStmt(std::unique_ptr<Expr> &&optExpr = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  ExprStmt(SourceInterface &interface, const CToken &curToken,
+           std::unique_ptr<Expr> &&optExpr = nullptr);
+  const Expr *getOptionalExpression() const;
 };
 
-class IfStmt final : public Stmt {
+class IfStmt final : public Node {
 private:
-  std::unique_ptr<Expr> mExpr;
+  Expr mExpr;
   std::unique_ptr<Stmt> mThenStmt;
   std::unique_ptr<Stmt> mOptElseStmt;
 
 public:
-  explicit IfStmt(std::unique_ptr<Expr> &&expr,
-                  std::unique_ptr<Stmt> &&thenStmt,
-                  std::unique_ptr<Stmt> &&optElseStmt = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  IfStmt(SourceInterface &interface, const CToken &curToken, Expr &&expr,
+         std::unique_ptr<Stmt> &&thenStmt,
+         std::unique_ptr<Stmt> &&optElseStmt = nullptr);
+
+  const Expr &getExpression() const;
+
+  const Stmt &getThenStmt() const;
+
+  const Stmt *getElseStmt() const;
 };
 
-class DoWhileStmt final : public Stmt {
+class SwitchStmt final : public Node {
 private:
-  std::unique_ptr<Stmt> mStmt;
-  std::unique_ptr<Expr> mExpr;
-
-public:
-  explicit DoWhileStmt(std::unique_ptr<Stmt> &&stmt,
-                       std::unique_ptr<Expr> &&expr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
-};
-
-class WhileStmt final : public Stmt {
-private:
-  std::unique_ptr<Expr> mExpr;
+  Expr mExpr;
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  explicit WhileStmt(std::unique_ptr<Expr> &&expr,
-                     std::unique_ptr<Stmt> &&stmt) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  SwitchStmt(SourceInterface &interface, const CToken &curToken,
+             Expr &&expression, std::unique_ptr<Stmt> &&statement);
+
+  const Expr &getExpression() const;
+
+  const Stmt &getStatement() const;
 };
 
-class ForStmt final : public Stmt {
+class DefaultStmt final : public Node {
+private:
+  std::unique_ptr<Stmt> mStmt;
+
+public:
+  DefaultStmt(SourceInterface &interface, const CToken &curToken,
+              std::unique_ptr<Stmt> &&statement);
+  const Stmt &getStatement() const;
+};
+
+class CaseStmt final : public Node {
+private:
+  using constantVariant = std::variant<llvm::APSInt, llvm::APFloat, void *>;
+  constantVariant mConstant;
+  std::unique_ptr<Stmt> m_statement;
+
+public:
+  CaseStmt(SourceInterface &interface, const CToken &curToken,
+           const constantVariant &constant, std::unique_ptr<Stmt> &&statement);
+
+  const constantVariant &getConstant() const;
+
+  const Stmt *getStatement() const;
+};
+
+class LabelStmt final : public Node {
+private:
+  std::string mIdentifier;
+
+public:
+  LabelStmt(SourceInterface &interface, const CToken &curToken,
+            std::string identifier);
+};
+
+class GotoStmt final : public Node {
+private:
+  std::string m_identifier;
+
+public:
+  GotoStmt(SourceInterface &interface, const CToken &curToken,
+           std::string identifier);
+  const std::string &getIdentifier() const;
+};
+
+class DoWhileStmt final : public Node {
+private:
+  std::unique_ptr<Stmt> mStmt;
+  Expr mExpr;
+
+public:
+  DoWhileStmt(SourceInterface &interface, const CToken &curToken,
+              std::unique_ptr<Stmt> &&stmt, Expr &&expr);
+  const Stmt &getStatement() const;
+
+  const Expr &getExpression() const;
+};
+
+class WhileStmt final : public Node {
+private:
+  Expr mExpr;
+  std::unique_ptr<Stmt> mStmt;
+
+public:
+  WhileStmt(SourceInterface &interface, const CToken &curToken, Expr &&expr,
+            std::unique_ptr<Stmt> &&stmt);
+  const Expr &getExpression() const;
+  const Stmt &getStatement() const;
+};
+
+class ForStmt final : public Node {
 private:
   std::unique_ptr<Expr> mInitExpr;
   std::unique_ptr<Expr> mControlExpr;
@@ -507,110 +646,484 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  explicit ForStmt(std::unique_ptr<Expr> &&initExpr,
-                   std::unique_ptr<Expr> &&controlExpr,
-                   std::unique_ptr<Expr> &&postExpr,
-                   std::unique_ptr<Stmt> &&stmt) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  ForStmt(SourceInterface &interface, const CToken &curToken,
+          std::unique_ptr<Stmt> &&stmt,
+          std::unique_ptr<Expr> &&initExpr = nullptr,
+          std::unique_ptr<Expr> &&controlExpr = nullptr,
+          std::unique_ptr<Expr> &&postExpr = nullptr);
+  const Stmt &getStatement() const;
+
+  const Expr *getInitial() const;
+
+  const Expr *getControlling() const;
+
+  const Expr *getPost() const;
 };
 
-class Declaration final : public Stmt {
+enum class StorageClassSpecifier { Typedef, Extern, Static, Auto, Register };
+
+struct FunctionSpecifier {};
+
+using DeclarationSpecifier = std::variant<StorageClassSpecifier, TypeSpecifier,
+                                          TypeQualifier, FunctionSpecifier>;
+
+class Declaration final : public Node {
 private:
-  std::unique_ptr<Type> mType;
-  std::string mName;
-  std::unique_ptr<Expr> mOptValue;
+  std::vector<DeclarationSpecifier> mDeclarationSpecifiers;
+  std::vector<
+      std::pair<std::unique_ptr<Declarator>, std::unique_ptr<Initializer>>>
+      mInitDeclarators;
 
 public:
-  explicit Declaration(std::unique_ptr<Type> &&type, std::string name,
-                       std::unique_ptr<Expr> &&optValue = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  Declaration(
+      SourceInterface &interface, const CToken &curToken,
+      std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+      std::vector<std::pair<std::unique_ptr<Declarator>,
+                            std::unique_ptr<Initializer>>> &&initDeclarators);
+  const std::vector<DeclarationSpecifier> &getDeclarationSpecifiers() const;
+  const std::vector<
+      std::pair<std::unique_ptr<Declarator>, std::unique_ptr<Initializer>>> &
+  getInitDeclarators() const;
 };
 
-class ForDeclarationStmt final : public Stmt {
+class ForDeclarationStmt final : public Node {
 private:
-  std::unique_ptr<Declaration> mInitDecl;
+  Declaration mInitDecl;
   std::unique_ptr<Expr> mControlExpr;
   std::unique_ptr<Expr> mPostExpr;
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  explicit ForDeclarationStmt(std::unique_ptr<Declaration> &&initDecl,
-                              std::unique_ptr<Expr> &&controlExpr,
-                              std::unique_ptr<Expr> &&postExpr,
-                              std::unique_ptr<Stmt> &&stmt) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  ForDeclarationStmt(SourceInterface &interface, const CToken &curToken,
+                     std::unique_ptr<Stmt> &&stmt, Declaration &&initDecl,
+                     std::unique_ptr<Expr> &&controlExpr = nullptr,
+                     std::unique_ptr<Expr> &&postExpr = nullptr);
+  const Stmt &getStatement() const;
+
+  const Declaration &getInitial() const;
+
+  const Expr *getControlling() const;
+
+  const Expr *getPost() const;
 };
 
-class BreakStmt final : public Stmt {
+class BreakStmt final : public Node {
 public:
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  BreakStmt(SourceInterface &interface, const CToken &curToken);
 };
 
-class ContinueStmt final : public Stmt {
+class ContinueStmt final : public Node {
 public:
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  ContinueStmt(SourceInterface &interface, const CToken &curToken);
 };
 
-class ReturnStmt final : public Stmt {
+class ReturnStmt final : public Node {
 private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  explicit ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  ReturnStmt(SourceInterface &interface, const CToken &curToken,
+             std::unique_ptr<Expr> &&optExpr = nullptr);
+  const Expr *getExpression() const;
 };
 
-class BlockStmt final : public Stmt {
+class BlockStmt final : public Node {
 private:
-  std::vector<std::unique_ptr<Stmt>> mStmts;
+  std::vector<BlockItem> mBlockItems;
 
 public:
-  explicit BlockStmt(std::vector<std::unique_ptr<Stmt>> &&stmts) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  BlockStmt(SourceInterface &interface, const CToken &curToken,
+            std::vector<BlockItem> &&blockItems);
+  const std::vector<BlockItem> &getBlockItems() const;
 };
 
-class ExternalDeclaration : public Node {
-protected:
-  ExternalDeclaration() = default;
-};
-
-class Function final : public ExternalDeclaration {
+class Stmt final : public Node {
 private:
-  std::unique_ptr<Type> mRetType;
+  using variant = std::variant<ReturnStmt, ExprStmt, IfStmt, BlockStmt, ForStmt,
+                               ForDeclarationStmt, WhileStmt, DoWhileStmt,
+                               BreakStmt, ContinueStmt, SwitchStmt, DefaultStmt,
+                               CaseStmt, GotoStmt, LabelStmt>;
+  variant mVariant;
+
+public:
+  Stmt(SourceInterface &interface, const CToken &curToken, variant &&variant);
+  const variant &getVariant() const;
+  variant &getVariant();
+};
+
+class BlockItem final : public Node {
+private:
+  using variant = std::variant<Stmt, Declaration>;
+  variant mVariant;
+
+public:
+  BlockItem(SourceInterface &interface, const CToken &curToken,
+            variant &&variant);
+
+  const variant &getVariant() const;
+
+  variant &getVariant();
+};
+
+class DirectAbstractDeclaratorAssignmentExpression final : public Node {
+  std::unique_ptr<DirectAbstractDeclarator> mDirectAbstractDeclarator;
+  std::unique_ptr<AssignExpr> mAssignmentExpression;
+
+public:
+  DirectAbstractDeclaratorAssignmentExpression(
+      SourceInterface &interface, const CToken &curToken,
+      std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
+      std::unique_ptr<AssignExpr> &&assignmentExpression);
+
+  const DirectAbstractDeclarator *getDirectAbstractDeclarator() const;
+
+  const AssignExpr *getAssignmentExpression() const;
+};
+
+class DirectAbstractDeclaratorParameterTypeList final : public Node {
+  std::unique_ptr<DirectAbstractDeclarator> mDirectAbstractDeclarator;
+  std::unique_ptr<ParameterTypeList> mParameterTypeList;
+
+public:
+  DirectAbstractDeclaratorParameterTypeList(
+      SourceInterface &interface, const CToken &curToken,
+      std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
+      std::unique_ptr<ParameterTypeList> &&parameterTypeList);
+
+  const DirectAbstractDeclarator *getDirectAbstractDeclarator() const;
+
+  const ParameterTypeList *getParameterTypeList() const;
+};
+
+class DirectAbstractDeclarator final : public Node {
+  using variant = std::variant<std::unique_ptr<AbstractDeclarator>,
+                               DirectAbstractDeclaratorAssignmentExpression,
+                               std::unique_ptr<DirectAbstractDeclarator>,
+                               DirectAbstractDeclaratorParameterTypeList>;
+
+  variant mVariant;
+
+public:
+  DirectAbstractDeclarator(SourceInterface &interface, const CToken &curToken,
+                           variant &&variant);
+
+  const variant &getVariant() const;
+};
+
+class AbstractDeclarator final : public Node {
+  std::vector<Pointer> mPointers;
+  DirectAbstractDeclarator mDirectAbstractDeclarator;
+
+public:
+  AbstractDeclarator(SourceInterface &interface, const CToken &curToken,
+                     std::vector<Pointer> &&pointers,
+                     DirectAbstractDeclarator &&directAbstractDeclarator);
+
+  const std::vector<Pointer> &getPointers() const;
+
+  const DirectAbstractDeclarator &getDirectAbstractDeclarator() const;
+};
+
+using ParameterDeclaration =
+    std::pair<std::vector<DeclarationSpecifier>,
+              std::variant<std::unique_ptr<Declarator>,
+                           std::unique_ptr<AbstractDeclarator>>>;
+
+class ParameterList final : public Node {
+private:
+  std::vector<ParameterDeclaration> mParameterList;
+
+public:
+  ParameterList(SourceInterface &interface, const CToken &curToken,
+                std::vector<ParameterDeclaration> &&parameterList);
+
+  const std::vector<ParameterDeclaration> &getParameterDeclarations() const;
+};
+
+class ParameterTypeList final : public Node {
+  ParameterList mParameterList;
+  bool mHasEllipse;
+
+public:
+  ParameterTypeList(SourceInterface &interface, const CToken &curToken,
+                    ParameterList &&parameterList, bool hasEllipse);
+
+  const ParameterList &getParameterList() const;
+
+  bool hasEllipse() const;
+};
+
+class DirectDeclaratorParentheseParameters final : public Node {
+  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
+  ParameterTypeList mParameterTypeList;
+
+public:
+  DirectDeclaratorParentheseParameters(SourceInterface &interface,
+                                       const CToken &curToken,
+                                       DirectDeclarator &&directDeclarator,
+                                       ParameterTypeList &&parameterTypeList);
+
+  const DirectDeclarator &getDirectDeclarator() const;
+
+  const ParameterTypeList &getParameterTypeList() const;
+};
+
+class DirectDeclaratorParentheseIdentifiers final : public Node {
+  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
+  std::vector<std::string> mIdentifiers;
+
+public:
+  DirectDeclaratorParentheseIdentifiers(SourceInterface &interface,
+                                        const CToken &curToken,
+                                        DirectDeclarator &&directDeclarator,
+                                        std::vector<std::string> &&identifiers);
+
+  const DirectDeclarator &getDirectDeclarator() const;
+
+  const std::vector<std::string> &getIdentifiers() const;
+};
+
+class DirectDeclaratorAsterisk final : public Node {
+  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
+  std::vector<TypeQualifier> mTypeQualifiers;
+
+public:
+  DirectDeclaratorAsterisk(SourceInterface &interface, const CToken &curToken,
+                           DirectDeclarator &&directDeclarator,
+                           std::vector<TypeQualifier> &&typeQualifiers);
+
+  const DirectDeclarator &getDirectDeclarator() const;
+
+  const std::vector<TypeQualifier> &getTypeQualifiers() const;
+};
+
+class DirectDeclaratorNoStaticOrAsterisk final : public Node {
+  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
+  std::vector<TypeQualifier> mTypeQualifiers;
+  std::unique_ptr<AssignExpr> mAssignmentExpression;
+
+public:
+  DirectDeclaratorNoStaticOrAsterisk(
+      SourceInterface &interface, const CToken &curToken,
+      std::unique_ptr<DirectDeclarator> &&directDeclarator,
+      std::vector<TypeQualifier> &&typeQualifiers,
+      std::unique_ptr<AssignExpr> &&assignmentExpression);
+
+  const DirectDeclarator &getDirectDeclarator() const;
+
+  const std::vector<TypeQualifier> &getTypeQualifiers() const;
+
+  const std::unique_ptr<AssignExpr> &getAssignmentExpression() const;
+};
+
+class DirectDeclaratorStatic final : public Node {
+  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
+  std::vector<TypeQualifier> mTypeQualifiers;
+  AssignExpr mAssignmentExpression;
+
+public:
+  DirectDeclaratorStatic(SourceInterface &interface, const CToken &curToken,
+                         std::unique_ptr<DirectDeclarator> &&directDeclarator,
+                         std::vector<TypeQualifier> &&typeQualifiers,
+                         AssignExpr &&assignmentExpression);
+
+  const DirectDeclarator &getDirectDeclarator() const;
+
+  const std::vector<TypeQualifier> &getTypeQualifiers() const;
+
+  const AssignExpr &getAssignmentExpression() const;
+};
+
+class DirectDeclarator final : public Node {
+  using variant = std::variant<std::string, std::unique_ptr<Declarator>,
+                               DirectDeclaratorNoStaticOrAsterisk,
+                               DirectDeclaratorStatic, DirectDeclaratorAsterisk,
+                               DirectDeclaratorParentheseParameters,
+                               DirectDeclaratorParentheseIdentifiers>;
+
+  variant mVariant;
+
+public:
+  DirectDeclarator(SourceInterface &interface, const CToken &curToken,
+                   variant &&variant);
+
+  const variant &getVariant() const;
+};
+
+class Declarator final : public Node {
+  std::vector<Pointer> mPointers;
+  DirectDeclarator mDirectDeclarator;
+
+public:
+  Declarator(SourceInterface &interface, const CToken &curToken,
+             std::vector<Pointer> &&pointers,
+             DirectDeclarator &&directDeclarator);
+
+  const std::vector<Pointer> &getPointers() const;
+
+  const DirectDeclarator &getDirectDeclarator() const;
+};
+
+class StructOrUnionSpecifier final : public Node {
+  bool mIsUnion;
+  std::string mIdentifier;
+
+public:
+  struct StructDeclaration {
+    std::vector<SpecifierQualifier> specifierQualifiers;
+    std::vector<std::pair<std::unique_ptr<Declarator>, std::int64_t>>
+        structDeclarators;
+  };
+
+private:
+  std::vector<StructDeclaration> mStructDeclarations;
+
+public:
+  StructOrUnionSpecifier(SourceInterface &interface, const CToken &curToken,
+                         bool isUnion, std::string identifier,
+                         std::vector<StructDeclaration> &&structDeclarations);
+
+  bool isUnion() const;
+
+  const std::string &getIdentifier() const;
+
+  const std::vector<StructDeclaration> &getStructDeclarations() const;
+};
+
+class EnumDeclaration final : public Node {
   std::string mName;
-  std::vector<std::pair<std::unique_ptr<Type>, std::string>> mParam;
-  std::unique_ptr<BlockStmt> mOptBlockStmt;
+  std::vector<std::pair<std::string, std::int32_t>> mValues;
 
 public:
-  explicit Function(
-      std::unique_ptr<Type> &&retType, std::string name,
-      std::vector<std::pair<std::unique_ptr<Type>, std::string>> &&params,
-      std::unique_ptr<BlockStmt> &&optBlockStmt = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  EnumDeclaration(SourceInterface &interface, const CToken &curToken,
+                  std::string name,
+                  std::vector<std::pair<std::string, std::int32_t>> values);
+
+  const std::string &getName() const;
+
+  const std::vector<std::pair<std::string, std::int32_t>> &getValues() const;
 };
 
-class GlobalDecl final : public ExternalDeclaration {
+class EnumSpecifier final : public Node {
+  using variant = std::variant<EnumDeclaration, std::string>;
+
+  variant mVariant;
+
+public:
+  EnumSpecifier(SourceInterface &interface, const CToken &curToken,
+                variant &&variant);
+
+  const variant &getVariant() const;
+};
+
+class TypeSpecifier final : public Node {
+public:
+  enum class PrimitiveTypeSpecifier {
+    Void,
+    Char,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double,
+    Signed,
+    Unsigned,
+  };
+
 private:
-  std::unique_ptr<Type> mType;
-  std::string mName;
-  std::unique_ptr<ConstantExpr> mOptValue;
+  using variant = std::variant<PrimitiveTypeSpecifier,
+                               std::unique_ptr<StructOrUnionSpecifier>,
+                               std::unique_ptr<EnumSpecifier>, std::string>;
+
+  variant mVariant;
 
 public:
-  explicit GlobalDecl(
-      std::unique_ptr<Type> &&type, std::string name,
-      std::unique_ptr<ConstantExpr> &&optValue = nullptr) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  TypeSpecifier(SourceInterface &interface, const CToken &curToken,
+                variant &&variant);
+
+  const variant &getVariant() const;
 };
 
-class Program final : public Node {
+class Pointer final : public Node {
+  std::vector<TypeQualifier> mTypeQualifiers;
+
+public:
+  Pointer(SourceInterface &interface, const CToken &curToken,
+          std::vector<TypeQualifier> &&typeQualifiers);
+
+  const std::vector<TypeQualifier> &getTypeQualifiers() const;
+};
+
+class InitializerList final : public Node {
+public:
+  using Designator = std::variant<std::size_t, std::string>;
+
+  using DesignatorList = std::vector<Designator>;
+
+  using vector = std::vector<std::pair<Initializer, DesignatorList>>;
+
 private:
-  std::vector<std::unique_ptr<ExternalDeclaration>> mExternalDecl;
+  vector mNonCommaExpressionsAndBlocks;
 
 public:
-  explicit Program(std::vector<std::unique_ptr<ExternalDeclaration>>
-                       &&externalDecl) noexcept;
-  NodeRetValue Codegen(CodeGenContext &context) const override;
+  InitializerList(SourceInterface &interface, const CToken &curToken,
+                  vector &&nonCommaExpressionsAndBlocks);
+
+  const vector &getNonCommaExpressionsAndBlocks() const;
 };
-} // namespace lcc::parser
+
+class Initializer final : public Node {
+  using variant = std::variant<AssignExpr, InitializerList>;
+  variant mVariant;
+
+public:
+  Initializer(SourceInterface &interface, const CToken &curToken,
+              variant &&variant);
+
+  const variant &getVariant() const;
+};
+
+class FunctionDefinition final : public Node {
+  std::vector<DeclarationSpecifier> mDeclarationSpecifiers;
+  Declarator mDeclarator;
+  std::vector<Declaration> mDeclarations;
+  BlockStmt mCompoundStatement;
+
+public:
+  FunctionDefinition(SourceInterface &interface, const CToken &curToken,
+                     std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+                     Declarator &&declarator,
+                     std::vector<Declaration> &&declarations,
+                     BlockStmt &&compoundStatement);
+
+  const std::vector<DeclarationSpecifier> &getDeclarationSpecifiers() const;
+
+  const Declarator &getDeclarator() const;
+
+  const std::vector<Declaration> &getDeclarations() const;
+
+  const BlockStmt &getCompoundStatement() const;
+};
+
+class ExternalDeclaration final : public Node {
+  using variant = std::variant<Declaration, FunctionDefinition>;
+  variant mVariant;
+
+public:
+  ExternalDeclaration(SourceInterface &interface, const CToken &curToken,
+                      variant &&variant);
+
+  const variant &getVariant() const;
+};
+
+class TranslationUnit final {
+  std::vector<ExternalDeclaration> mGlobals;
+
+public:
+  explicit TranslationUnit(std::vector<ExternalDeclaration> &&globals) noexcept;
+
+  const std::vector<ExternalDeclaration> &getGlobals() const;
+};
+} // namespace lcc
 
 #endif // LCC_SYNTAX_H

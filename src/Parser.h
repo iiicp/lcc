@@ -16,13 +16,13 @@
 namespace lcc {
 class Parser {
 private:
-  std::vector<CToken> mTokens;
+  const SourceInterface& mSourceInterface;
   using TokIter = std::vector<CToken>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
 
 public:
-  explicit Parser(std::vector<CToken> && tokens): mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()), mTokEnd(mTokens.cend()) {}
+  explicit Parser(const CTokenObject & sourceObject): mSourceInterface(sourceObject), mTokCursor(sourceObject.data().cbegin()), mTokEnd(sourceObject.data().cend()) {}
   std::unique_ptr<Program> ParseProgram();
 
 private:

@@ -127,6 +127,9 @@ public:
     mType = type;
   }
 };
+
+using CTokenIterator = const CToken*;
+
 } // namespace lcc::lexer
 
 #endif // LCC_CTOKEN_H

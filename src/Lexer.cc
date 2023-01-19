@@ -709,7 +709,7 @@ tok::TokenKind GetKeywordTokenType(std::string_view characters) {
   return tok::identifier;
 }
 
-PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
+PPTokenObject tokenize(std::string &sourceCode, std::string_view sourcePath) {
 
   /// check BOM header
   constexpr static std::string_view UTF8_BOM = "\xef\xbb\xbf";
@@ -944,12 +944,12 @@ PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath) {
     }
     }
   }
-  return PPTokens(std::move(results),
+  return PPTokenObject(std::move(results),
                   {Source::File{std::string(sourcePath), std::move(sourceCode),
                                 std::move(lineStartOffset)}});
 }
 
-CTokens toCTokens(PPTokens &&ppTokens) {
+CTokenObject toCTokens(PPTokenObject &&ppTokens) {
   std::vector<CToken> result;
   for (auto &iter : ppTokens.data()) {
     switch (iter.getTokenKind()) {
@@ -1005,7 +1005,7 @@ CTokens toCTokens(PPTokens &&ppTokens) {
     }
   }
   result.shrink_to_fit();
-  return CTokens(std::move(result),
+  return CTokenObject(std::move(result),
                  {ppTokens.getFiles().begin(), ppTokens.getFiles().end()});
 }
 } // namespace lcc

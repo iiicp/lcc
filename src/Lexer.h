@@ -18,11 +18,11 @@
 
 namespace lcc {
 
-using PPTokens = SourceObject<PPToken>;
-using CTokens = SourceObject<CToken>;
+using PPTokenObject = SourceObject<PPToken>;
+using CTokenObject = SourceObject<CToken>;
 
-PPTokens tokenize(std::string &sourceCode, std::string_view sourcePath = "<stdin>");
-CTokens toCTokens(PPTokens && ppTokens);
+PPTokenObject tokenize(std::string &sourceCode, std::string_view sourcePath = "<stdin>");
+CTokenObject toCTokens(PPTokenObject && ppTokens);
 }
 
 #endif // LCC_LEXER_H

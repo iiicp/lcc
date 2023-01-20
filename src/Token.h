@@ -86,31 +86,16 @@ public:
 };
 
 class CToken final : public TokenBase {
-  using TokenValue =
-      std::variant<std::monostate, llvm::APSInt, llvm::APFloat, std::string>;
-public:
-  enum NumType : uint8_t
-  {
-    None,
-    Int,
-    UnsignedInt,
-    Long,
-    UnsignedLong,
-    LongLong,
-    UnsignedLongLong,
-    Float,
-    Double,
-    LongDouble
-  };
 private:
+  using TokenValue =
+      std::variant<std::monostate, int32_t, uint32_t, int64_t, uint64_t, float, double, std::string>;
   TokenValue mValue;
-  NumType mType;
 
 public:
   using ValueType = TokenValue;
   explicit CToken(tok::TokenKind tokenKind, uint32_t offset, uint32_t length,
-                  uint32_t fileId, uint32_t macroId, ValueType value = std::monostate{}, NumType type = NumType::None)
-      : TokenBase(tokenKind, offset, length, fileId, macroId), mValue(std::move(value)), mType(type) {}
+                  uint32_t fileId, uint32_t macroId, ValueType value = std::monostate{})
+      : TokenBase(tokenKind, offset, length, fileId, macroId), mValue(std::move(value)) {}
 
   const ValueType &getValue() const {
     return mValue;
@@ -118,13 +103,6 @@ public:
 
   void setValue(const ValueType& value) {
     mValue = value;
-  }
-
-  NumType getNumType() const {
-    return mType;
-  }
-  void setNumType(NumType type) {
-    mType = type;
   }
 };
 

@@ -155,11 +155,7 @@ Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExprConstant &node) {
       [](auto &&value) -> Semantics::ConstRetType {
         using T = std::decay_t<decltype(value)>;
         if constexpr (!std::is_same_v<T, std::string>) {
-          if constexpr (std::is_same_v<T, llvm::APSInt>) {
-            return Semantics::ConstRetType::ValueType(value.getExtValue());
-          }else {
-            return Semantics::ConstRetType::ValueType(value.convertToFloat());
-          }
+            return Semantics::ConstRetType::ValueType(value);
         } else {
           return FailureReason(
               "Can't use string literal in constant expression");
@@ -226,9 +222,7 @@ Semantics::ConstantEvaluator::visit(const Syntax::UnaryExprUnaryOperator &node) 
         [](auto &&value) -> ConstRetType {
           using T = std::decay_t<decltype(value)>;
           if constexpr (hasLogicNegate<T>{}) {
-            /// todo?
-//            return Semantics::ConstRetType::ValueType(!value);
-            return FailureReason("Can't apply - to constant operator");
+            return Semantics::ConstRetType::ValueType(!value);
           } else {
             return FailureReason("Can't apply - to constant operator");
           }

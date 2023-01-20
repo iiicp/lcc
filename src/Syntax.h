@@ -127,7 +127,7 @@ public:
 };
 
 class PrimaryExprConstant final : public Node {
-  using Variant = std::variant<llvm::APSInt, llvm::APFloat, std::string>;
+  using Variant = std::variant<std::int32_t, std::uint32_t, std::int64_t, std::uint64_t, float, double, std::string>;
 
 private:
   Variant mVariant;

@@ -18,10 +18,6 @@
 #include <charconv>
 #include <optional>
 
-#include <llvm/Support/Error.h>
-
-constexpr auto UTF32_MAX = 0x10FFFF;
-
 namespace lcc {
 namespace util {
 bool IsLetter(char ch) {
@@ -147,10 +143,12 @@ std::optional<std::vector<char>> processCharacters(std::string_view characters) 
         /// error at least one hexadecimal digit required
         return {};
       }
-
-      llvm::APInt input;
-      llvm::StringRef(characters.data()+offset, lastHex-offset).getAsInteger(16, input);
-      auto value = input.getZExtValue();
+      std::string_view sv(characters.data()+offset, lastHex-offset);
+      char *endptr = nullptr;
+      auto value = std::strtol(sv.data(), &endptr, 16);
+      if (endptr) {
+        LCC_UNREACHABLE;
+      }
       result.push_back(value);
       resultStart++;
       offset = lastHex;
@@ -204,45 +202,6 @@ CToken ParseStringLiteral(const PPToken &ppToken, const SourceInterface &interfa
                 std::string(chars.value().begin(), chars.value().end()));
 }
 
-template <class T, class... Args>
-std::pair<CToken::ValueType, CToken::NumType>
-castInteger(std::uint64_t integer,
-            std::array<CToken::NumType, sizeof...(Args) + 1> types) {
-  // Clang
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-compare"
-  // GCC
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-compare"
-  // MSVC
-#pragma warning(push)
-#pragma warning(disable : 4018)
-#pragma warning(disable : 4389)
-  if constexpr (std::is_signed_v<T>) {
-    if (llvm::APInt::getSignedMaxValue(sizeof(T) * 8).uge(integer)) {
-      return {{llvm::APSInt(llvm::APInt(sizeof(T) * 8, integer),
-                            !std::is_signed_v<T>)},
-              types[0]};
-    }
-  } else {
-    if (llvm::APInt::getMaxValue(sizeof(T) * 8).uge(integer)) {
-      return {{llvm::APSInt(llvm::APInt(sizeof(T) * 8, integer),
-                            !std::is_signed_v<T>)},
-              types[0]};
-    }
-  }
-  if constexpr (sizeof...(Args) != 0) {
-    std::array<CToken::NumType, sizeof...(Args)> second{};
-    std::copy(types.begin() + 1, types.end(), second.begin());
-    return castInteger<Args...>(integer, second);
-  } else {
-    LCC_UNREACHABLE;
-  }
-#pragma GCC diagnostic pop
-#pragma clang diagnostic pop
-#pragma warning(pop)
-}
-
 /**
 整型
 10进制：123 123u 123l 123ul 123lu 123ull 123llu
@@ -258,7 +217,7 @@ int c = 0x123lu;
 16进制: 0x.ff 0x.ffp-3
 float a1 = 0x.ffp-3;
  */
-std::pair<CToken::ValueType, CToken::NumType>
+CToken::ValueType
 ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
   std::string_view character = ppToken.getValue();
   const char *begin = character.begin(), *end = character.end();
@@ -344,89 +303,81 @@ ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
         isHexOrOctal || std::any_of(suffix.begin(), suffix.end(), [](char c) {
           return c == 'u' || c == 'U';
         });
-    llvm::APInt test;
-    llvm::StringRef(begin, suffixBegin - begin).getAsInteger(0, test);
-    if (test.getActiveBits() > (unsignedConsidered ? 64u : 63u)) {
-      logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "integer value too big to be representable");
-    }
-    auto integer = test.getZExtValue();
+    std::string_view sv(begin, suffixBegin - begin);
+    char* endptr = nullptr;
+    std::uint64_t number = std::strtoull(sv.data(), &endptr, 0);
     if (suffix.empty()) {
-      if (isHexOrOctal) {
-        /// think about all case
-        return castInteger<std::int32_t, std::uint32_t, std::int64_t,
-                           std::uint64_t>(
-            integer, {CToken::NumType::Int, CToken::NumType::UnsignedInt,
-                      CToken::NumType::Long, CToken::NumType::UnsignedLong});
+      if (number > static_cast<uint64_t>(std::numeric_limits<int32_t>::max())) {
+        if (isHexOrOctal && number <= std::numeric_limits<uint32_t>::max()) {
+          return static_cast<uint32_t>(number);
+        }else if (isHexOrOctal && number > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+          return number;
+        }else {
+          return static_cast<int64_t>(number);
+        }
+      }else {
+        return static_cast<int32_t>(number);
       }
-      return castInteger<std::int32_t, std::int64_t>(
-          integer, {CToken::NumType::Int, CToken::NumType::Long});
     } else if (suffix == "u" || suffix == "U") {
-      /// think about unsigned case
-      return castInteger<std::uint32_t, std::uint64_t>(
-          integer,
-          {CToken::NumType::UnsignedInt, CToken::NumType::UnsignedLong});
+      if (number > std::numeric_limits<uint32_t>::max()) {
+        return number;
+      }
+      return static_cast<uint32_t>(number);
     } else if (suffix == "L" || suffix == "l") {
       /// think about long case
       if (isHexOrOctal) {
-        return castInteger<std::int64_t, std::uint64_t>(
-            integer, {CToken::NumType::Long, CToken::NumType::UnsignedLong});
+        if (number > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+          return number;
+        }
       }
-      return castInteger<std::int64_t>(integer, {CToken::NumType::Long});
+      return static_cast<int64_t>(number);
     } else if (suffix.size() == 2 &&
                std::any_of(suffix.begin(), suffix.end(),
                            [](char c) { return c == 'u' || c == 'U'; }) &&
                std::any_of(suffix.begin(), suffix.end(),
                            [](char c) { return c == 'l' || c == 'L'; })) {
       /// just think about ul
-      return castInteger<std::uint64_t>(integer,
-                                        {CToken::NumType::UnsignedLong});
+      return static_cast<uint64_t>(number);
     } else if (suffix == "ll" || suffix == "LL") {
       if (isHexOrOctal) {
-        return castInteger<std::int64_t, std::uint64_t>(
-            integer,
-            {CToken::NumType::LongLong, CToken::NumType::UnsignedLongLong});
+        if (number > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+          return number;
+        }
       }
-      /// just think about ll
-      return castInteger<std::int64_t>(integer, {CToken::NumType::LongLong});
+      return static_cast<int64_t>(number);
     } else if (suffix.size() == 3 &&
                std::any_of(suffix.begin(), suffix.end(),
                            [](char c) { return c == 'u' || c == 'U'; }) &&
                (suffix.find("LL") != std::string_view::npos ||
                 suffix.find("ll") != std::string_view::npos)) {
       /// just think about ull
-      return castInteger<std::uint64_t>(integer,
-                                        {CToken::NumType::UnsignedLongLong});
+      return number;
     } else {
       LCC_UNREACHABLE;
     }
   } else {
     auto input = (*begin == '.' ? "0" : "") + std::string(begin, suffixBegin);
+    char* endptr = nullptr;
     if (suffix.empty()) {
-      llvm::APFloat number(llvm::APFloat::IEEEdouble());
-      auto result =
-          number.convertFromString(input, llvm::APFloat::rmNearestTiesToEven);
-      if (!result) {
+      double d = std::strtod(input.c_str(), &endptr);
+      if (endptr) {
         LCC_UNREACHABLE;
       }
-      return {std::move(number), CToken::NumType::Double};
+      return d;
     }
     if (suffix == "f" || suffix == "F") {
-      llvm::APFloat number(llvm::APFloat::IEEEsingle());
-      auto result =
-          number.convertFromString(input, llvm::APFloat::rmNearestTiesToEven);
-      if (!result) {
+      float d = std::strtof(input.c_str(), &endptr);
+      if (endptr) {
         LCC_UNREACHABLE;
       }
-      return {std::move(number), CToken::NumType::Float};
+      return d;
     }
     if (suffix == "l" || suffix == "L") {
-      llvm::APFloat number(llvm::APFloat::IEEEdouble());
-      auto result =
-          number.convertFromString(input, llvm::APFloat::rmNearestTiesToEven);
-      if (!result) {
+      double d = std::strtod(input.c_str(), &endptr);
+      if (endptr) {
         LCC_UNREACHABLE;
       }
-      return {std::move(number), CToken::NumType::LongDouble};
+      return d;
     }
   }
   LCC_UNREACHABLE;
@@ -970,7 +921,7 @@ CTokenObject toCTokens(PPTokenObject &&ppTokens) {
       auto number = ParseNumber(iter, ppTokens);
       result.emplace_back(tok::numeric_constant, iter.getOffset(),
                           iter.getLength(), iter.getFileId(), iter.getMacroId(),
-                          std::move(number.first), number.second);
+                          number);
       break;
     }
     case tok::string_literal: {
@@ -995,7 +946,7 @@ CTokenObject toCTokens(PPTokenObject &&ppTokens) {
       result.emplace_back(
           tok::char_constant, iter.getOffset(), iter.getLength(),
           iter.getFileId(), iter.getMacroId(),
-          llvm::APSInt(llvm::APInt(4 * 8, chars.value()[0], true), false), CToken::Int);
+          (int32_t)chars.value()[0]);
       break;
     }
     default:

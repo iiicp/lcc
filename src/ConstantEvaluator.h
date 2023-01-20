@@ -6,8 +6,6 @@
 #include "Semantics.h"
 #include "Syntax.h"
 
-#include <map>
-
 namespace lcc::Semantics
 {
     using ConstRetType =

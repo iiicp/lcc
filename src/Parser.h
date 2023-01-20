@@ -13,6 +13,9 @@
 #include "Token.h"
 #include "Syntax.h"
 #include <vector>
+#include <set>
+#include <string>
+#include <optional>
 namespace lcc {
 class Parser {
 private:
@@ -20,48 +23,85 @@ private:
   using TokIter = std::vector<CToken>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
-
+public:
+  class Scope {
+  private:
+    std::vector<std::set<std::string>> mCurrentScope;
+    std::vector<std::set<std::string>> mTypedefs;
+  public:
+    Scope() {
+      mCurrentScope.emplace_back();
+      mTypedefs.emplace_back();
+    }
+    bool isTypedef(const std::string& name) const;
+    void addToScope(std::string name);
+    bool isInScope(const std::string& name) const;
+    void pushScope();
+    void popScope();
+  };
+private:
+  Scope mScope;
 public:
   explicit Parser(const CTokenObject & sourceObject): mSourceInterface(sourceObject), mTokCursor(sourceObject.data().cbegin()), mTokEnd(sourceObject.data().cend()) {}
-  std::unique_ptr<Program> ParseProgram();
+  Syntax::TranslationUnit ParseTranslationUnit();
 
 private:
-  std::unique_ptr<Function> ParseFunction();
-  std::unique_ptr<GlobalDecl> ParseGlobalDecl();
-  std::unique_ptr<ConstantExpr> ParseConstantExpr();
-  std::unique_ptr<Stmt> ParseStmt();
-  std::unique_ptr<BlockStmt> ParseBlockStmt();
-  std::unique_ptr<IfStmt> ParseIfStmt();
-  std::unique_ptr<WhileStmt> ParseWhileStmt();
-  std::unique_ptr<DoWhileStmt> ParseDoWhileStmt();
-  std::unique_ptr<ForStmt> ParseForStmt();
-  std::unique_ptr<ForDeclarationStmt> ParseForDeclStmt();
-  std::unique_ptr<Declaration> ParseDeclStmt();
-  std::unique_ptr<BreakStmt> ParseBreakStmt();
-  std::unique_ptr<ContinueStmt> ParseContinueStmt();
-  std::unique_ptr<ReturnStmt> ParseReturnStmt();
-  std::unique_ptr<ExprStmt> ParseExprStmt();
-  std::unique_ptr<Expr> ParseExpr();
-  std::unique_ptr<AssignExpr> ParseAssignExpr();
-  std::unique_ptr<ConditionalExpr> ParseConditionalExpr();
-  std::unique_ptr<LogOrExpr> ParseLogOrExpr();
-  std::unique_ptr<LogAndExpr> ParseLogAndExpr();
-  std::unique_ptr<BitOrExpr> ParseBitOrExpr();
-  std::unique_ptr<BitXorExpr> ParseBitXorExpr();
-  std::unique_ptr<BitAndExpr> ParseBitAndExpr();
-  std::unique_ptr<EqualExpr> ParseEqualExpr();
-  std::unique_ptr<RelationalExpr> ParseRelationalExpr();
-  std::unique_ptr<ShiftExpr> ParseShiftExpr();
-  std::unique_ptr<AdditiveExpr> ParseAdditiveExpr();
-  std::unique_ptr<MultiExpr> ParseMultiExpr();
-  std::unique_ptr<CastExpr> ParseCastExpr();
-  std::unique_ptr<UnaryExpr> ParseUnaryExpr();
-  std::unique_ptr<PostFixExpr> ParsePostFixExpr();
-  std::unique_ptr<PrimaryExpr> ParsePrimaryExpr();
-  std::unique_ptr<Type> ParseType();
-  std::unique_ptr<Type> ParseType(std::unique_ptr<Type> &&baseType);
+  std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
+  std::optional<Syntax::FunctionDefinition> ParseFunctionDefinition();
+  std::optional<Syntax::Declaration> ParseDeclaration();
+  std::optional<Syntax::DeclarationSpecifier> ParseDeclarationSpecifier();
+  std::optional<Syntax::SpecifierQualifier> ParseSpecifierQualifier();
+  std::optional<Syntax::Declarator> ParseDeclarator();
+  std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
+  std::optional<Syntax::AbstractDeclarator> ParseAbstractDeclarator();
+  std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclarator();
+  std::optional<Syntax::ParameterTypeList> ParseParameterTypeList();
+  std::optional<Syntax::ParameterList> ParseParameterList();
+  std::optional<Syntax::Pointer> ParsePointer();
+  std::optional<Syntax::StructOrUnionSpecifier> ParseStructOrUnionSpecifier();
+  std::optional<Syntax::EnumSpecifier> ParseEnumSpecifier();
+  std::optional<Syntax::EnumDeclaration> ParseEnumDeclaration();
+  std::optional<Syntax::Initializer> ParseInitializer();
+  std::optional<Syntax::InitializerList> ParseInitializerList();
+
+  std::optional<Syntax::BlockItem> ParseBlockItem();
+  std::optional<Syntax::BlockStmt> ParseBlockStmt();
+  std::optional<Syntax::Stmt> ParseStmt();
+//  std::unique_ptr<BlockStmt> ParseBlockStmt();
+//  std::unique_ptr<IfStmt> ParseIfStmt();
+//  std::unique_ptr<WhileStmt> ParseWhileStmt();
+//  std::unique_ptr<DoWhileStmt> ParseDoWhileStmt();
+//  std::unique_ptr<ForStmt> ParseForStmt();
+//  std::unique_ptr<ForDeclarationStmt> ParseForDeclStmt();
+//  std::unique_ptr<BreakStmt> ParseBreakStmt();
+//  std::unique_ptr<ContinueStmt> ParseContinueStmt();
+//  std::unique_ptr<ReturnStmt> ParseReturnStmt();
+//  std::unique_ptr<ExprStmt> ParseExprStmt();
+
+  std::optional<Syntax::Expr> ParseExpr();
+  std::optional<Syntax::AssignExpr> ParseAssignExpr();
+  std::optional<Syntax::ConditionalExpr> ParseConditionalExpr();
+  std::optional<Syntax::LogOrExpr> ParseLogOrExpr();
+  std::optional<Syntax::LogAndExpr> ParseLogAndExpr();
+  std::optional<Syntax::BitOrExpr> ParseBitOrExpr();
+  std::optional<Syntax::BitXorExpr> ParseBitXorExpr();
+  std::optional<Syntax::BitAndExpr> ParseBitAndExpr();
+  std::optional<Syntax::EqualExpr> ParseEqualExpr();
+  std::optional<Syntax::RelationalExpr> ParseRelationalExpr();
+  std::optional<Syntax::ShiftExpr> ParseShiftExpr();
+  std::optional<Syntax::AdditiveExpr> ParseAdditiveExpr();
+  std::optional<Syntax::MultiExpr> ParseMultiExpr();
+  std::optional<Syntax::CastExpr> ParseCastExpr();
+  std::optional<Syntax::UnaryExpr> ParseUnaryExpr();
+  std::optional<Syntax::PostFixExpr> ParsePostFixExpr();
+  std::optional<Syntax::PrimaryExpr> ParsePrimaryExpr();
+
+  std::optional<Syntax::TypeName> ParseTypeName();
   bool IsFunction();
   bool IsTypeName();
+  bool IsDeclarationSpecifier();
+  bool IsSpecifierQualifier();
+  bool isAssignment(tok::TokenKind type);
   bool Match(tok::TokenKind tokenType);
   bool Expect(tok::TokenKind tokenType);
   bool Consume(tok::TokenKind tokenType);

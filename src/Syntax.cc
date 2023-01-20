@@ -10,205 +10,860 @@
  * Sign:     enjoy life
  ***********************************/
 #include "Syntax.h"
-
+#include <algorithm>
+#include <cassert>
+#include <utility>
 namespace lcc {
-PrimaryType::PrimaryType(std::vector<tok::TokenKind> &&types) noexcept
-    : mTypes(types) {}
-PointerType::PointerType(std::unique_ptr<Type> &&type) noexcept
-    : mType(std::move(type)) {}
 
-Expr::Expr(std::unique_ptr<AssignExpr> &&assignExpr,
-           std::vector<std::unique_ptr<AssignExpr>> &&optAssignExps) noexcept
-    : mAssignExpr(std::move(assignExpr)),
-      mOptAssignExps(std::move(optAssignExps)) {}
-
-ConstantExpr::ConstantExpr(ConstantValue &value) : mValue(value) {}
-
-AssignExpr::AssignExpr(std::unique_ptr<ConditionalExpr> &&condExpr,
-                       tok::TokenKind tokenType,
-                       std::unique_ptr<AssignExpr> &&assignExpr) noexcept
-    : mCondExpr(std::move(condExpr)), mTokType(tokenType),
-      mAssignExpr(std::move(assignExpr)) {}
-
-ConditionalExpr::ConditionalExpr(
-    std::unique_ptr<LogOrExpr> &&logOrExpr, std::unique_ptr<Expr> &&optExpr,
-    std::unique_ptr<ConditionalExpr> &&optCondExpr) noexcept
-    : mLogOrExpr(std::move(logOrExpr)), mOptExpr(std::move(optExpr)),
-      mOptCondExpr(std::move(optCondExpr)) {}
-
-LogOrExpr::LogOrExpr(
-    std::unique_ptr<LogAndExpr> &&logAndExpr,
-    std::vector<std::unique_ptr<LogAndExpr>> &&optLogAndExps) noexcept
-    : mLogAndExpr(std::move(logAndExpr)),
-      mOptLogAndExps(std::move(optLogAndExps)) {}
-
-LogAndExpr::LogAndExpr(
-    std::unique_ptr<BitOrExpr> &&bitOrExpr,
-    std::vector<std::unique_ptr<BitOrExpr>> &&optBitOrExps) noexcept
-    : mBitOrExpr(std::move(bitOrExpr)), mOptBitOrExps(std::move(optBitOrExps)) {
+/// expr
+Expr::Expr(const SourceInterface &interface, const CToken &curToken,
+           std::vector<AssignExpr> assignExpressions)
+    : Node(interface, curToken),
+      mAssignExpressions(std::move(assignExpressions)) {
+  assert(!mAssignExpressions.empty());
 }
 
-BitOrExpr::BitOrExpr(
-    std::unique_ptr<BitXorExpr> &&bitXorExpr,
-    std::vector<std::unique_ptr<BitXorExpr>> &&optBitXorExps) noexcept
-    : mBitXorExpr(std::move(bitXorExpr)),
-      mOptBitXorExps(std::move(optBitXorExps)) {}
-
-BitXorExpr::BitXorExpr(
-    std::unique_ptr<BitAndExpr> &&bitAndExpr,
-    std::vector<std::unique_ptr<BitAndExpr>> &&optBitAndExps) noexcept
-    : mBitAndExpr(std::move(bitAndExpr)),
-      mOptBitAndExps(std::move(optBitAndExps)) {}
-
-BitAndExpr::BitAndExpr(
-    std::unique_ptr<EqualExpr> &&equalExpr,
-    std::vector<std::unique_ptr<EqualExpr>> &&optEqualExps) noexcept
-    : mEqualExpr(std::move(equalExpr)), mOptEqualExps(std::move(optEqualExps)) {
+const std::vector<AssignExpr> &Expr::getAssignExpressions() const {
+  return mAssignExpressions;
 }
 
-EqualExpr::EqualExpr(
-    std::unique_ptr<RelationalExpr> &&relationalExpr,
-    std::vector<std::pair<tok::TokenKind, std::unique_ptr<RelationalExpr>>>
-        &&optRelationalExps) noexcept
-    : mRelationalExpr(std::move(relationalExpr)),
-      mOptRelationExps(std::move(optRelationalExps)) {}
+PrimaryExprIdentifier::PrimaryExprIdentifier(const SourceInterface &interface,
+                                             const CToken &curToken,
+                                             std::string identifier)
+    : Node(interface, curToken), mIdentifier(std::move(identifier)) {}
 
-RelationalExpr::RelationalExpr(
-    std::unique_ptr<ShiftExpr> &&shiftExpr,
-    std::vector<std::pair<tok::TokenKind, std::unique_ptr<ShiftExpr>>>
-        &&optShiftExps) noexcept
-    : mShiftExpr(std::move(shiftExpr)), mOptShiftExps(std::move(optShiftExps)) {
+const std::string &PrimaryExprIdentifier::getIdentifier() const {
+  return mIdentifier;
+}
+
+PrimaryExprConstant::PrimaryExprConstant(const SourceInterface &interface,
+                                         const CToken &curToken,
+                                         Variant variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const Variant &PrimaryExprConstant::getValue() const { return mVariant; }
+
+PrimaryExprParent::PrimaryExprParent(const SourceInterface &interface,
+                                     const CToken &curToken, Expr &&expr)
+    : Node(interface, curToken), mExpr(std::move(expr)) {}
+
+const Expr &PrimaryExprParent::getExpr() const { return mExpr; }
+
+PrimaryExpr::PrimaryExpr(const SourceInterface &interface,
+                         const CToken &curToken, Variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const Variant &PrimaryExpr::getVariant() const { return mVariant; }
+
+PostFixExprPrimary::PostFixExprPrimary(const SourceInterface &interface,
+                                       const CToken &curToken,
+                                       PrimaryExpr &&primaryExpr)
+    : Node(interface, curToken), mPrimaryExpr(std::move(primaryExpr)) {}
+
+const PostFixExprPrimary &PostFixExprPrimary::getPrimaryExpr() const {
+  return mPrimaryExpr;
+}
+
+PostFixExprSubscript::PostFixExprSubscript(
+    const SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr)
+    : Node(interface, curToken), mPostFixExpr(std::move(postFixExpr)),
+      mExpr(std::move(expr)) {
+  assert(mPostFixExpr);
+}
+
+const PostFixExpr &PostFixExprSubscript::getPostFixExpr() const {
+  return *mPostFixExpr;
+}
+
+const Expr &PostFixExprSubscript::getExpr() const { return mExpr; }
+
+PostFixExprIncrement::PostFixExprIncrement(
+    const SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<PostFixExpr> &&postFixExpr)
+    : Node(interface, curToken), mPostFixExpr(std::move(postFixExpr)) {
+  assert(mPostFixExpr);
+}
+
+const PostFixExpr &PostFixExprIncrement::getPostFixExpr() const {
+  return *mPostFixExpr;
+}
+
+PostFixExprDecrement::PostFixExprDecrement(
+    const SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<PostFixExpr> &&postFixExpr)
+    : Node(interface, curToken), mPostFixExpr(std::move(postFixExpr)) {
+  assert(mPostFixExpr);
+}
+
+const PostFixExpr &PostFixExprDecrement::getPostFixExpr() const {
+  return *mPostFixExpr;
+}
+
+PostFixExprDot::PostFixExprDot(const SourceInterface &interface,
+                               const CToken &curToken,
+                               std::unique_ptr<PostFixExpr> &&postFixExpr,
+                               std::string identifier)
+    : Node(interface, curToken), mPostFixExpr(std::move(postFixExpr)),
+      mIdentifier(std::move(identifier)) {
+  assert(mPostFixExpr);
+}
+
+const PostFixExpr &PostFixExprDot::getPostFixExpr() const {
+  return *mPostFixExpr;
+}
+
+const std::string &PostFixExprDot::getIdentifier() const { return mIdentifier; }
+
+PostFixExprArrow::PostFixExprArrow(const SourceInterface &interface,
+                                   const CToken &curToken,
+                                   std::unique_ptr<PostFixExpr> &&postFixExpr,
+                                   std::string identifier)
+    : Node(interface, curToken), mPostFixExpr(std::move(postFixExpr)),
+      mIdentifier(std::move(identifier)) {}
+
+const PostFixExpr &PostFixExprArrow::getPostFixExpr() const {
+  return *mPostFixExpr;
+}
+
+const std::string &PostFixExprArrow::getIdentifier() const {
+  return mIdentifier;
+}
+
+PostFixExprFuncCall::PostFixExprFuncCall(
+    const SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<PostFixExpr> &&postFixExpr,
+    std::vector<std::unique_ptr<AssignExpr>> &&optParams)
+    : Node(interface, curToken), mPostFixExpr(std::move(postFixExpr)),
+      mOptParams(std::move(optParams)) {}
+
+const PostFixExpr &PostFixExprFuncCall::getPostFixExpr() const {
+  return *mPostFixExpr;
+}
+
+const std::vector<std::unique_ptr<AssignExpr>> &
+PostFixExprFuncCall::getOptionalAssignExpressions() const {
+  return mOptParams;
+}
+
+PostFixExpr::PostFixExpr(const SourceInterface &interface,
+                         const CToken &curToken, Variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const Variant &PostFixExpr::getVariant() const { return mVariant; }
+
+UnaryExprPostFixExpr::UnaryExprPostFixExpr(
+    const SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<PostFixExpr> &&postExpr)
+    : Node(interface, curToken), mPostExpr(std::move(postExpr)) {}
+
+const PostFixExpr &UnaryExprPostFixExpr::getPostExpr() const {
+  return mPostExpr;
+}
+
+UnaryExprUnaryOperator::UnaryExprUnaryOperator(
+    const SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<UnaryExpr> &&unaryExpr)
+    : Node(interface, curToken), mTok(curToken.getTokenKind()),
+      mUnaryExpr(std::move(unaryExpr)) {}
+
+tok::TokenKind UnaryExprUnaryOperator::getOperator() const { return mTok; }
+
+const UnaryExpr &UnaryExprUnaryOperator::getUnaryExpr() const {
+  return *mUnaryExpr;
+}
+
+UnaryExprSizeOf::UnaryExprSizeOf(const SourceInterface &interface,
+                                 const CToken &curToken, Variant &&variant)
+    : Node(interface, curToken), mValue(std::move(variant)) {}
+
+const Variant &UnaryExprSizeOf::getVariant() const { return mValue; }
+
+UnaryExpr::UnaryExpr(const SourceInterface &interface, const CToken &curToken,
+                     Variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const Variant &UnaryExpr::getVariant() const { return mVariant; }
+
+AssignExprAssign::AssignExprAssign(const SourceInterface &interface,
+                                   const CToken &curToken,
+                                   UnaryExpr &&unaryExpr,
+                                   std::unique_ptr<AssignExpr> &&assignExpr)
+    : Node(interface, curToken), mUnaryExpr(std::move(unaryExpr)),
+      mAssignExpr(std::move(assignExpr)) {
+  assert(mAssignExpr);
+}
+
+const UnaryExpr &AssignExprAssign::getUnaryExpr() const { return mUnaryExpr; }
+
+const AssignExpr &AssignExprAssign::getAssignExpr() const {
+  return *mAssignExpr;
+}
+
+TypeName::TypeName(const SourceInterface &interface, const CToken &curToken,
+                   std::vector<SpecifierQualifier> &&specifierQualifiers,
+                   std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
+    : Node(interface, curToken),
+      mSpecifierQualifiers(std::move(specifierQualifiers)),
+      mAbstractDeclarator(std::move(abstractDeclarator)) {}
+
+const std::vector<SpecifierQualifier> &
+TypeName::getSpecifierQualifiers() const {
+  return mSpecifierQualifiers;
+}
+
+const AbstractDeclarator *TypeName::getAbstractDeclarator() const {
+  return mAbstractDeclarator.get();
+}
+
+CastExpr::CastExpr(const SourceInterface &interface, const CToken &curToken,
+                   Variant &&unaryOrCast)
+    : Node(interface, curToken), mVariant(std::move(unaryOrCast)) {}
+
+const Variant &CastExpr::getVariant() const { return mVariant; }
+
+MultiExpr::MultiExpr(
+    SourceInterface &interface, const CToken &curToken, CastExpr &&castExpr,
+    std::vector<std::pair<tok::TokenKind, CastExpr>> &&optCastExps)
+    : Node(interface, curToken), mCastExpr(std::move(castExpr)),
+      mOptCastExps(std::move(optCastExps)) {}
+
+const CastExpr &MultiExpr::getCastExpr() const { return mCastExpr; }
+
+const std::vector<std::pair<tok::TokenKind, CastExpr>> &
+MultiExpr::getOptionalCastExpr() const {
+  return mOptCastExps;
+}
+
+AdditiveExpr::AdditiveExpr(
+    SourceInterface &interface, const CToken &curToken, MultiExpr &&multiExpr,
+    std::vector<std::pair<tok::TokenKind, MultiExpr>> &&optionalMultiExps)
+    : Node(interface, curToken), mMultiExpr(std::move(multiExpr)),
+      mOptionalMultiExpr(std::move(optionalMultiExps)) {}
+
+const MultiExpr &AdditiveExpr::getMultiExpr() const { return mMultiExpr; }
+
+const std::vector<std::pair<tok::TokenKind, MultiExpr>> &
+AdditiveExpr::getOptionalMultiExpr() const {
+  return mOptionalMultiExpr;
 }
 
 ShiftExpr::ShiftExpr(
-    std::unique_ptr<AdditiveExpr> &&additiveExpr,
-    std::vector<std::pair<tok::TokenKind, std::unique_ptr<AdditiveExpr>>>
-        &&optAdditiveExps) noexcept
-    : mAdditiveExpr(std::move(additiveExpr)),
+    SourceInterface &interface, const CToken &curToken,
+    AdditiveExpr &&additiveExpr,
+    std::vector<std::pair<tok::TokenKind, AdditiveExpr>> &&optAdditiveExps)
+    : Node(interface, curToken), mAdditiveExpr(std::move(additiveExpr)),
       mOptAdditiveExps(std::move(optAdditiveExps)) {}
 
-AdditiveExpr::AdditiveExpr(
-    std::unique_ptr<MultiExpr> &&multiExpr,
-    std::vector<std::pair<tok::TokenKind, std::unique_ptr<MultiExpr>>>
-        &&optionalMultiExps) noexcept
-    : mMultiExpr(std::move(multiExpr)),
-      mOptionalMultiExps(std::move(optionalMultiExps)) {}
+const AdditiveExpr &ShiftExpr::getAdditiveExpr() const { return mAdditiveExpr; }
 
-MultiExpr::MultiExpr(
-    std::unique_ptr<CastExpr> &&castExpr,
-    std::vector<std::pair<tok::TokenKind, std::unique_ptr<CastExpr>>>
-        &&optCastExps) noexcept
-    : mCastExpr(std::move(castExpr)), mOptCastExps(std::move(optCastExps)) {}
+const std::vector<std::pair<tok::TokenKind, AdditiveExpr>> &
+ShiftExpr::getOptAdditiveExps() const {
+  return mOptAdditiveExps;
+}
 
-CastExpr::CastExpr(Variant &&unaryOrCast) noexcept
-    : mVariant(std::move(unaryOrCast)) {}
+RelationalExpr::RelationalExpr(
+    SourceInterface &interface, const CToken &curToken, ShiftExpr &&shiftExpr,
+    std::vector<std::pair<tok::TokenKind, ShiftExpr>> &&optShiftExps)
+    : Node(interface, curToken), mShiftExpr(std::move(shiftExpr)),
+      mOptShiftExps(std::move(optShiftExps)) {}
 
-UnaryExpr::UnaryExpr(Variant &&variant) noexcept
-: mVariant(std::move(variant)) {}
+const ShiftExpr &RelationalExpr::getShiftExpr() const { return mShiftExpr; }
 
-UnaryExprSizeOf::UnaryExprSizeOf(Variant &&variant) noexcept
-: mUnaryOrType(std::move(variant)) {}
+const std::vector<std::pair<tok::TokenKind, ShiftExpr>> &
+RelationalExpr::getOptionalShiftExpressions() const {
+  return mOptShiftExps;
+}
 
-UnaryExprPostFixExpr::UnaryExprPostFixExpr(std::unique_ptr<PostFixExpr> && postExpr) noexcept
-: mPostExpr(std::move(postExpr)) {}
+EqualExpr::EqualExpr(
+    SourceInterface &interface, const CToken &curToken,
+    RelationalExpr &&relationalExpr,
+    std::vector<std::pair<tok::TokenKind, RelationalExpr>> &&optRelationalExps)
+    : Node(interface, curToken), mRelationalExpr(std::move(relationalExpr)),
+      mOptRelationExps(std::move(optRelationalExps)) {}
 
-UnaryExprUnaryOperator::UnaryExprUnaryOperator(
-    tok::TokenKind tokTy,
-    std::unique_ptr<UnaryExpr> && unaryExpr) noexcept
-: mTok(tokTy), mUnaryExpr(std::move(unaryExpr)) {}
+const RelationalExpr &EqualExpr::getRelationalExpr() const {
+  return mRelationalExpr;
+}
 
-PostFixExpr::PostFixExpr(Variant && variant) noexcept
-    : mVariant(std::move(variant)) {}
+const std::vector<std::pair<tok::TokenKind, RelationalExpr>> &
+EqualExpr::getOptionalRelationalExpr() const {
+  return mOptRelationExps;
+}
 
-PostFixExprDecrement::PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept
-: mPostFixExpr(std::move(postFixExpr)) {}
+LogAndExpr::LogAndExpr(SourceInterface &interface, const CToken &curToken,
+                       BitOrExpr &&bitOrExpr,
+                       std::vector<BitOrExpr> &&optBitOrExps)
+    : Node(interface, curToken), mBitOrExpr(std::move(bitOrExpr)),
+      mOptBitOrExps(std::move(optBitOrExps)) {}
 
-PostFixExprIncrement::PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr) noexcept
-: mPostFixExpr(std::move(postFixExpr)) {}
+const BitOrExpr &LogAndExpr::getBitOrExpression() const { return mBitOrExpr; }
 
-PostFixExprArrow::PostFixExprArrow(std::unique_ptr<PostFixExpr> && postFixExpr,
-                 std::string identifier) noexcept
-: mPostFixExpr(std::move(postFixExpr)), mIdentifier(identifier) {}
+const std::vector<BitOrExpr> &LogAndExpr::getOptionalBitOrExpressions() const {
+  return mOptBitOrExps;
+}
 
-PostFixExprDot::PostFixExprDot(std::unique_ptr<PostFixExpr> && postFixExpr,
-               std::string identifier) noexcept
-    : mPostFixExpr(std::move(postFixExpr)), mIdentifier(identifier) {}
+BitAndExpr::BitAndExpr(SourceInterface &interface, const CToken &curToken,
+                       EqualExpr &&equalExpr,
+                       std::vector<EqualExpr> &&optEqualExps)
+    : Node(interface, curToken), mEqualExpr(std::move(equalExpr)),
+      mOptEqualExps(std::move(optEqualExps)) {}
 
-PostFixExprFuncCall::PostFixExprFuncCall(std::unique_ptr<PostFixExpr> && postFixExpr,
-                    std::vector<std::unique_ptr<AssignExpr>> && optParams) noexcept
-: mPostFixExpr(std::move(postFixExpr)), mOptParams(std::move(optParams)) {}
+const EqualExpr &BitAndExpr::getEqualExpr() const { return mEqualExpr; }
 
-PostFixExprSubscript::PostFixExprSubscript(std::unique_ptr<PostFixExpr> && postFixExpr,
-                    std::unique_ptr<Expr> && expr) noexcept
-: mPostFixExpr(std::move(postFixExpr)), mExpr(std::move(expr)) {}
+const std::vector<EqualExpr> &BitAndExpr::getOptionalEqualExpr() const {
+  return mOptEqualExps;
+}
 
-ExprStmt::ExprStmt(std::unique_ptr<Expr> &&optExpr) noexcept
-    : mOptExpr(std::move(optExpr)) {}
+BitXorExpr::BitXorExpr(SourceInterface &interface, const CToken &curToken,
+                       BitAndExpr &&bitAndExpr,
+                       std::vector<BitAndExpr> &&optBitAndExps)
+    : Node(interface, curToken), mBitAndExpr(std::move(bitAndExpr)),
+      mOptBitAndExps(std::move(optBitAndExps)) {}
 
-IfStmt::IfStmt(std::unique_ptr<Expr> &&expr, std::unique_ptr<Stmt> &&thenStmt,
-               std::unique_ptr<Stmt> &&optElseStmt) noexcept
-    : mExpr(std::move(expr)), mThenStmt(std::move(thenStmt)),
-      mOptElseStmt(std::move(optElseStmt)) {}
+const BitAndExpr &BitXorExpr::getBitAndExpr() const { return mBitAndExpr; }
 
-PostFixExprPrimary::PostFixExprPrimary(std::unique_ptr<PrimaryExpr> && primaryExpr) noexcept
-: mPrimaryExpr(std::move(primaryExpr)) {}
+const std::vector<BitAndExpr> &
+BitXorExpr::getOptionalBitAndExpressions() const {
+  return mOptBitAndExps;
+}
 
-PrimaryExpr::PrimaryExpr(Variant &&variant) noexcept
-: mVariant(std::move(variant)) {}
+BitOrExpr::BitOrExpr(SourceInterface &interface, const CToken &curToken,
+                     BitXorExpr &&bitXorExpr,
+                     std::vector<BitXorExpr> &&optBitXorExps)
+    : Node(interface, curToken), mBitXorExpr(std::move(bitXorExpr)),
+      mOptBitXorExps(std::move(optBitXorExps)) {}
 
-PrimaryExprParent::PrimaryExprParent(std::unique_ptr<Expr> && expr) noexcept
-: mExpr(std::move(expr)) {}
+const BitXorExpr &BitOrExpr::getBitXorExpression() const { return mBitXorExpr; }
 
-PrimaryExprIdentifier::PrimaryExprIdentifier(std::string identifier)
-: mIdentifier(identifier) {}
+const std::vector<BitXorExpr> &BitOrExpr::getOptionalBitXorExpressions() const {
+  return mOptBitXorExps;
+}
 
-PrimaryExprConstant::PrimaryExprConstant(Variant variant)
-: mVariant(variant) {}
+LogOrExpr::LogOrExpr(SourceInterface &interface, const CToken &curToken,
+                     LogAndExpr &&logAndExpr,
+                     std::vector<LogAndExpr> &&optLogAndExps)
+    : Node(interface, curToken), mLogAndExpr(std::move(logAndExpr)),
+      mOptLogAndExps(std::move(optLogAndExps)) {}
 
-DoWhileStmt::DoWhileStmt(std::unique_ptr<Stmt> &&stmt,
-                         std::unique_ptr<Expr> &&expr) noexcept
-    : mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
+const LogOrExpr &LogOrExpr::getAndExpression() const { return mLogAndExpr; }
 
-WhileStmt::WhileStmt(std::unique_ptr<Expr> &&expr,
-                     std::unique_ptr<Stmt> &&stmt) noexcept
-    : mExpr(std::move(expr)), mStmt(std::move(stmt)) {}
+const std::vector<LogOrExpr> &LogOrExpr::getOptionalAndExpressions() const {
+  return mOptLogAndExps;
+}
 
-ForStmt::ForStmt(std::unique_ptr<Expr> &&initExpr,
+ConditionalExpr::ConditionalExpr(SourceInterface &interface,
+                                 const CToken &curToken, LogOrExpr &&logOrExpr,
+                                 std::unique_ptr<Expr> &&optExpr,
+                                 std::unique_ptr<ConditionalExpr> &&optCondExpr)
+    : Node(interface, curToken), mLogOrExpr(std::move(logOrExpr)),
+      mOptExpr(std::move(optExpr)), mOptCondExpr(std::move(optCondExpr)) {}
+
+const LogOrExpr &ConditionalExpr::getLogicalOrExpression() const {
+  return mLogOrExpr;
+}
+
+const Expr *ConditionalExpr::getOptionalExpression() const {
+  return mOptExpr.get();
+}
+
+const ConditionalExpr *
+ConditionalExpr::getOptionalConditionalExpression() const {
+  return mOptCondExpr.get();
+}
+
+AssignExpr::AssignExpr(
+    SourceInterface &interface, const CToken &curToken,
+    std::variant<AssignExprAssign, ConditionalExpr> &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const std::variant<AssignExprAssign, ConditionalExpr> &
+AssignExpr::getVariant() const {
+  return mVariant;
+}
+
+/// stmt
+ReturnStmt::ReturnStmt(SourceInterface &interface, const CToken &curToken,
+                       std::unique_ptr<Expr> &&optExpr)
+    : Node(interface, curToken), mOptExpr(std::move(optExpr)) {}
+
+const Expr *ReturnStmt::getExpression() const { return mOptExpr.get(); }
+
+IfStmt::IfStmt(SourceInterface &interface, const CToken &curToken, Expr &&expr,
+               std::unique_ptr<Stmt> &&thenStmt,
+               std::unique_ptr<Stmt> &&optElseStmt)
+    : Node(interface, curToken), mExpr(std::move(expr)),
+      mThenStmt(std::move(thenStmt)), mOptElseStmt(std::move(optElseStmt)) {
+  assert(mThenStmt);
+}
+
+const Expr &IfStmt::getExpression() const { return mExpr; }
+
+const Stmt &IfStmt::getThenStmt() const { return *mThenStmt; }
+
+const Stmt *IfStmt::getElseStmt() const { return mOptElseStmt.get(); }
+
+SwitchStmt::SwitchStmt(SourceInterface &interface, const CToken &curToken,
+                       Expr &&expression, std::unique_ptr<Stmt> &&statement)
+    : Node(interface, curToken), mExpr(std::move(expression)),
+      mStmt(std::move(statement)) {
+  assert(mStmt);
+}
+
+const Expr &SwitchStmt::getExpression() const { return mExpr; }
+
+const Stmt &SwitchStmt::getStatement() const { return mStmt; }
+
+DefaultStmt::DefaultStmt(SourceInterface &interface, const CToken &curToken,
+                         std::unique_ptr<Stmt> &&statement)
+    : Node(interface, curToken), mStmt(std::move(statement)) {
+  assert(mStmt);
+}
+
+const Stmt &DefaultStmt::getStatement() const { return *mStmt; }
+
+CaseStmt::CaseStmt(SourceInterface &interface, const CToken &curToken,
+                   const constantVariant &constant,
+                   std::unique_ptr<Stmt> &&statement)
+    : Node(interface, curToken), mConstant(constant),
+      mStatement(std::move(statement)) {}
+
+const Stmt *CaseStmt::getStatement() const { return mStatement.get(); }
+
+const constantVariant &CaseStmt::getConstant() const { return mConstant; }
+
+GotoStmt::GotoStmt(SourceInterface &interface, const CToken &curToken,
+                   std::string identifier)
+    : Node(interface, curToken), mIdentifier(std::move(identifier)) {}
+
+const std::string &GotoStmt::getIdentifier() const { return mIdentifier; }
+
+LabelStmt::LabelStmt(SourceInterface &interface, const CToken &curToken,
+                     std::string identifier)
+    : Node(interface, curToken), mIdentifier(std::move(identifier)) {}
+
+const std::string &LabelStmt::getIdentifier() const { return mIdentifier; }
+
+WhileStmt::WhileStmt(SourceInterface &interface, const CToken &curToken,
+                     Expr &&expr, std::unique_ptr<Stmt> &&stmt)
+    : Node(interface, curToken), mStmt(std::move(stmt)) {
+  assert(mStmt);
+}
+
+const Expr &WhileStmt::getExpression() const { return mExpr; }
+
+const Stmt &WhileStmt::getStatement() const { return *mStmt; }
+
+DoWhileStmt::DoWhileStmt(SourceInterface &interface, const CToken &curToken,
+                         std::unique_ptr<Stmt> &&stmt, Expr &&expr)
+    : Node(interface, curToken), mStmt(std::move(stmt)) {
+  assert(mStmt);
+}
+const Expr &DoWhileStmt::getExpression() const { return mExpr; }
+
+const Stmt &DoWhileStmt::getStatement() const { return *mStmt; }
+
+ForStmt::ForStmt(SourceInterface &interface, const CToken &curToken,
+                 std::unique_ptr<Stmt> &&stmt, std::unique_ptr<Expr> &&initExpr,
                  std::unique_ptr<Expr> &&controlExpr,
-                 std::unique_ptr<Expr> &&postExpr,
-                 std::unique_ptr<Stmt> &&stmt) noexcept
-    : mInitExpr(std::move(initExpr)), mControlExpr(std::move(controlExpr)),
-      mPostExpr(std::move(postExpr)), mStmt(std::move(stmt)) {}
+                 std::unique_ptr<Expr> &&postExpr)
+    : Node(interface, curToken), mStmt(std::move(stmt)),
+      mInitExpr(std::move(initExpr)), mControlExpr(std::move(controlExpr)),
+      mPostExpr(std::move(postExpr)) {
+  assert(mStmt);
+}
 
-Declaration::Declaration(std::unique_ptr<Type> &&type, std::string name,
-                         std::unique_ptr<Expr> &&optValue) noexcept
-    : mType(std::move(type)), mName(name), mOptValue(std::move(optValue)) {}
+const Stmt &ForStmt::getStatement() const { return *mStmt; }
 
-ForDeclarationStmt::ForDeclarationStmt(std::unique_ptr<Declaration> &&initDecl,
+const Expr *ForStmt::getInitial() const { return mInitExpr.get(); }
+
+const Expr *ForStmt::getControlling() const { return mControlExpr.get(); }
+
+const Expr *ForStmt::getPost() const { return mPostExpr.get(); }
+
+ForDeclarationStmt::ForDeclarationStmt(SourceInterface &interface,
+                                       const CToken &curToken,
+                                       std::unique_ptr<Stmt> &&stmt,
+                                       Declaration &&initDecl,
                                        std::unique_ptr<Expr> &&controlExpr,
-                                       std::unique_ptr<Expr> &&postExpr,
-                                       std::unique_ptr<Stmt> &&stmt) noexcept
-    : mInitDecl(std::move(initDecl)), mControlExpr(std::move(controlExpr)),
-      mPostExpr(std::move(postExpr)), mStmt(std::move(stmt)) {}
+                                       std::unique_ptr<Expr> &&postExpr)
+    : Node(interface, curToken), mStmt(std::move(stmt)),
+      mInitDecl(std::move(initDecl)), mControlExpr(std::move(controlExpr)),
+      mPostExpr(std::move(postExpr)) {
+  assert(mStmt);
+}
 
-ReturnStmt::ReturnStmt(std::unique_ptr<Expr> &&optExpr) noexcept
-    : mOptExpr(std::move(optExpr)) {}
+const Declaration &ForDeclarationStmt::getInitial() const { return mInitDecl; }
 
-BlockStmt::BlockStmt(std::vector<std::unique_ptr<Stmt>> &&stmts) noexcept
-    : mStmts(std::move(stmts)) {}
+const Expr *ForDeclarationStmt::getControlling() const {
+  return mControlExpr.get();
+}
 
-Function::Function(
-    std::unique_ptr<Type> &&retType, std::string name,
-    std::vector<std::pair<std::unique_ptr<Type>, std::string>> &&params,
-    std::unique_ptr<BlockStmt> &&optBlockStmt) noexcept
-    : mRetType(std::move(retType)), mName(name), mParam(std::move(params)),
-      mOptBlockStmt(std::move(optBlockStmt)) {}
+const Expr *ForDeclarationStmt::getPost() const { return mPostExpr.get(); }
 
-GlobalDecl::GlobalDecl(std::unique_ptr<Type> &&type, std::string name,
-                       std::unique_ptr<ConstantExpr> &&optValue) noexcept
-    : mType(std::move(type)), mName(name), mOptValue(std::move(optValue)) {}
+const Stmt &ForDeclarationStmt::getStatement() const { return *mStmt; }
 
-Program::Program(
-    std::vector<std::unique_ptr<ExternalDeclaration>> &&externalDecl) noexcept
-    : mExternalDecl(std::move(externalDecl)) {}
-} // namespace lcc::parser
+ExprStmt::ExprStmt(SourceInterface &interface, const CToken &curToken,
+                   std::unique_ptr<Expr> &&optExpr)
+    : Node(interface, curToken), mOptExpr(std::move(optExpr)) {}
+
+const Expr *ExprStmt::getOptionalExpression() const { return mOptExpr.get(); }
+
+BreakStmt::BreakStmt(SourceInterface &interface, const CToken &curToken)
+    : Node(interface, curToken) {}
+
+ContinueStmt::ContinueStmt(SourceInterface &interface, const CToken &curToken)
+    : Node(interface, curToken) {}
+
+BlockItem::BlockItem(SourceInterface &interface, const CToken &curToken,
+                     variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &BlockItem::getVariant() const { return mVariant; }
+
+variant &BlockItem::getVariant() { return mVariant; }
+
+BlockStmt::BlockStmt(SourceInterface &interface, const CToken &curToken,
+                     std::vector<BlockItem> &&blockItems)
+    : Node(interface, curToken), mBlockItems(std::move(blockItems)) {}
+
+const std::vector<BlockItem> &BlockStmt::getBlockItems() const {
+  return mBlockItems;
+}
+
+Stmt::Stmt(SourceInterface &interface, const CToken &curToken,
+           variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &Stmt::getVariant() const { return mVariant; }
+variant &Stmt::getVariant() { return mVariant; }
+
+/// decl
+Declaration::Declaration(
+    SourceInterface &interface, const CToken &curToken,
+    std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+    std::vector<std::pair<std::unique_ptr<Declarator>,
+                          std::unique_ptr<Initializer>>> &&initDeclarators)
+    : Node(interface, curToken),
+      mDeclarationSpecifiers(std::move(declarationSpecifiers)),
+      mInitDeclarators(std::move(initDeclarators)) {}
+
+const std::vector<DeclarationSpecifier> &
+Declaration::getDeclarationSpecifiers() const {
+  return mDeclarationSpecifiers;
+}
+
+const std::vector<
+    std::pair<std::unique_ptr<Declarator>, std::unique_ptr<Initializer>>> &
+Declaration::getInitDeclarators() const {
+  return mInitDeclarators;
+}
+
+DirectAbstractDeclaratorAssignmentExpression::
+    DirectAbstractDeclaratorAssignmentExpression(
+        SourceInterface &interface, const CToken &curToken,
+        std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
+        std::unique_ptr<AssignExpr> &&assignmentExpression)
+    : Node(interface, curToken),
+      mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
+      mAssignmentExpression(std::move(assignmentExpression)) {}
+
+const DirectAbstractDeclarator *
+DirectAbstractDeclaratorAssignmentExpression::getDirectAbstractDeclarator()
+    const {
+  return mDirectAbstractDeclarator.get();
+}
+
+const AssignExpr *
+DirectAbstractDeclaratorAssignmentExpression::getAssignmentExpression() const {
+  return mAssignmentExpression.get();
+}
+
+DirectAbstractDeclaratorParameterTypeList::
+    DirectAbstractDeclaratorParameterTypeList(
+        SourceInterface &interface, const CToken &curToken,
+        std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
+        std::unique_ptr<ParameterTypeList> &&parameterTypeList)
+    : Node(interface, curToken),
+      mDirectAbstractDeclarator(
+          std::move(directAbstractDeclarator),
+          mParameterTypeList(std::move(parameterTypeList))) {}
+
+const DirectAbstractDeclarator *
+DirectAbstractDeclaratorParameterTypeList::getDirectAbstractDeclarator() const {
+  return mDirectAbstractDeclarator.get();
+}
+
+const ParameterTypeList *
+DirectAbstractDeclaratorParameterTypeList::getParameterTypeList() const {
+  return mParameterTypeList.get();
+}
+
+DirectAbstractDeclarator::DirectAbstractDeclarator(SourceInterface &interface,
+                                                   const CToken &curToken,
+                                                   variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &DirectAbstractDeclarator::getVariant() const { return mVariant; }
+
+AbstractDeclarator::AbstractDeclarator(
+    SourceInterface &interface, const CToken &curToken,
+    std::vector<Pointer> &&pointers,
+    DirectAbstractDeclarator &&directAbstractDeclarator)
+    : Node(interface, curToken), mPointers(std::move(pointers)),
+      mDirectAbstractDeclarator(std::move(directAbstractDeclarator)) {}
+
+const std::vector<Pointer> &AbstractDeclarator::getPointers() const {
+  return mPointers;
+}
+
+const DirectAbstractDeclarator &
+AbstractDeclarator::getDirectAbstractDeclarator() const {
+  return mDirectAbstractDeclarator;
+}
+
+ParameterList::ParameterList(SourceInterface &interface, const CToken &curToken,
+                             std::vector<ParameterDeclaration> &&parameterList)
+    : Node(interface, curToken), mParameterList(std::move(parameterList)) {}
+
+const std::vector<ParameterDeclaration> &
+ParameterList::getParameterDeclarations() const {
+  return mParameterList;
+}
+
+ParameterTypeList::ParameterTypeList(SourceInterface &interface,
+                                     const CToken &curToken,
+                                     ParameterList &&parameterList,
+                                     bool hasEllipse)
+    : Node(interface, curToken), mParameterList(std::move(parameterList)),
+      mHasEllipse(hasEllipse) {}
+
+const ParameterList &ParameterTypeList::getParameterList() const {
+  return mParameterList;
+}
+
+bool ParameterTypeList::hasEllipse() const { return mHasEllipse; }
+
+DirectDeclaratorParentParameters::DirectDeclaratorParentParameters(
+    SourceInterface &interface, const CToken &curToken,
+    DirectDeclarator &&directDeclarator, ParameterTypeList &&parameterTypeList)
+    : Node(interface, curToken), mDirectDeclarator(std::move(directDeclarator)),
+      mParameterTypeList(std::move(parameterTypeList)) {}
+
+const DirectDeclarator &
+DirectDeclaratorParentParameters::getDirectDeclarator() const {
+  return mDirectDeclarator;
+}
+
+const ParameterTypeList &
+DirectDeclaratorParentParameters::getParameterTypeList() const {
+  return mParameterTypeList;
+}
+
+DirectDeclaratorParentIdentifiers::DirectDeclaratorParentIdentifiers(
+    SourceInterface &interface, const CToken &curToken,
+    DirectDeclarator &&directDeclarator, std::vector<std::string> &&identifiers)
+    : Node(interface, curToken), mDirectDeclarator(std::move(directDeclarator)),
+      mIdentifiers(std::move(identifiers)) {}
+
+const DirectDeclarator &
+DirectDeclaratorParentIdentifiers::getDirectDeclarator() const {
+  return mDirectDeclarator;
+}
+
+const std::vector<std::string> &
+DirectDeclaratorParentIdentifiers::getIdentifiers() const {
+  return mIdentifiers;
+}
+
+DirectDeclaratorAsterisk::DirectDeclaratorAsterisk(
+    SourceInterface &interface, const CToken &curToken,
+    DirectDeclarator &&directDeclarator,
+    std::vector<TypeQualifier> &&typeQualifiers)
+    : Node(interface, curToken), mDirectDeclarator(std::move(directDeclarator)),
+      mTypeQualifiers(std::move(typeQualifiers)) {}
+
+const DirectDeclarator &DirectDeclaratorAsterisk::getDirectDeclarator() const {
+  return mDirectDeclarator;
+}
+
+const std::vector<TypeQualifier> &
+DirectDeclaratorAsterisk::getTypeQualifiers() const {
+  return mTypeQualifiers;
+}
+
+DirectDeclaratorNoStaticOrAsterisk::DirectDeclaratorNoStaticOrAsterisk(
+    SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<DirectDeclarator> &&directDeclarator,
+    std::vector<TypeQualifier> &&typeQualifiers,
+    std::unique_ptr<AssignExpr> &&assignmentExpression)
+    : Node(interface, curToken), mDirectDeclarator(std::move(directDeclarator)),
+      mTypeQualifiers(std::move(typeQualifiers)),
+      mAssignmentExpression(std::move(assignmentExpression)) {}
+
+const DirectDeclarator &
+DirectDeclaratorNoStaticOrAsterisk::getDirectDeclarator() const {
+  return *mDirectDeclarator;
+}
+
+const std::vector<TypeQualifier> &
+DirectDeclaratorNoStaticOrAsterisk::getTypeQualifiers() const {
+  return mTypeQualifiers;
+}
+
+const std::unique_ptr<AssignExpr> &
+DirectDeclaratorNoStaticOrAsterisk::getAssignmentExpression() const {
+  return mAssignmentExpression;
+}
+
+DirectDeclaratorStatic::DirectDeclaratorStatic(
+    SourceInterface &interface, const CToken &curToken,
+    std::unique_ptr<DirectDeclarator> &&directDeclarator,
+    std::vector<TypeQualifier> &&typeQualifiers,
+    AssignExpr &&assignmentExpression)
+    : Node(interface, curToken), mDirectDeclarator(std::move(directDeclarator)),
+      mTypeQualifiers(std::move(typeQualifiers)),
+      mAssignmentExpression(std::move(assignmentExpression)) {}
+
+const DirectDeclarator &DirectDeclaratorStatic::getDirectDeclarator() const {
+  return *mDirectDeclarator;
+}
+
+const std::vector<TypeQualifier> &
+DirectDeclaratorStatic::getTypeQualifiers() const {
+  return mTypeQualifiers;
+}
+
+const AssignExpr &DirectDeclaratorStatic::getAssignmentExpression() const {
+  return AssignExpr;
+}
+
+DirectDeclarator::DirectDeclarator(SourceInterface &interface,
+                                   const CToken &curToken, variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &DirectDeclarator::getVariant() const { return mVariant; }
+
+Declarator::Declarator(SourceInterface &interface, const CToken &curToken,
+                       std::vector<Pointer> &&pointers,
+                       DirectDeclarator &&directDeclarator)
+    : Node(interface, curToken), mPointers(std::move(pointers)),
+      mDirectDeclarator(std::move(directDeclarator)) {}
+
+const std::vector<Pointer> &Declarator::getPointers() const {
+  return mPointers;
+}
+
+const DirectDeclarator &Declarator::getDirectDeclarator() const {
+  return mDirectDeclarator;
+}
+
+StructOrUnionSpecifier::StructOrUnionSpecifier(
+    SourceInterface &interface, const CToken &curToken, bool isUnion,
+    std::string identifier, std::vector<StructDeclaration> &&structDeclarations)
+    : Node(interface, curToken), mIsUnion(isUnion), mIdentifier(identifier),
+      mStructDeclarations(std::move(structDeclarations)) {}
+
+bool StructOrUnionSpecifier::isUnion() const { return mIsUnion; }
+
+const std::string &StructOrUnionSpecifier::getIdentifier() const {
+  return mIdentifier;
+}
+
+const std::vector<StructDeclaration> &
+StructOrUnionSpecifier::getStructDeclarations() const {
+  return mStructDeclarations;
+}
+
+EnumDeclaration::EnumDeclaration(
+    SourceInterface &interface, const CToken &curToken, std::string name,
+    std::vector<std::pair<std::string, std::int32_t>> values)
+    : Node(interface, curToken), mName(name), mValues(std::move(values)) {}
+
+const std::string &EnumDeclaration::getName() const { return mName; }
+
+const std::vector<std::pair<std::string, std::int32_t>> &
+EnumDeclaration::getValues() const {
+  return mValues;
+}
+
+EnumSpecifier::EnumSpecifier(SourceInterface &interface, const CToken &curToken,
+                             variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &EnumSpecifier::getVariant() const { return mVariant; }
+
+TypeSpecifier::TypeSpecifier(SourceInterface &interface, const CToken &curToken,
+                             variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &TypeSpecifier::getVariant() const { return mVariant; }
+
+Pointer::Pointer(SourceInterface &interface, const CToken &curToken,
+                 std::vector<TypeQualifier> &&typeQualifiers)
+    : Node(interface, curToken), mTypeQualifiers(std::move(typeQualifiers)) {}
+
+const std::vector<TypeQualifier> &Pointer::getTypeQualifiers() const {
+  return mTypeQualifiers;
+}
+
+InitializerList::InitializerList(SourceInterface &interface,
+                                 const CToken &curToken,
+                                 vector &&nonCommaExpressionsAndBlocks)
+    : Node(interface, curToken),
+      mNonCommaExpressionsAndBlocks(std::move(nonCommaExpressionsAndBlocks)) {}
+
+const vector &InitializerList::getNonCommaExpressionsAndBlocks() const {
+  return mNonCommaExpressionsAndBlocks;
+}
+
+Initializer::Initializer(SourceInterface &interface, const CToken &curToken,
+                         variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &Initializer::getVariant() const { return mVariant; }
+
+FunctionDefinition::FunctionDefinition(
+    SourceInterface &interface, const CToken &curToken,
+    std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+    Declarator &&declarator, std::vector<Declaration> &&declarations,
+    BlockStmt &&compoundStatement)
+    : Node(interface, curToken),
+      mDeclarationSpecifiers(std::move(declarationSpecifiers)),
+      mDeclarator(std::move(declarator)),
+      mDeclarations(std::move(declarations)),
+      mCompoundStatement(std::move(compoundStatement)) {}
+
+const std::vector<DeclarationSpecifier> &
+FunctionDefinition::getDeclarationSpecifiers() const {
+  return mDeclarationSpecifiers;
+}
+
+const Declarator &FunctionDefinition::getDeclarator() const {
+  return mDeclarator;
+}
+
+const std::vector<Declaration> &FunctionDefinition::getDeclarations() const {
+  return mDeclarations;
+}
+
+const BlockStmt &FunctionDefinition::getCompoundStatement() const {
+  return mCompoundStatement;
+}
+
+ExternalDeclaration::ExternalDeclaration(SourceInterface &interface,
+                                         const CToken &curToken,
+                                         variant &&variant)
+    : Node(interface, curToken), mVariant(std::move(variant)) {}
+
+const variant &ExternalDeclaration::getVariant() const { return mVariant; }
+
+explicit TranslationUnit::TranslationUnit(
+    std::vector<ExternalDeclaration> &&globals) noexcept
+    : mGlobals(std::move(globals)) {}
+
+const std::vector<ExternalDeclaration> &TranslationUnit::getGlobals() const {
+  return mGlobals;
+}
+
+} // namespace lcc

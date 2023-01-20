@@ -100,8 +100,8 @@ class DirectDeclarator;
 class DirectDeclaratorNoStaticOrAsterisk;
 class DirectDeclaratorStatic;
 class DirectDeclaratorAsterisk;
-class DirectDeclaratorParentheseParameters;
-class DirectDeclaratorParentheseIdentifiers;
+class DirectDeclaratorParentParameters;
+class DirectDeclaratorParentIdentifiers;
 class AbstractDeclarator;
 class DirectAbstractDeclarator;
 class DirectAbstractDeclaratorParameterTypeList;
@@ -227,7 +227,7 @@ public:
                       std::vector<std::unique_ptr<AssignExpr>> &&optParams);
 
   const PostFixExpr &getPostFixExpr() const;
-  const std::vector<std::unique_ptr<AssignExpr>> &getOptionalAssignExpressions;
+  const std::vector<std::unique_ptr<AssignExpr>> &getOptionalAssignExpressions() const;
 };
 
 class PostFixExprIncrement final : public Node {
@@ -291,7 +291,7 @@ public:
 class UnaryExprSizeOf final : public Node {
   using Variant =
       std::variant<std::unique_ptr<UnaryExpr>, std::unique_ptr<TypeName>>;
-  Variant mUnaryOrType;
+  Variant mValue;
 
 public:
   UnaryExprSizeOf(const SourceInterface &interface, const CToken &curToken,
@@ -583,7 +583,7 @@ class CaseStmt final : public Node {
 private:
   using constantVariant = std::variant<llvm::APSInt, llvm::APFloat, void *>;
   constantVariant mConstant;
-  std::unique_ptr<Stmt> m_statement;
+  std::unique_ptr<Stmt> mStatement;
 
 public:
   CaseStmt(SourceInterface &interface, const CToken &curToken,
@@ -601,11 +601,12 @@ private:
 public:
   LabelStmt(SourceInterface &interface, const CToken &curToken,
             std::string identifier);
+  const std::string &getIdentifier() const;
 };
 
 class GotoStmt final : public Node {
 private:
-  std::string m_identifier;
+  std::string mIdentifier;
 
 public:
   GotoStmt(SourceInterface &interface, const CToken &curToken,
@@ -853,12 +854,12 @@ public:
   bool hasEllipse() const;
 };
 
-class DirectDeclaratorParentheseParameters final : public Node {
+class DirectDeclaratorParentParameters final : public Node {
   std::unique_ptr<DirectDeclarator> mDirectDeclarator;
   ParameterTypeList mParameterTypeList;
 
 public:
-  DirectDeclaratorParentheseParameters(SourceInterface &interface,
+  DirectDeclaratorParentParameters(SourceInterface &interface,
                                        const CToken &curToken,
                                        DirectDeclarator &&directDeclarator,
                                        ParameterTypeList &&parameterTypeList);
@@ -868,12 +869,12 @@ public:
   const ParameterTypeList &getParameterTypeList() const;
 };
 
-class DirectDeclaratorParentheseIdentifiers final : public Node {
+class DirectDeclaratorParentIdentifiers final : public Node {
   std::unique_ptr<DirectDeclarator> mDirectDeclarator;
   std::vector<std::string> mIdentifiers;
 
 public:
-  DirectDeclaratorParentheseIdentifiers(SourceInterface &interface,
+  DirectDeclaratorParentIdentifiers(SourceInterface &interface,
                                         const CToken &curToken,
                                         DirectDeclarator &&directDeclarator,
                                         std::vector<std::string> &&identifiers);
@@ -938,8 +939,8 @@ class DirectDeclarator final : public Node {
   using variant = std::variant<std::string, std::unique_ptr<Declarator>,
                                DirectDeclaratorNoStaticOrAsterisk,
                                DirectDeclaratorStatic, DirectDeclaratorAsterisk,
-                               DirectDeclaratorParentheseParameters,
-                               DirectDeclaratorParentheseIdentifiers>;
+                               DirectDeclaratorParentParameters,
+                               DirectDeclaratorParentIdentifiers>;
 
   variant mVariant;
 

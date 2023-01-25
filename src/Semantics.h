@@ -111,23 +111,23 @@ public:
   bool operator!=(const AbstractArrayType &rhs) const;
 };
 
-class ValArrayType final
-{
+class ValArrayType final {
   bool m_restricted;
   std::shared_ptr<const Type> m_type;
 
-  ValArrayType(bool isRestricted, std::shared_ptr<Semantics::Type>&& type);
+  ValArrayType(bool isRestricted, std::shared_ptr<Semantics::Type> &&type);
 
 public:
-  static Type create(bool isConst, bool isVolatile, bool isRestricted, Type&& type);
+  static Type create(bool isConst, bool isVolatile, bool isRestricted,
+                     Type &&type);
 
-  const Type& getType() const;
+  const Type &getType() const;
 
   bool isRestricted() const;
 
-  bool operator==(const ValArrayType& rhs) const;
+  bool operator==(const ValArrayType &rhs) const;
 
-  bool operator!=(const ValArrayType& rhs) const;
+  bool operator!=(const ValArrayType &rhs) const;
 };
 
 class FunctionType final {
@@ -161,22 +161,21 @@ public:
 class RecordType final {
   std::string m_name;
   bool m_isUnion;
-  std::vector<std::tuple<Type, std::string, std::int64_t>> m_members;
+  std::vector<std::pair<Type, std::string>> m_members;
 
   RecordType(std::string name, bool isUnion,
-             std::vector<std::tuple<Type, std::string, std::int64_t>> &&names);
+             std::vector<std::pair<Type, std::string>> &&names);
 
 public:
-  static Type create(
-      bool isConst, bool isVolatile, bool isUnion, const std::string &name,
-      std::vector<std::tuple<Type, std::string, std::int64_t>> &&members = {});
+  static Type create(bool isConst, bool isVolatile, bool isUnion,
+                     const std::string &name,
+                     std::vector<std::pair<Type, std::string>> &&members = {});
 
   const std::string &getName() const;
 
   bool isUnion() const;
 
-  const std::vector<std::tuple<Type, std::string, std::int64_t>> &
-  getMembers() const;
+  const std::vector<std::pair<Type, std::string>> &getMembers() const;
 
   bool isDefinition() const;
 
@@ -232,8 +231,9 @@ class Type final {
   bool m_isConst;
   bool m_isVolatile;
   std::string m_name;
-  using variant = std::variant<PrimitiveType, ArrayType, AbstractArrayType,ValArrayType,
-                               FunctionType, RecordType, EnumType, PointerType>;
+  using variant =
+      std::variant<PrimitiveType, ArrayType, AbstractArrayType, ValArrayType,
+                   FunctionType, RecordType, EnumType, PointerType>;
 
   variant m_type;
 
@@ -337,6 +337,6 @@ Expected<std::size_t, FailureReason> sizeOf(const Type &type);
 Expected<std::size_t, FailureReason> alignmentOf(const Type &type);
 
 bool isVoid(const Type &type);
-}
+} // namespace lcc::Semantics
 
 #endif // LCC_SEMANTICS_H

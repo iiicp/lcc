@@ -660,7 +660,7 @@ tok::TokenKind GetKeywordTokenType(std::string_view characters) {
   return tok::identifier;
 }
 
-PPTokenObject tokenize(std::string &sourceCode, std::string_view sourcePath) {
+PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePath) {
 
   /// check BOM header
   constexpr static std::string_view UTF8_BOM = "\xef\xbb\xbf";
@@ -900,7 +900,7 @@ PPTokenObject tokenize(std::string &sourceCode, std::string_view sourcePath) {
                                 std::move(lineStartOffset)}});
 }
 
-CTokenObject toCTokens(PPTokenObject &&ppTokens) {
+CTokenObject Lexer::toCTokens(PPTokenObject &&ppTokens) {
   std::vector<CToken> result;
   for (auto &iter : ppTokens.data()) {
     switch (iter.getTokenKind()) {

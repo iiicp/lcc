@@ -155,7 +155,7 @@ Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExprConstant &node) {
       [](auto &&value) -> Semantics::ConstRetType {
         using T = std::decay_t<decltype(value)>;
         if constexpr (!std::is_same_v<T, std::string>) {
-            return Semantics::ConstRetType::ValueType(value);
+          return Semantics::ConstRetType::ValueType(value);
         } else {
           return FailureReason(
               "Can't use string literal in constant expression");
@@ -164,23 +164,23 @@ Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExprConstant &node) {
       node.getValue());
 }
 
-Semantics::ConstRetType Semantics::ConstantEvaluator::visit(
-    const Syntax::PrimaryExprParent &node) {
+Semantics::ConstRetType
+Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExprParent &node) {
   return visit(node.getExpr());
 }
 
-Semantics::ConstRetType Semantics::ConstantEvaluator::visit(
-    const Syntax::PostFixExprPrimary &node) {
+Semantics::ConstRetType
+Semantics::ConstantEvaluator::visit(const Syntax::PostFixExprPrimary &node) {
   return visit(node.getPrimaryExpr());
 }
 
-Semantics::ConstRetType Semantics::ConstantEvaluator::visit(
-    const Syntax::UnaryExprPostFixExpr &node) {
+Semantics::ConstRetType
+Semantics::ConstantEvaluator::visit(const Syntax::UnaryExprPostFixExpr &node) {
   return visit(node.getPostExpr());
 }
 
-Semantics::ConstRetType
-Semantics::ConstantEvaluator::visit(const Syntax::UnaryExprUnaryOperator &node) {
+Semantics::ConstRetType Semantics::ConstantEvaluator::visit(
+    const Syntax::UnaryExprUnaryOperator &node) {
   auto value = visit(node.getUnaryExpr());
   if (!value) {
     return value;
@@ -246,7 +246,9 @@ template <typename G> struct Y {
 
 template <typename G> Y(G) -> Y<G>;
 
-template <class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template <class... Ts> struct overload : Ts... {
+  using Ts::operator()...;
+};
 template <class... Ts> overload(Ts...) -> overload<Ts...>;
 } // namespace
 
@@ -409,7 +411,8 @@ Semantics::ConstantEvaluator::visit(const Syntax::CastExpr &node) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
-Semantics::ConstRetType Semantics::ConstantEvaluator::visit(const Syntax::MultiExpr &node) {
+Semantics::ConstRetType
+Semantics::ConstantEvaluator::visit(const Syntax::MultiExpr &node) {
   if (node.getOptionalCastExpr().empty()) {
     return visit(node.getCastExpr());
   }
@@ -1000,20 +1003,19 @@ Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExpr &node) {
 Semantics::ConstRetType
 Semantics::ConstantEvaluator::visit(const Syntax::PostFixExpr &node) {
   return std::visit(
-      overload{
-          [this](auto &&value) -> ConstRetType { return visit(value); },
-          [](const Syntax::PostFixExprFuncCall &) -> ConstRetType {
-            return FailureReason(
-                "Function call not allowed in constant expression");
-          },
-          [](const Syntax::PostFixExprIncrement &) -> ConstRetType {
-            return FailureReason(
-                "Increment not allowed in constant expression");
-          },
-          [](const Syntax::PostFixExprDecrement &) -> ConstRetType {
-            return FailureReason(
-                "Decrement not allowed in constant expression");
-          }},
+      overload{[this](auto &&value) -> ConstRetType { return visit(value); },
+               [](const Syntax::PostFixExprFuncCall &) -> ConstRetType {
+                 return FailureReason(
+                     "Function call not allowed in constant expression");
+               },
+               [](const Syntax::PostFixExprIncrement &) -> ConstRetType {
+                 return FailureReason(
+                     "Increment not allowed in constant expression");
+               },
+               [](const Syntax::PostFixExprDecrement &) -> ConstRetType {
+                 return FailureReason(
+                     "Decrement not allowed in constant expression");
+               }},
       node.getVariant());
 }
 

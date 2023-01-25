@@ -21,8 +21,11 @@ namespace lcc {
 using PPTokenObject = SourceObject<PPToken>;
 using CTokenObject = SourceObject<CToken>;
 
-PPTokenObject tokenize(std::string &sourceCode, std::string_view sourcePath = "<stdin>");
-CTokenObject toCTokens(PPTokenObject && ppTokens);
+class Lexer {
+public:
+  static PPTokenObject tokenize(std::string &sourceCode, std::string_view sourcePath = "<stdin>");
+  static CTokenObject toCTokens(PPTokenObject && ppTokens);
+};
 }
 
 #endif // LCC_LEXER_H

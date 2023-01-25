@@ -76,6 +76,7 @@ PUNCTUATOR(comma, ",")
 
 
 KEYWORD(auto)
+KEYWORD(_Bool)
 KEYWORD(break)
 KEYWORD(case)
 KEYWORD(char)

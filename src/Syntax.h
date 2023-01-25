@@ -11,7 +11,6 @@
  ***********************************/
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
-#include "CodeGenContext.h"
 #include "Lexer.h"
 #include "SourceInterface.h"
 #include "Token.h"
@@ -19,19 +18,6 @@
 #include <variant>
 #include <vector>
 namespace lcc::Syntax {
-class Node {
-private:
-  const CToken &mTok;
-
-public:
-  Node(const CToken &curToken) : mTok(curToken){};
-  virtual ~Node() = default;
-  Node(const Node &) = default;
-  Node &operator=(const Node &) = default;
-  Node(Node &&) = default;
-  Node &operator=(Node &&) = default;
-};
-
 class PrimaryExprIdentifier;
 class PrimaryExprConstant;
 class PrimaryExprParent;
@@ -60,27 +46,28 @@ class BitOrExpr;
 class LogAndExpr;
 class LogOrExpr;
 class ConditionalExpr;
+using ConstantExpr = ConditionalExpr;
 class AssignExpr;
 class AssignExprAssign;
 class Expr;
 
-class GotoStmt;
-class LabelStmt;
+class ReturnStmt;
 class ExprStmt;
 class IfStmt;
-class DoWhileStmt;
-class WhileStmt;
 class SwitchStmt;
-class CaseStmt;
 class DefaultStmt;
+class CaseStmt;
+class BlockStmt;
+class ForStmt;
 class Declaration;
 class ForDeclarationStmt;
-class ForStmt;
+class DoWhileStmt;
+class WhileStmt;
 class BreakStmt;
 class ContinueStmt;
-class ReturnStmt;
+class GotoStmt;
+class LabelStmt;
 class BlockItem;
-class BlockStmt;
 class Stmt;
 class InitializerList;
 class Initializer;
@@ -90,16 +77,13 @@ class ExternalDeclaration;
 class TranslationUnit;
 class TypeName;
 class Declarator;
-class EnumDeclaration;
 class EnumSpecifier;
+class EnumDeclaration;
 class StructOrUnionSpecifier;
 class TypeSpecifier;
 class DirectDeclarator;
-class DirectDeclaratorNoStaticOrAsterisk;
-class DirectDeclaratorStatic;
-class DirectDeclaratorAsterisk;
+class DirectDeclaratorSquare;
 class DirectDeclaratorParentParameters;
-class DirectDeclaratorParentIdentifiers;
 class AbstractDeclarator;
 class DirectAbstractDeclarator;
 class DirectAbstractDeclaratorParameterTypeList;
@@ -108,13 +92,28 @@ class Pointer;
 class ParameterTypeList;
 class ParameterList;
 
+class Node {
+public:
+  Node(){};
+  virtual ~Node() = default;
+  Node(const Node &) = default;
+  Node &operator=(const Node &) = default;
+  Node(Node &&) = default;
+  Node &operator=(Node &&) = default;
+};
+
+/**
+ expression:
+    assignment-expression
+    expression , assignment-expression
+ */
 class Expr final : public Node {
 private:
   std::vector<AssignExpr> mAssignExpressions;
 
 public:
-  Expr(const CToken &curToken, std::vector<AssignExpr> assignExpressions);
-  const std::vector<AssignExpr> &getAssignExpressions() const;
+  Expr(std::vector<AssignExpr> assignExpressions);
+  [[nodiscard]] const std::vector<AssignExpr> &getAssignExpressions() const;
 };
 
 class PrimaryExprIdentifier final : public Node {
@@ -122,19 +121,21 @@ private:
   std::string mIdentifier;
 
 public:
-  PrimaryExprIdentifier(const CToken &curToken, std::string identifier);
-  const std::string &getIdentifier() const;
+  PrimaryExprIdentifier(std::string identifier);
+  [[nodiscard]] const std::string &getIdentifier() const;
 };
 
 class PrimaryExprConstant final : public Node {
-  using Variant = std::variant<std::int32_t, std::uint32_t, std::int64_t, std::uint64_t, float, double, std::string>;
+public:
+  using Variant = std::variant<std::int32_t, std::uint32_t, std::int64_t,
+                               std::uint64_t, float, double, std::string>;
 
 private:
   Variant mVariant;
 
 public:
-  PrimaryExprConstant(const CToken &curToken, Variant variant);
-  const Variant &getValue() const;
+  PrimaryExprConstant(Variant variant);
+  [[nodiscard]] const Variant &getValue() const;
 };
 
 class PrimaryExprParent final : public Node {
@@ -142,8 +143,8 @@ private:
   Expr mExpr;
 
 public:
-  PrimaryExprParent(const CToken &curToken, Expr &&expr);
-  const Expr &getExpr() const;
+  PrimaryExprParent(Expr &&expr);
+  [[nodiscard]] const Expr &getExpr() const;
 };
 
 class PrimaryExpr final : public Node {
@@ -153,9 +154,9 @@ private:
   Variant mVariant;
 
 public:
-  PrimaryExpr(const CToken &curToken, Variant &&variant);
+  PrimaryExpr(Variant &&variant);
 
-  const Variant &getVariant() const;
+  [[nodiscard]] const Variant &getVariant() const;
 };
 
 class PostFixExprPrimary final : public Node {
@@ -163,9 +164,9 @@ private:
   PrimaryExpr mPrimaryExpr;
 
 public:
-  PostFixExprPrimary(const CToken &curToken, PrimaryExpr &&primaryExpr);
+  PostFixExprPrimary(PrimaryExpr &&primaryExpr);
 
-  const PrimaryExpr &getPrimaryExpr() const;
+  [[nodiscard]] const PrimaryExpr &getPrimaryExpr() const;
 };
 
 class PostFixExprSubscript final : public Node {
@@ -174,11 +175,10 @@ private:
   Expr mExpr;
 
 public:
-  PostFixExprSubscript(const CToken &curToken,
-                       std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr);
+  PostFixExprSubscript(std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr);
 
-  const PostFixExpr &getPostFixExpr() const;
-  const Expr &getExpr() const;
+  [[nodiscard]] const PostFixExpr &getPostFixExpr() const;
+  [[nodiscard]] const Expr &getExpr() const;
 };
 
 class PostFixExprDot final : public Node {
@@ -187,12 +187,11 @@ private:
   std::string mIdentifier;
 
 public:
-  PostFixExprDot(const CToken &curToken,
-                 std::unique_ptr<PostFixExpr> &&postFixExpr,
+  PostFixExprDot(std::unique_ptr<PostFixExpr> &&postFixExpr,
                  std::string identifier);
 
-  const PostFixExpr &getPostFixExpr() const;
-  const std::string &getIdentifier() const;
+  [[nodiscard]] const PostFixExpr &getPostFixExpr() const;
+  [[nodiscard]] const std::string &getIdentifier() const;
 };
 
 class PostFixExprArrow final : public Node {
@@ -201,25 +200,23 @@ private:
   std::string mIdentifier;
 
 public:
-  PostFixExprArrow(const CToken &curToken,
-                   std::unique_ptr<PostFixExpr> &&postFixExpr,
+  PostFixExprArrow(std::unique_ptr<PostFixExpr> &&postFixExpr,
                    std::string identifier);
-  const PostFixExpr &getPostFixExpr() const;
-  const std::string &getIdentifier() const;
+  [[nodiscard]] const PostFixExpr &getPostFixExpr() const;
+  [[nodiscard]] const std::string &getIdentifier() const;
 };
 
 class PostFixExprFuncCall final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
-  std::vector<std::unique_ptr<AssignExpr>> mOptParams;
+  std::vector<AssignExpr> mOptParams;
 
 public:
-  PostFixExprFuncCall(const CToken &curToken,
-                      std::unique_ptr<PostFixExpr> &&postFixExpr,
-                      std::vector<std::unique_ptr<AssignExpr>> &&optParams);
+  PostFixExprFuncCall(std::unique_ptr<PostFixExpr> &&postFixExpr,
+                      std::vector<AssignExpr> &&optParams);
 
-  const PostFixExpr &getPostFixExpr() const;
-  const std::vector<std::unique_ptr<AssignExpr>> &
+  [[nodiscard]] const PostFixExpr &getPostFixExpr() const;
+  [[nodiscard]] const std::vector<AssignExpr> &
   getOptionalAssignExpressions() const;
 };
 
@@ -228,9 +225,8 @@ private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
 
 public:
-  PostFixExprIncrement(const CToken &curToken,
-                       std::unique_ptr<PostFixExpr> &&postFixExpr);
-  const PostFixExpr &getPostFixExpr() const;
+  PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr);
+  [[nodiscard]] const PostFixExpr &getPostFixExpr() const;
 };
 
 class PostFixExprDecrement final : public Node {
@@ -238,9 +234,8 @@ private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
 
 public:
-  PostFixExprDecrement(const CToken &curToken,
-                       std::unique_ptr<PostFixExpr> &&postFixExpr);
-  const PostFixExpr &getPostFixExpr() const;
+  PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr);
+  [[nodiscard]] const PostFixExpr &getPostFixExpr() const;
 };
 
 class PostFixExpr final : public Node {
@@ -251,8 +246,8 @@ class PostFixExpr final : public Node {
   Variant mVariant;
 
 public:
-  PostFixExpr(const CToken &curToken, Variant &&variant);
-  const Variant &getVariant() const;
+  PostFixExpr(Variant &&variant);
+  [[nodiscard]] const Variant &getVariant() const;
 };
 
 class UnaryExprUnaryOperator final : public Node {
@@ -261,11 +256,11 @@ private:
   std::unique_ptr<UnaryExpr> mUnaryExpr;
 
 public:
-  UnaryExprUnaryOperator(const CToken &curToken,
+  UnaryExprUnaryOperator(tok::TokenKind tokenKind,
                          std::unique_ptr<UnaryExpr> &&unaryExpr);
 
-  tok::TokenKind getOperator() const;
-  const UnaryExpr &getUnaryExpr() const;
+  [[nodiscard]] tok::TokenKind getOperator() const;
+  [[nodiscard]] const UnaryExpr &getUnaryExpr() const;
 };
 
 class UnaryExprPostFixExpr final : public Node {
@@ -273,10 +268,9 @@ private:
   PostFixExpr mPostExpr;
 
 public:
-  UnaryExprPostFixExpr(const CToken &curToken,
-                       PostFixExpr &&postExpr);
+  UnaryExprPostFixExpr(PostFixExpr &&postExpr);
 
-  const PostFixExpr &getPostExpr() const;
+  [[nodiscard]] const PostFixExpr &getPostExpr() const;
 };
 
 class UnaryExprSizeOf final : public Node {
@@ -285,9 +279,9 @@ class UnaryExprSizeOf final : public Node {
   Variant mValue;
 
 public:
-  UnaryExprSizeOf(const CToken &curToken, Variant &&variant);
+  UnaryExprSizeOf(Variant &&variant);
 
-  const Variant &getVariant() const;
+  [[nodiscard]] const Variant &getVariant() const;
 };
 
 class UnaryExpr final : public Node {
@@ -296,7 +290,7 @@ class UnaryExpr final : public Node {
   Variant mVariant;
 
 public:
-  UnaryExpr(const CToken &curToken, Variant &&variant);
+  UnaryExpr(Variant &&variant);
 
   const Variant &getVariant() const;
 };
@@ -308,11 +302,13 @@ private:
   std::unique_ptr<AssignExpr> mAssignExpr;
 
 public:
-  AssignExprAssign(const CToken &curToken, UnaryExpr &&unaryExpr,
+  AssignExprAssign(UnaryExpr &&unaryExpr,
+                   tok::TokenKind tokenKind,
                    std::unique_ptr<AssignExpr> &&assignExpr);
 
-  const UnaryExpr &getUnaryExpr() const;
-  const AssignExpr &getAssignExpr() const;
+  [[nodiscard]] const UnaryExpr &getUnaryExpr() const;
+  [[nodiscard]] const AssignExpr &getAssignExpr() const;
+  [[nodiscard]] const tok::TokenKind getOperator() const;
 };
 
 enum class TypeQualifier { Const, Restrict, Volatile };
@@ -325,8 +321,7 @@ private:
   std::unique_ptr<AbstractDeclarator> mAbstractDeclarator;
 
 public:
-  TypeName(const CToken &curToken,
-           std::vector<SpecifierQualifier> &&specifierQualifiers,
+  TypeName(std::vector<SpecifierQualifier> &&specifierQualifiers,
            std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
 
   const std::vector<SpecifierQualifier> &getSpecifierQualifiers() const;
@@ -342,7 +337,7 @@ public:
   Variant mVariant;
 
 public:
-  CastExpr(const CToken &curToken, Variant &&unaryOrCast);
+  CastExpr(Variant &&unaryOrCast);
 
   const Variant &getVariant() const;
 };
@@ -354,7 +349,7 @@ private:
 
 public:
   explicit MultiExpr(
-      const CToken &curToken, CastExpr &&castExpr,
+      CastExpr &&castExpr,
       std::vector<std::pair<tok::TokenKind, CastExpr>> &&optCastExps);
   const CastExpr &getCastExpr() const;
   const std::vector<std::pair<tok::TokenKind, CastExpr>> &
@@ -368,7 +363,7 @@ private:
 
 public:
   AdditiveExpr(
-      const CToken &curToken, MultiExpr &&multiExpr,
+      MultiExpr &&multiExpr,
       std::vector<std::pair<tok::TokenKind, MultiExpr>> &&optionalMultiExps);
   const MultiExpr &getMultiExpr() const;
   const std::vector<std::pair<tok::TokenKind, MultiExpr>> &
@@ -382,7 +377,7 @@ private:
 
 public:
   ShiftExpr(
-      const CToken &curToken, AdditiveExpr &&additiveExpr,
+      AdditiveExpr &&additiveExpr,
       std::vector<std::pair<tok::TokenKind, AdditiveExpr>> &&optAdditiveExps);
   const AdditiveExpr &getAdditiveExpr() const;
   const std::vector<std::pair<tok::TokenKind, AdditiveExpr>> &
@@ -396,7 +391,7 @@ private:
 
 public:
   RelationalExpr(
-      const CToken &curToken, ShiftExpr &&shiftExpr,
+      ShiftExpr &&shiftExpr,
       std::vector<std::pair<tok::TokenKind, ShiftExpr>> &&optShiftExps);
   const ShiftExpr &getShiftExpr() const;
   const std::vector<std::pair<tok::TokenKind, ShiftExpr>> &
@@ -409,7 +404,7 @@ private:
   std::vector<std::pair<tok::TokenKind, RelationalExpr>> mOptRelationExps;
 
 public:
-  EqualExpr(const CToken &curToken, RelationalExpr &&relationalExpr,
+  EqualExpr(RelationalExpr &&relationalExpr,
             std::vector<std::pair<tok::TokenKind, RelationalExpr>>
                 &&optRelationalExps);
   const RelationalExpr &getRelationalExpr() const;
@@ -424,8 +419,7 @@ private:
   std::vector<EqualExpr> mOptEqualExps;
 
 public:
-  BitAndExpr(const CToken &curToken, EqualExpr &&equalExpr,
-             std::vector<EqualExpr> &&optEqualExps);
+  BitAndExpr(EqualExpr &&equalExpr, std::vector<EqualExpr> &&optEqualExps);
   const EqualExpr &getEqualExpr() const;
 
   const std::vector<EqualExpr> &getOptionalEqualExpr() const;
@@ -437,8 +431,7 @@ private:
   std::vector<BitAndExpr> mOptBitAndExps;
 
 public:
-  BitXorExpr(const CToken &curToken, BitAndExpr &&bitAndExpr,
-             std::vector<BitAndExpr> &&optBitAndExps);
+  BitXorExpr(BitAndExpr &&bitAndExpr, std::vector<BitAndExpr> &&optBitAndExps);
   const BitAndExpr &getBitAndExpr() const;
   const std::vector<BitAndExpr> &getOptionalBitAndExpressions() const;
 };
@@ -449,8 +442,7 @@ private:
   std::vector<BitXorExpr> mOptBitXorExps;
 
 public:
-  BitOrExpr(const CToken &curToken, BitXorExpr &&bitXorExpr,
-            std::vector<BitXorExpr> &&optBitXorExps);
+  BitOrExpr(BitXorExpr &&bitXorExpr, std::vector<BitXorExpr> &&optBitXorExps);
   const BitXorExpr &getBitXorExpression() const;
 
   const std::vector<BitXorExpr> &getOptionalBitXorExpressions() const;
@@ -462,8 +454,7 @@ private:
   std::vector<BitOrExpr> mOptBitOrExps;
 
 public:
-  LogAndExpr(const CToken &curToken, BitOrExpr &&bitOrExpr,
-             std::vector<BitOrExpr> &&optBitOrExps);
+  LogAndExpr(BitOrExpr &&bitOrExpr, std::vector<BitOrExpr> &&optBitOrExps);
   const BitOrExpr &getBitOrExpression() const;
   const std::vector<BitOrExpr> &getOptionalBitOrExpressions() const;
 };
@@ -474,8 +465,7 @@ private:
   std::vector<LogAndExpr> mOptLogAndExps;
 
 public:
-  LogOrExpr(const CToken &curToken, LogAndExpr &&logAndExpr,
-            std::vector<LogAndExpr> &&optLogAndExps);
+  LogOrExpr(LogAndExpr &&logAndExpr, std::vector<LogAndExpr> &&optLogAndExps);
   const LogAndExpr &getAndExpression() const;
 
   const std::vector<LogAndExpr> &getOptionalAndExpressions() const;
@@ -489,8 +479,7 @@ private:
 
 public:
   explicit ConditionalExpr(
-      const CToken &curToken, LogOrExpr &&logOrExpr,
-      std::unique_ptr<Expr> &&optExpr = nullptr,
+      LogOrExpr &&logOrExpr, std::unique_ptr<Expr> &&optExpr = nullptr,
       std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr);
   const LogOrExpr &getLogicalOrExpression() const;
   const Expr *getOptionalExpression() const;
@@ -505,8 +494,7 @@ private:
   std::unique_ptr<AssignExpr> mAssignExpr;
 
 public:
-  AssignExpr(const CToken &curToken,
-             std::variant<AssignExprAssign, ConditionalExpr> &&variant);
+  AssignExpr(std::variant<AssignExprAssign, ConditionalExpr> &&variant);
 
   const std::variant<AssignExprAssign, ConditionalExpr> &getVariant() const;
 };
@@ -516,8 +504,9 @@ private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  ExprStmt(const CToken &curToken, std::unique_ptr<Expr> &&optExpr = nullptr);
+  ExprStmt(std::unique_ptr<Expr> &&optExpr = nullptr);
   const Expr *getOptionalExpression() const;
+  std::unique_ptr<Expr> moveOptionalExpr();
 };
 
 class IfStmt final : public Node {
@@ -527,7 +516,7 @@ private:
   std::unique_ptr<Stmt> mOptElseStmt;
 
 public:
-  IfStmt(const CToken &curToken, Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
+  IfStmt(Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
          std::unique_ptr<Stmt> &&optElseStmt = nullptr);
 
   const Expr &getExpression() const;
@@ -543,8 +532,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  SwitchStmt(const CToken &curToken, Expr &&expression,
-             std::unique_ptr<Stmt> &&statement);
+  SwitchStmt(Expr &&expression, std::unique_ptr<Stmt> &&statement);
 
   const Expr &getExpression() const;
 
@@ -556,19 +544,18 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  DefaultStmt(const CToken &curToken, std::unique_ptr<Stmt> &&statement);
+  DefaultStmt(std::unique_ptr<Stmt> &&statement);
   const Stmt &getStatement() const;
 };
 
 class CaseStmt final : public Node {
 private:
-  using constantVariant = std::variant<llvm::APSInt, llvm::APFloat, void *>;
+  using constantVariant = std::variant<int32_t, uint32_t, int64_t, uint64_t, float, double, void *>;
   constantVariant mConstant;
   std::unique_ptr<Stmt> mStatement;
 
 public:
-  CaseStmt(const CToken &curToken, const constantVariant &constant,
-           std::unique_ptr<Stmt> &&statement);
+  CaseStmt(const constantVariant &constant, std::unique_ptr<Stmt> &&statement);
 
   const constantVariant &getConstant() const;
 
@@ -580,7 +567,7 @@ private:
   std::string mIdentifier;
 
 public:
-  LabelStmt(const CToken &curToken, std::string identifier);
+  LabelStmt(std::string identifier);
   const std::string &getIdentifier() const;
 };
 
@@ -589,7 +576,7 @@ private:
   std::string mIdentifier;
 
 public:
-  GotoStmt(const CToken &curToken, std::string identifier);
+  GotoStmt(std::string identifier);
   const std::string &getIdentifier() const;
 };
 
@@ -599,8 +586,7 @@ private:
   Expr mExpr;
 
 public:
-  DoWhileStmt(const CToken &curToken, std::unique_ptr<Stmt> &&stmt,
-              Expr &&expr);
+  DoWhileStmt(std::unique_ptr<Stmt> &&stmt, Expr &&expr);
   const Stmt &getStatement() const;
 
   const Expr &getExpression() const;
@@ -612,7 +598,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  WhileStmt(const CToken &curToken, Expr &&expr, std::unique_ptr<Stmt> &&stmt);
+  WhileStmt(Expr &&expr, std::unique_ptr<Stmt> &&stmt);
   const Expr &getExpression() const;
   const Stmt &getStatement() const;
 };
@@ -625,7 +611,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  ForStmt(const CToken &curToken, std::unique_ptr<Stmt> &&stmt,
+  ForStmt(std::unique_ptr<Stmt> &&stmt,
           std::unique_ptr<Expr> &&initExpr = nullptr,
           std::unique_ptr<Expr> &&controlExpr = nullptr,
           std::unique_ptr<Expr> &&postExpr = nullptr);
@@ -654,7 +640,7 @@ private:
 
 public:
   Declaration(
-      const CToken &curToken,
+
       std::vector<DeclarationSpecifier> &&declarationSpecifiers,
       std::vector<std::pair<std::unique_ptr<Declarator>,
                             std::unique_ptr<Initializer>>> &&initDeclarators);
@@ -672,8 +658,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  ForDeclarationStmt(const CToken &curToken, std::unique_ptr<Stmt> &&stmt,
-                     Declaration &&initDecl,
+  ForDeclarationStmt(std::unique_ptr<Stmt> &&stmt, Declaration &&initDecl,
                      std::unique_ptr<Expr> &&controlExpr = nullptr,
                      std::unique_ptr<Expr> &&postExpr = nullptr);
   const Stmt &getStatement() const;
@@ -687,12 +672,12 @@ public:
 
 class BreakStmt final : public Node {
 public:
-  BreakStmt(const CToken &curToken);
+  BreakStmt();
 };
 
 class ContinueStmt final : public Node {
 public:
-  ContinueStmt(const CToken &curToken);
+  ContinueStmt();
 };
 
 class ReturnStmt final : public Node {
@@ -700,7 +685,7 @@ private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  ReturnStmt(const CToken &curToken, std::unique_ptr<Expr> &&optExpr = nullptr);
+  ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr);
   const Expr *getExpression() const;
 };
 
@@ -709,7 +694,7 @@ private:
   std::vector<BlockItem> mBlockItems;
 
 public:
-  BlockStmt(const CToken &curToken, std::vector<BlockItem> &&blockItems);
+  BlockStmt(std::vector<BlockItem> &&blockItems);
   const std::vector<BlockItem> &getBlockItems() const;
 };
 
@@ -722,7 +707,7 @@ private:
   variant mVariant;
 
 public:
-  Stmt(const CToken &curToken, variant &&variant);
+  Stmt(variant &&variant);
   const variant &getVariant() const;
   variant &getVariant();
 };
@@ -733,7 +718,7 @@ private:
   variant mVariant;
 
 public:
-  BlockItem(const CToken &curToken, variant &&variant);
+  BlockItem(variant &&variant);
 
   const variant &getVariant() const;
 
@@ -746,7 +731,7 @@ class DirectAbstractDeclaratorAssignmentExpression final : public Node {
 
 public:
   DirectAbstractDeclaratorAssignmentExpression(
-      const CToken &curToken,
+
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
       std::unique_ptr<AssignExpr> &&assignmentExpression);
 
@@ -761,7 +746,7 @@ class DirectAbstractDeclaratorParameterTypeList final : public Node {
 
 public:
   DirectAbstractDeclaratorParameterTypeList(
-      const CToken &curToken,
+
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
       std::unique_ptr<ParameterTypeList> &&parameterTypeList);
 
@@ -779,7 +764,7 @@ class DirectAbstractDeclarator final : public Node {
   variant mVariant;
 
 public:
-  DirectAbstractDeclarator(const CToken &curToken, variant &&variant);
+  DirectAbstractDeclarator(variant &&variant);
 
   const variant &getVariant() const;
 };
@@ -789,7 +774,7 @@ class AbstractDeclarator final : public Node {
   DirectAbstractDeclarator mDirectAbstractDeclarator;
 
 public:
-  AbstractDeclarator(const CToken &curToken, std::vector<Pointer> &&pointers,
+  AbstractDeclarator(std::vector<Pointer> &&pointers,
                      DirectAbstractDeclarator &&directAbstractDeclarator);
 
   const std::vector<Pointer> &getPointers() const;
@@ -807,8 +792,7 @@ private:
   std::vector<ParameterDeclaration> mParameterList;
 
 public:
-  ParameterList(const CToken &curToken,
-                std::vector<ParameterDeclaration> &&parameterList);
+  ParameterList(std::vector<ParameterDeclaration> &&parameterList);
 
   const std::vector<ParameterDeclaration> &getParameterDeclarations() const;
 };
@@ -818,8 +802,7 @@ class ParameterTypeList final : public Node {
   bool mHasEllipse;
 
 public:
-  ParameterTypeList(const CToken &curToken, ParameterList &&parameterList,
-                    bool hasEllipse);
+  ParameterTypeList(ParameterList &&parameterList, bool hasEllipse);
 
   const ParameterList &getParameterList() const;
 
@@ -831,8 +814,7 @@ class DirectDeclaratorParentParameters final : public Node {
   ParameterTypeList mParameterTypeList;
 
 public:
-  DirectDeclaratorParentParameters(const CToken &curToken,
-                                   DirectDeclarator &&directDeclarator,
+  DirectDeclaratorParentParameters(DirectDeclarator &&directDeclarator,
                                    ParameterTypeList &&parameterTypeList);
 
   const DirectDeclarator &getDirectDeclarator() const;
@@ -840,42 +822,13 @@ public:
   const ParameterTypeList &getParameterTypeList() const;
 };
 
-class DirectDeclaratorParentIdentifiers final : public Node {
-  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
-  std::vector<std::string> mIdentifiers;
-
-public:
-  DirectDeclaratorParentIdentifiers(const CToken &curToken,
-                                    DirectDeclarator &&directDeclarator,
-                                    std::vector<std::string> &&identifiers);
-
-  const DirectDeclarator &getDirectDeclarator() const;
-
-  const std::vector<std::string> &getIdentifiers() const;
-};
-
-class DirectDeclaratorAsterisk final : public Node {
-  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
-  std::vector<TypeQualifier> mTypeQualifiers;
-
-public:
-  DirectDeclaratorAsterisk(const CToken &curToken,
-                           DirectDeclarator &&directDeclarator,
-                           std::vector<TypeQualifier> &&typeQualifiers);
-
-  const DirectDeclarator &getDirectDeclarator() const;
-
-  const std::vector<TypeQualifier> &getTypeQualifiers() const;
-};
-
-class DirectDeclaratorNoStaticOrAsterisk final : public Node {
+class DirectDeclaratorSquare final : public Node {
   std::unique_ptr<DirectDeclarator> mDirectDeclarator;
   std::vector<TypeQualifier> mTypeQualifiers;
   std::unique_ptr<AssignExpr> mAssignmentExpression;
 
 public:
-  DirectDeclaratorNoStaticOrAsterisk(
-      const CToken &curToken,
+  DirectDeclaratorSquare(
       std::unique_ptr<DirectDeclarator> &&directDeclarator,
       std::vector<TypeQualifier> &&typeQualifiers,
       std::unique_ptr<AssignExpr> &&assignmentExpression);
@@ -887,35 +840,15 @@ public:
   const std::unique_ptr<AssignExpr> &getAssignmentExpression() const;
 };
 
-class DirectDeclaratorStatic final : public Node {
-  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
-  std::vector<TypeQualifier> mTypeQualifiers;
-  AssignExpr mAssignmentExpression;
-
-public:
-  DirectDeclaratorStatic(const CToken &curToken,
-                         std::unique_ptr<DirectDeclarator> &&directDeclarator,
-                         std::vector<TypeQualifier> &&typeQualifiers,
-                         AssignExpr &&assignmentExpression);
-
-  const DirectDeclarator &getDirectDeclarator() const;
-
-  const std::vector<TypeQualifier> &getTypeQualifiers() const;
-
-  const AssignExpr &getAssignmentExpression() const;
-};
-
 class DirectDeclarator final : public Node {
   using variant =
       std::variant<std::string, std::unique_ptr<Declarator>,
-                   DirectDeclaratorNoStaticOrAsterisk, DirectDeclaratorStatic,
-                   DirectDeclaratorAsterisk, DirectDeclaratorParentParameters,
-                   DirectDeclaratorParentIdentifiers>;
+                   DirectDeclaratorSquare, DirectDeclaratorParentParameters>;
 
   variant mVariant;
 
 public:
-  DirectDeclarator(const CToken &curToken, variant &&variant);
+  DirectDeclarator(variant &&variant);
 
   const variant &getVariant() const;
 };
@@ -925,7 +858,7 @@ class Declarator final : public Node {
   DirectDeclarator mDirectDeclarator;
 
 public:
-  Declarator(const CToken &curToken, std::vector<Pointer> &&pointers,
+  Declarator(std::vector<Pointer> &&pointers,
              DirectDeclarator &&directDeclarator);
 
   const std::vector<Pointer> &getPointers() const;
@@ -940,16 +873,14 @@ class StructOrUnionSpecifier final : public Node {
 public:
   struct StructDeclaration {
     std::vector<SpecifierQualifier> specifierQualifiers;
-    std::vector<std::pair<std::unique_ptr<Declarator>, std::int64_t>>
-        structDeclarators;
+    std::vector<std::unique_ptr<Declarator>> structDeclarators;
   };
 
 private:
   std::vector<StructDeclaration> mStructDeclarations;
 
 public:
-  StructOrUnionSpecifier(const CToken &curToken, bool isUnion,
-                         std::string identifier,
+  StructOrUnionSpecifier(bool isUnion, std::string identifier,
                          std::vector<StructDeclaration> &&structDeclarations);
 
   bool isUnion() const;
@@ -964,7 +895,7 @@ class EnumDeclaration final : public Node {
   std::vector<std::pair<std::string, std::int32_t>> mValues;
 
 public:
-  EnumDeclaration(const CToken &curToken, std::string name,
+  EnumDeclaration(std::string name,
                   std::vector<std::pair<std::string, std::int32_t>> values);
 
   const std::string &getName() const;
@@ -978,7 +909,7 @@ class EnumSpecifier final : public Node {
   variant mVariant;
 
 public:
-  EnumSpecifier(const CToken &curToken, variant &&variant);
+  EnumSpecifier(variant &&variant);
 
   const variant &getVariant() const;
 };
@@ -1005,7 +936,7 @@ private:
   variant mVariant;
 
 public:
-  TypeSpecifier(const CToken &curToken, variant &&variant);
+  TypeSpecifier(variant &&variant);
 
   const variant &getVariant() const;
 };
@@ -1014,7 +945,7 @@ class Pointer final : public Node {
   std::vector<TypeQualifier> mTypeQualifiers;
 
 public:
-  Pointer(const CToken &curToken, std::vector<TypeQualifier> &&typeQualifiers);
+  Pointer(std::vector<TypeQualifier> &&typeQualifiers);
 
   const std::vector<TypeQualifier> &getTypeQualifiers() const;
 };
@@ -1031,8 +962,7 @@ private:
   vector mNonCommaExpressionsAndBlocks;
 
 public:
-  InitializerList(const CToken &curToken,
-                  vector &&nonCommaExpressionsAndBlocks);
+  InitializerList(vector &&nonCommaExpressionsAndBlocks);
 
   const vector &getNonCommaExpressionsAndBlocks() const;
 };
@@ -1042,7 +972,7 @@ class Initializer final : public Node {
   variant mVariant;
 
 public:
-  Initializer(const CToken &curToken, variant &&variant);
+  Initializer(variant &&variant);
 
   const variant &getVariant() const;
 };
@@ -1050,21 +980,16 @@ public:
 class FunctionDefinition final : public Node {
   std::vector<DeclarationSpecifier> mDeclarationSpecifiers;
   Declarator mDeclarator;
-  std::vector<Declaration> mDeclarations;
   BlockStmt mCompoundStatement;
 
 public:
-  FunctionDefinition(const CToken &curToken,
-                     std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+  FunctionDefinition(std::vector<DeclarationSpecifier> &&declarationSpecifiers,
                      Declarator &&declarator,
-                     std::vector<Declaration> &&declarations,
                      BlockStmt &&compoundStatement);
 
   const std::vector<DeclarationSpecifier> &getDeclarationSpecifiers() const;
 
   const Declarator &getDeclarator() const;
-
-  const std::vector<Declaration> &getDeclarations() const;
 
   const BlockStmt &getCompoundStatement() const;
 };
@@ -1074,7 +999,7 @@ class ExternalDeclaration final : public Node {
   variant mVariant;
 
 public:
-  ExternalDeclaration(const CToken &curToken, variant &&variant);
+  ExternalDeclaration(variant &&variant);
 
   const variant &getVariant() const;
 };
@@ -1087,6 +1012,6 @@ public:
 
   const std::vector<ExternalDeclaration> &getGlobals() const;
 };
-} // namespace lcc
+} // namespace lcc::Syntax
 
 #endif // LCC_SYNTAX_H

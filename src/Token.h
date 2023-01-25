@@ -10,10 +10,6 @@
 
 #ifndef LCC_TOKEN_H
 #define LCC_TOKEN_H
-
-#include "llvm/ADT/APSInt.h"
-#include "llvm/ADT/APFloat.h"
-
 #include "SourceInterface.h"
 #include "TokenKinds.h"
 #include <cstdint>

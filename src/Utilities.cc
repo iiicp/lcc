@@ -15,22 +15,8 @@
 #include <iostream>
 
 namespace lcc {
-std::string to_string(const llvm::APSInt& apsInt)
-{
-  llvm::SmallString<25> number;
-  apsInt.toString(number);
-  return std::string(number.begin(), number.end());
-}
-
-std::string to_string(const llvm::APFloat& apFloat)
-{
-  llvm::SmallString<25> number;
-  apFloat.toString(number, 0, 3, false);
-  return std::string(number.begin(), number.end());
-}
-
-void logErr(int32_t row, int32_t col, std::string msg) {
+void LOGE(uint32_t row, uint32_t col, const std::string &msg) {
   std::cerr << row << ":" << col << ", " << msg << std::endl;
   LCC_ASSERT(0);
 }
-}
+} // namespace lcc

@@ -11,195 +11,51 @@
 #include "Lexer.h"
 #include "Utilities.h"
 #include <algorithm>
-#include <cassert>
-#include <iostream>
-#include <sstream>
-#include <unordered_map>
-#include <charconv>
-#include <optional>
+#include <charconv> // std::from_chars
 
 namespace lcc {
-namespace util {
-bool IsLetter(char ch) {
-  if (ch == '_') {
-    return true;
-  }
-  if (ch >= 'a' && ch <= 'z') {
-    return true;
-  }
-  if (ch >= 'A' && ch <= 'Z') {
-    return true;
-  }
-  return false;
-}
 
-bool IsWhiteSpace(char ch) {
-  return (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r' || ch == '\f' ||
-          ch == '\v');
-}
-
-bool IsDigit(char ch) { return ch >= '0' && ch <= '9'; }
-
-bool IsOctDigit(char ch) {return ch >= '0' && ch <= '7';}
-
-bool IsHexDigit(char ch) {
-  return IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
-}
-
-bool IsPunctuation(char ch) {
-  return ch == '[' || ch == ']' || ch == '(' || ch == ')' || ch == '{' ||
-         ch == '}' || ch == '.' || ch == '&' || ch == '*' || ch == '+' ||
-         ch == '-' || ch == '~' || ch == '!' || ch == '/' || ch == '%' ||
-         ch == '<' || ch == '>' || ch == '^' || ch == '|' || ch == '?' ||
-         ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
-}
-
-std::uint32_t octalToValue(std::string_view value)
-{
-  std::uint32_t result;
-  auto errors = std::from_chars(value.data(), value.data() + value.size(), result, 8);
-  LCC_ASSERT(errors.ec == std::errc{});
-  return result;
-}
-} // namespace util
-
-enum class State {
-  Start,
-  CharacterLiteral,
-  StringLiteral,
-  Identifier,
-  Number,
-  Punctuator,
-  LineComment,
-  BlockComment,
-  AfterInclude
-};
-
-std::optional<std::uint32_t> escapeCharToValue(char escape) {
-  switch (escape) {
-  case '\\':
-    return '\\';
-  case '\'':
-    return '\'';
-  case '"':
-    return '"';
-  case 'a':
-    return '\a';
-  case 'b':
-    return '\b';
-  case 'f':
-    return '\f';
-  case 'n':
-    return '\n';
-  case 'r':
-    return '\r';
-  case 't':
-    return '\t';
-  case 'v':
-    return '\v';
-  case '?':
-    return '\?';
-  case ' ':
-//    LCC_ASSERT(0 && "expected character after backslash");
-    return {};
-    break;
-  default:
-//    LCC_ASSERT(0 && "invalid escape sequence");
-    return {};
-    break;
-  }
-  return 0;
-}
-
-std::optional<std::vector<char>> processCharacters(std::string_view characters) {
-  std::vector<char> result;
-  result.resize(characters.size());
-  int offset = 0, resultStart = 0;
-  while (offset < characters.size()) {
-    char ch = characters[offset];
+Lexer::Lexer(std::string &sourceCode, std::string_view sourcePath, LanguageOption option)
+: mLangOption(option) {
+  RegularSourceCode(sourceCode);
+  /// calculate start offset per line
+  uint32_t offset = 0;
+  auto &offsets = mSourceFile.lineStartOffsets;
+  offsets.push_back(offset);
+  for (auto &ch : sourceCode) {
+    offset++;
     if (ch == '\n') {
-        return {};
-    }
-    if (ch != '\\') {
-      result.push_back(ch);
-      resultStart++;
-      offset++;
-      continue;
-    }
-    if (offset + 1 == characters.size()) {
-      break;
-    }
-    if (characters[offset+1] == 'x') {
-      offset += 2;
-      int lastHex = offset;
-      while (lastHex < characters.size()) {
-        if (util::IsHexDigit(characters[lastHex])) {
-          lastHex++;
-          continue;
-        }
-        break;
-      }
-      if (offset == lastHex) {
-        /// error at least one hexadecimal digit required
-        return {};
-      }
-      std::string_view sv(characters.data()+offset, lastHex-offset);
-      char *endptr = nullptr;
-      auto value = std::strtol(sv.data(), &endptr, 16);
-      if (endptr) {
-        LCC_UNREACHABLE;
-      }
-      result.push_back(value);
-      resultStart++;
-      offset = lastHex;
-      break;
-    }
-    /// '\0' is octal char
-    else if (util::IsDigit(characters[offset+1])) {
-      offset++;
-      int start = offset;
-      /// first octal char must be oct char
-      if (!util::IsOctDigit(characters[offset])) {
-        return {};
-      }
-      /// first octal char
-      if (util::IsOctDigit(characters[offset])) {
-        offset++;
-      }
-      /// second octal char
-      if (util::IsOctDigit(characters[offset])) {
-        offset++;
-      }
-      /// third octal char
-      if (util::IsOctDigit(characters[offset])) {
-        offset++;
-      }
-      auto value = util::octalToValue(characters.substr(start, offset-start));
-      result.push_back((char)value);
-      resultStart++;
-      break;
-    }else {
-      auto character = escapeCharToValue(characters[offset + 1]);
-      if (!character) {
-        return {};
-      }
-      result.push_back((char)character.value());
-      resultStart++;
-      offset += 2;
+      offsets.push_back(offset);
     }
   }
-  result.resize(resultStart);
-  return result;
+  offsets.push_back(offset + 1);
+  offsets.shrink_to_fit();
+
+  mSourceFile.sourceCode = sourceCode;
+  mSourceFile.sourcePath = sourcePath;
 }
 
-CToken ParseStringLiteral(const PPToken &ppToken, const SourceInterface &interface) {
-  auto chars = processCharacters(ppToken.getValue());
-  if (!chars) {
-    logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "parse string literal error");
+void Lexer::RegularSourceCode(std::string &sourceCode) {
+  /// check BOM header
+  std::string_view UTF8_BOM = "\xef\xbb\xbf";
+  if (sourceCode.size() >= 3 && sourceCode.substr(0, 3) == UTF8_BOM) {
+    sourceCode = sourceCode.substr(3);
   }
-  return CToken(tok::string_literal, ppToken.getOffset(), ppToken.getLength(),
-                ppToken.getFileId(), ppToken.getMacroId(),
-                std::string(chars.value().begin(), chars.value().end()));
+  /// compatible with windows
+  std::string::size_type pos = 0;
+  while ((pos = sourceCode.find("\r\n", pos)) != sourceCode.npos) {
+    sourceCode.erase(pos, 1);
+  }
+
+  sourceCode.shrink_to_fit();
+}
+
+Token::ValueType Lexer::ParseStringLiteral(const Token &ppToken) {
+  auto chars = ProcessCharacters(ppToken.getContent());
+  if (!chars) {
+    LOGE(ppToken.getLine(), ppToken.getColumn(), "parse string literal error");
+  }
+  return std::string(chars.value().begin(), chars.value().end());
 }
 
 /**
@@ -217,16 +73,15 @@ int c = 0x123lu;
 16进制: 0x.ff 0x.ffp-3
 float a1 = 0x.ffp-3;
  */
-CToken::ValueType
-ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
-  std::string_view character = ppToken.getValue();
+Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
+  std::string_view character = ppToken.getContent();
   const char *begin = character.begin(), *end = character.end();
   LCC_ASSERT(std::distance(begin, end) >= 1);
   /// If the number is just "0x", treat the x as a suffix instead of as a hex
   /// prefix
   bool isHex = character.size() > 2 &&
                (character.starts_with("0x") || character.starts_with("0X")) &&
-               util::IsHexDigit(character[2]);
+                IsHexDigit(character[2]);
   std::vector<char> charSet{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   if (isHex) {
     charSet = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
@@ -263,10 +118,10 @@ ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
     suffixBegin = std::find_if(suffixBegin, end, searchFunction);
     /// first character must be digit
     if (prev == suffixBegin) {
-      logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "expected digits after exponent");
+      LOGE(ppToken.getLine(), ppToken.getColumn(), "expected digits after exponent");
     }
   } else if (isHex && isFloat) {
-    logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "binary floating point must contain exponent");
+    LOGE(ppToken.getLine(), ppToken.getColumn(), "binary floating point must contain exponent");
   }
 
   bool isHexOrOctal = isHex;
@@ -275,7 +130,7 @@ ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
     size_t len = std::distance(begin, suffixBegin);
     for (int i = 0; i < len; ++i) {
       if (character[i] >= '8') {
-        logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "invalid octal character");
+        LOGE(ppToken.getLine(), ppToken.getColumn(), "invalid octal character");
       }
     }
   }
@@ -295,7 +150,7 @@ ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
         std::find(variants.begin(), variants.end(), suffix) != variants.end();
   }
   if (!valid) {
-    logErr(ppToken.getLine(interface), ppToken.getColumn(interface), "invalid literal suffix");
+    LOGE(ppToken.getLine(), ppToken.getColumn(), "invalid literal suffix");
   }
 
   if (!isFloat) {
@@ -304,8 +159,7 @@ ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
           return c == 'u' || c == 'U';
         });
     std::string_view sv(begin, suffixBegin - begin);
-    char* endptr = nullptr;
-    std::uint64_t number = std::strtoull(sv.data(), &endptr, 0);
+    std::uint64_t number = std::strtoull(sv.data(), nullptr, 0);
     if (suffix.empty()) {
       if (number > static_cast<uint64_t>(std::numeric_limits<int32_t>::max())) {
         if (isHexOrOctal && number <= std::numeric_limits<uint32_t>::max()) {
@@ -357,159 +211,146 @@ ParseNumber(const PPToken &ppToken, const SourceInterface &interface) {
     }
   } else {
     auto input = (*begin == '.' ? "0" : "") + std::string(begin, suffixBegin);
-    char* endptr = nullptr;
     if (suffix.empty()) {
-      double d = std::strtod(input.c_str(), &endptr);
-      if (endptr) {
-        LCC_UNREACHABLE;
-      }
-      return d;
+      return std::strtod(input.c_str(), nullptr);
     }
     if (suffix == "f" || suffix == "F") {
-      float d = std::strtof(input.c_str(), &endptr);
-      if (endptr) {
-        LCC_UNREACHABLE;
-      }
-      return d;
+      return std::strtof(input.c_str(), nullptr);
     }
     if (suffix == "l" || suffix == "L") {
-      double d = std::strtod(input.c_str(), &endptr);
-      if (endptr) {
-        LCC_UNREACHABLE;
-      }
-      return d;
+      return std::strtod(input.c_str(), nullptr);
     }
   }
   LCC_UNREACHABLE;
 }
 
-tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
+tok::TokenKind Lexer::ParsePunctuation(uint32_t & offset, char curChar, char nextChar,
                                 char nnChar) {
   tok::TokenKind type = tok::unknown;
   switch (curChar) {
   case '[': {
     type = tok::l_square;
-    ++pos;
+    ++offset;
     break;
   }
   case ']': {
     type = tok::r_square;
-    ++pos;
+    ++offset;
     break;
   }
   case '(': {
     type = tok::l_paren;
-    ++pos;
+    ++offset;
     break;
   }
   case ')': {
     type = tok::r_paren;
-    ++pos;
+    ++offset;
     break;
   }
   case '{': {
     type = tok::l_brace;
-    ++pos;
+    ++offset;
     break;
   }
   case '}': {
     type = tok::r_brace;
-    ++pos;
+    ++offset;
     break;
   }
   case '.': {
     if (nextChar == '.' && nnChar == '.') {
-      pos += 3;
+      offset += 3;
       type = tok::ellipsis;
     } else {
-      ++pos;
+      ++offset;
       type = tok::period;
     }
     break;
   }
   case '&': {
     if (nextChar == '&') {
-      pos += 2;
+      offset += 2;
       type = tok::amp_amp;
     } else if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::amp_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::amp;
     }
     break;
   }
   case '*': {
     if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::star_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::star;
     }
     break;
   }
   case '+': {
     if (nextChar == '+') {
-      pos += 2;
+      offset += 2;
       type = tok::plus_plus;
     } else if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::plus_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::plus;
     }
     break;
   }
   case '-': {
     if (nextChar == '>') {
-      pos += 2;
+      offset += 2;
       type = tok::arrow;
     } else if (nextChar == '-') {
-      pos += 2;
+      offset += 2;
       type = tok::minus_minus;
     } else if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::minus_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::minus;
     }
     break;
   }
   case '~': {
-    ++pos;
+    ++offset;
     type = tok::tilde;
     break;
   }
   case '!': {
     if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::exclaim_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::exclaim;
     }
     break;
   }
   case '/': {
     if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::slash_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::slash;
     }
     break;
   }
   case '%': {
     if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::percent_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::percent;
     }
     break;
@@ -517,17 +358,17 @@ tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
   case '<': {
     if (nextChar == '<') {
       if (nnChar == '=') {
-        pos += 3;
+        offset += 3;
         type = tok::less_less_equal;
       } else {
-        pos += 2;
+        offset += 2;
         type = tok::less_less;
       }
     } else if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::less_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::less;
     }
     break;
@@ -535,37 +376,37 @@ tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
   case '>': {
     if (nextChar == '>') {
       if (nnChar == '=') {
-        pos += 3;
+        offset += 3;
         type = tok::greater_greater_equal;
       } else {
-        pos += 2;
+        offset += 2;
         type = tok::greater_greater;
       }
     } else if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::greater_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::greater;
     }
     break;
   }
   case '^': {
     if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::caret_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::caret;
     }
     break;
   }
   case '|': {
     if (nextChar == '|') {
-      pos += 2;
+      offset += 2;
       type = tok::pipe_pipe;
     } else if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::pipe_equal;
     } else {
       type = tok::pipe;
@@ -573,41 +414,41 @@ tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
     break;
   }
   case '?': {
-    ++pos;
+    ++offset;
     type = tok::question;
     break;
   }
   case ':': {
-    ++pos;
+    ++offset;
     type = tok::colon;
     break;
   }
   case ';': {
-    ++pos;
+    ++offset;
     type = tok::semi;
     break;
   }
   case ',': {
-    ++pos;
+    ++offset;
     type = tok::comma;
     break;
   }
   case '=': {
     if (nextChar == '=') {
-      pos += 2;
+      offset += 2;
       type = tok::equal_equal;
     } else {
-      ++pos;
+      ++offset;
       type = tok::equal;
     }
     break;
   }
   case '#': {
     if (nextChar == '#') {
-      pos += 2;
+      offset += 2;
       type = tok::pp_hashhash;
     } else {
-      ++pos;
+      ++offset;
       type = tok::pp_hash;
     }
     break;
@@ -617,112 +458,36 @@ tok::TokenKind ParsePunctuation(uint32_t &pos, char curChar, char nextChar,
   }
   return type;
 }
-
-tok::TokenKind GetKeywordTokenType(std::string_view characters) {
-  static std::unordered_map<std::string_view, tok::TokenKind> hashTable = {
-      {"auto", tok::kw_auto},
-      {"double", tok::kw_double},
-      {"int", tok::kw_int},
-      {"struct", tok::kw_struct},
-      {"break", tok::kw_break},
-      {"else", tok::kw_else},
-      {"long", tok::kw_long},
-      {"switch", tok::kw_switch},
-      {"case", tok::kw_case},
-      {"enum", tok::kw_enum},
-      {"register", tok::kw_register},
-      {"typedef", tok::kw_typedef},
-      {"char", tok::kw_char},
-      {"extern", tok::kw_extern},
-      {"return", tok::kw_return},
-      {"union", tok::kw_union},
-      {"const", tok::kw_const},
-      {"float", tok::kw_float},
-      {"short", tok::kw_short},
-      {"unsigned", tok::kw_unsigned},
-      {"continue", tok::kw_continue},
-      {"for", tok::kw_for},
-      {"signed", tok::kw_signed},
-      {"default", tok::kw_default},
-      {"goto", tok::kw_goto},
-      {"sizeof", tok::kw_sizeof},
-      {"volatile", tok::kw_volatile},
-      {"do", tok::kw_do},
-      {"if", tok::kw_if},
-      {"static", tok::kw_static},
-      {"while", tok::kw_while},
-      {"void", tok::kw_void},
-      {"restrict", tok::kw_restrict},
-      {"inline", tok::kw_inline}};
-  if (hashTable.find(characters) != hashTable.end()) {
-    return hashTable[characters];
-  }
-  return tok::identifier;
-}
-
-PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePath) {
-
-  /// check BOM header
-  constexpr static std::string_view UTF8_BOM = "\xef\xbb\xbf";
-  if (sourceCode.size() >= 3 && sourceCode.substr(0, 3) == UTF8_BOM) {
-    sourceCode = sourceCode.substr(3);
-  }
-
-  /// compatible with windows
-  {
-    std::string::size_type pos = 0;
-    while ((pos = sourceCode.find("\r\n", pos)) != sourceCode.npos) {
-      sourceCode.erase(pos, 1);
-    }
-  }
-  sourceCode.shrink_to_fit();
-
-  /// calculate start offset per line
-  uint32_t offset = 0;
-  std::vector<uint32_t> lineStartOffset = {offset};
-  for (auto &ch : sourceCode) {
-    offset++;
-    if (ch == '\n') {
-      lineStartOffset.push_back(offset);
-    }
-  }
-  lineStartOffset.push_back(offset + 1);
-  lineStartOffset.shrink_to_fit();
-
+std::vector<Token> Lexer::tokenize() {
   /// variables used each time
-  std::vector<PPToken> results;
-  offset = 0;
-  uint32_t tokenStartOffset = 0;
-  bool leadingWhiteSpace = false;
+  std::vector<Token> results;
 
-  char delimiter;
-  std::string characters;
-  State state = State::Start;
+  uint32_t offset = 0;
 
-  auto InsertToken = [&](uint32_t start, uint32_t end, tok::TokenKind tokenKind,
+  auto InsertToken = [&](uint32_t startOffset, uint32_t endOffset, tok::TokenKind tokenKind,
                          std::string value = {}) {
-    auto &newToken = results.emplace_back(tokenKind, start, end - start, 0, 0,
+    auto &newToken = results.emplace_back(tokenKind, startOffset, endOffset - startOffset, mSourceFile,
                                           std::move(value));
     newToken.setLeadingWhitespace(leadingWhiteSpace);
     leadingWhiteSpace = false;
     characters.clear();
   };
 
+  std::string_view sourceCode = mSourceFile.sourceCode;
   while (offset < sourceCode.size()) {
-    char curChar = (offset < sourceCode.size() ? sourceCode[offset] : ' ');
-    std::string debugStr = sourceCode.substr(offset);
+    char curChar = (offset < sourceCode.size() ? sourceCode[offset] : '\0');
     char nextChar =
         (offset < sourceCode.size() - 1) ? sourceCode[offset + 1] : '\0';
 
     switch (state) {
     case State::Start: {
-      if (util::IsLetter(curChar)) {
+      if ( IsLetter(curChar)) {
         state = State::Identifier;
         tokenStartOffset = offset;
         break;
       }
-      if (util::IsDigit(curChar) ||
-          (curChar == '.' && util::IsDigit(nextChar))) {
+      if ( IsDigit(curChar) ||
+          (curChar == '.' &&  IsDigit(nextChar))) {
         state = State::Number;
         tokenStartOffset = offset;
         break;
@@ -736,7 +501,7 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
         if (results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
-            results[results.size() - 1].getValue() == "include") {
+            results[results.size() - 1].getContent() == "include") {
           state = State::AfterInclude;
           delimiter = '"';
           tokenStartOffset = offset++;
@@ -767,11 +532,11 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
         break;
       }
       /// Line comments and block comments need to be processed first
-      if (util::IsPunctuation(curChar)) {
+      if ( IsPunctuation(curChar)) {
         if (curChar == '<' && results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
-            results[results.size() - 1].getValue() == "include") {
+            results[results.size() - 1].getContent() == "include") {
           state = State::AfterInclude;
           delimiter = '>';
           tokenStartOffset = offset++;
@@ -782,14 +547,12 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
         break;
       }
       /// last process
-      if (util::IsWhiteSpace(curChar)) {
+      if (IsWhiteSpace(curChar)) {
         leadingWhiteSpace = true;
         offset++;
         break;
       }
-      std::cerr << "offset: " << tokenStartOffset
-                << ", illegal char: " << curChar << std::endl;
-      LCC_ASSERT(0);
+      LOGE(GetLine(tokenStartOffset), GetColumn(tokenStartOffset), "illegal char");
       break;
     }
     case State::CharacterLiteral: {
@@ -815,7 +578,7 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
       break;
     }
     case State::Identifier: {
-      if (util::IsLetter(curChar) || util::IsDigit(curChar)) {
+      if ( IsLetter(curChar) ||  IsDigit(curChar)) {
         characters += curChar;
         offset++;
       } else {
@@ -834,7 +597,7 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
             (curChar != 'p' && curChar != 'P') &&
             (curChar != 'f' && curChar != 'F') &&
             (curChar != 'u' && curChar != 'U') &&
-            (curChar != 'l' && curChar != 'L') && !util::IsDigit(curChar) &&
+            (curChar != 'l' && curChar != 'L') && ! IsDigit(curChar) &&
             (curChar != '.') &&
             (((characters.back() | toLower) != 'e' &&
               (characters.back() | toLower) != 'p') ||
@@ -854,7 +617,7 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
           (offset < sourceCode.size() - 2) ? sourceCode[offset + 2] : '\0';
       tok::TokenKind tk = ParsePunctuation(offset, curChar, nextChar, nnChar);
       LCC_ASSERT(tk != tok::unknown);
-      InsertToken(tokenStartOffset, offset, tk);
+      InsertToken(tokenStartOffset, offset, tk, tok::getPunctuatorSpelling(tk));
       state = State::Start;
       break;
     }
@@ -889,74 +652,225 @@ PPTokenObject Lexer::tokenize(std::string &sourceCode, std::string_view sourcePa
         state = State::Start;
         break;
       }
-      std::cerr << "offset: " << tokenStartOffset
-                << ", illegal newline in after include" << std::endl;
-      LCC_ASSERT(0);
+      LOGE(GetLine(tokenStartOffset), GetColumn(tokenStartOffset), "illegal newline in after include");
     }
     }
   }
-  return PPTokenObject(std::move(results),
-                  {Source::File{std::string(sourcePath), std::move(sourceCode),
-                                std::move(lineStartOffset)}});
+  results.shrink_to_fit();
+
+  if (mLangOption == LanguageOption::C) {
+    return toCTokens(std::move(results));
+  }
+
+  return results;
 }
 
-CTokenObject Lexer::toCTokens(PPTokenObject &&ppTokens) {
-  std::vector<CToken> result;
-  for (auto &iter : ppTokens.data()) {
+std::vector<Token> Lexer::toCTokens(std::vector<Token>&& ppTokens) {
+  std::vector<Token> results;
+  for (auto &iter : ppTokens) {
     switch (iter.getTokenKind()) {
     case tok::pp_hash:
     case tok::pp_hashhash:
     case tok::pp_backslash:
-      logErr(iter.getLine(ppTokens), iter.getColumn(ppTokens), "illegal token kind in c token");
+      LOGE(iter.getLine(), iter.getColumn(), "illegal token kind in c token");
       break;
     case tok::pp_newline:
       break;
     case tok::identifier: {
-      result.emplace_back(GetKeywordTokenType(iter.getValue()),
-                          iter.getOffset(), iter.getLength(), iter.getFileId(),
-                          iter.getMacroId(), lcc::to_string(iter.getValue()));
+      iter.setTokenKind(tok::getKeywordTokenType(iter.getContent()));
+      results.push_back(iter);
       break;
     }
     case tok::pp_number: {
-      auto number = ParseNumber(iter, ppTokens);
-      result.emplace_back(tok::numeric_constant, iter.getOffset(),
-                          iter.getLength(), iter.getFileId(), iter.getMacroId(),
-                          number);
+      auto number = ParseNumber(iter);
+      iter.setTokenKind(tok::numeric_constant);
+      iter.setValue(number);
+      results.push_back(iter);
       break;
     }
     case tok::string_literal: {
-      auto cToken = ParseStringLiteral(iter, ppTokens);
-      result.push_back(std::move(cToken));
+      auto str = ParseStringLiteral(iter);
+      iter.setTokenKind(tok::string_literal);
+      iter.setValue(str);
+      results.push_back(iter);
       break;
     }
     case tok::char_constant: {
-      auto chars = processCharacters(iter.getValue());
-      if (!chars) {
-        logErr(iter.getLine(ppTokens), iter.getLine(ppTokens), "process char constant error");
+      auto chars = ProcessCharacters(iter.getContent());
+      if (!chars || chars.value().empty() || chars.value().size() > 1) {
+        LOGE(iter.getLine(), iter.getLine(), "process char constant error");
         break;
       }
-      if (chars.value().empty()) {
-        logErr(iter.getLine(ppTokens), iter.getColumn(ppTokens), "character literal cannot be empty");
-        break;
-      }
-      if (chars.value().size() > 1) {
-        logErr(iter.getLine(ppTokens), iter.getColumn(ppTokens), "character literal size more than 1");
-        break;
-      }
-      result.emplace_back(
-          tok::char_constant, iter.getOffset(), iter.getLength(),
-          iter.getFileId(), iter.getMacroId(),
-          (int32_t)chars.value()[0]);
+      iter.setTokenKind(tok::char_constant);
+      iter.setValue((int32_t)chars.value()[0]);
+      results.push_back(iter);
       break;
     }
     default:
-      result.emplace_back(iter.getTokenKind(), iter.getOffset(),
-                          iter.getLength(), iter.getFileId(),
-                          iter.getMacroId());
+      iter.setValue(tok::getPunctuatorSpelling(iter.getTokenKind()));
+      results.push_back(iter);
     }
   }
-  result.shrink_to_fit();
-  return CTokenObject(std::move(result),
-                 {ppTokens.getFiles().begin(), ppTokens.getFiles().end()});
+  results.shrink_to_fit();
+  return results;
+}
+
+bool Lexer::IsLetter(char ch) {
+  if (ch == '_') {
+    return true;
+  }
+  if (ch >= 'a' && ch <= 'z') {
+    return true;
+  }
+  if (ch >= 'A' && ch <= 'Z') {
+    return true;
+  }
+  return false;
+}
+
+bool Lexer::IsWhiteSpace(char ch) {
+  return (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r' || ch == '\f' ||
+          ch == '\v');
+}
+
+bool Lexer::IsDigit(char ch) { return ch >= '0' && ch <= '9'; }
+
+bool Lexer::IsOctDigit(char ch) {return ch >= '0' && ch <= '7';}
+
+bool Lexer::IsHexDigit(char ch) {
+  return IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+}
+
+bool Lexer::IsPunctuation(char ch) {
+  return ch == '[' || ch == ']' || ch == '(' || ch == ')' || ch == '{' ||
+         ch == '}' || ch == '.' || ch == '&' || ch == '*' || ch == '+' ||
+         ch == '-' || ch == '~' || ch == '!' || ch == '/' || ch == '%' ||
+         ch == '<' || ch == '>' || ch == '^' || ch == '|' || ch == '?' ||
+         ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
+}
+
+uint32_t Lexer::GetLine(uint32_t offset) const {
+  auto result = std::lower_bound(mSourceFile.lineStartOffsets.begin(), mSourceFile.lineStartOffsets.end(), offset);
+  return std::distance(mSourceFile.lineStartOffsets.begin(), result) + ((*result == offset) ? 1 : 0);
+}
+
+uint32_t Lexer::GetColumn(uint32_t offset) const {
+  uint32_t line = GetLine(offset);
+  return offset - mSourceFile.lineStartOffsets[line - 1] + 1;
+}
+
+uint32_t Lexer::OctalToNum(std::string_view value)
+{
+  std::uint32_t result;
+  auto errors = std::from_chars(value.data(), value.data() + value.size(), result, 8);
+  LCC_ASSERT(errors.ec == std::errc{});
+  return result;
+}
+
+std::optional<std::uint32_t> Lexer::EscapeCharToValue(char escape) {
+  switch (escape) {
+  case '\\':
+    return '\\';
+  case '\'':
+    return '\'';
+  case '"':
+    return '"';
+  case 'a':
+    return '\a';
+  case 'b':
+    return '\b';
+  case 'f':
+    return '\f';
+  case 'n':
+    return '\n';
+  case 'r':
+    return '\r';
+  case 't':
+    return '\t';
+  case 'v':
+    return '\v';
+  case '?':
+    return '\?';
+  default:
+    return {};
+  }
+  return 0;
+}
+
+std::optional<std::vector<char>> Lexer::ProcessCharacters(std::string_view characters) {
+  std::vector<char> result;
+  result.reserve(characters.size());
+  int offset = 0, resultStart = 0;
+  while (offset < characters.size()) {
+    char ch = characters[offset];
+    if (ch == '\n') {
+      return {};
+    }
+    if (ch != '\\') {
+      result.push_back(ch);
+      resultStart++;
+      offset++;
+      continue;
+    }
+    if (offset + 1 == characters.size()) {
+      break;
+    }
+    if (characters[offset+1] == 'x') {
+      offset += 2;
+      int lastHex = offset;
+      while (lastHex < characters.size()) {
+        if (IsHexDigit(characters[lastHex])) {
+          lastHex++;
+          continue;
+        }
+        break;
+      }
+      if (offset == lastHex) {
+        /// error at least one hexadecimal digit required
+        return {};
+      }
+      std::string_view sv(characters.data()+offset, lastHex-offset);
+      auto value = std::strtol(sv.data(), nullptr, 16);
+      result.push_back((char)value);
+      resultStart++;
+      offset = lastHex;
+      break;
+    }
+    /// '\0' is octal char
+    else if ( IsDigit(characters[offset+1])) {
+      offset++;
+      int start = offset;
+      /// first octal char must be oct char
+      if (! IsOctDigit(characters[offset])) {
+        return {};
+      }
+      /// first octal char
+      if ( IsOctDigit(characters[offset])) {
+        offset++;
+      }
+      /// second octal char
+      if ( IsOctDigit(characters[offset])) {
+        offset++;
+      }
+      /// third octal char
+      if ( IsOctDigit(characters[offset])) {
+        offset++;
+      }
+      auto value = OctalToNum(characters.substr(start, offset-start));
+      result.push_back((char)value);
+      resultStart++;
+      break;
+    }else {
+      auto character = EscapeCharToValue(characters[offset + 1]);
+      if (!character) {
+        return {};
+      }
+      result.push_back((char)character.value());
+      resultStart++;
+      offset += 2;
+    }
+  }
+  result.resize(resultStart);
+  return result;
 }
 } // namespace lcc

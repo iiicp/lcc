@@ -34,32 +34,6 @@
   } while (0)
 
 namespace lcc {
-template <class T, class = void>
-struct ToString : std::false_type
-{
-};
-
-template <class T>
-struct ToString<T, std::void_t<decltype(std::to_string(std::declval<T>()))>> : std::true_type
-{
-};
-
-template <class T, class = std::enable_if_t<ToString<T>{}>>
-std::string to_string(T value)
-{
-  return std::to_string(value);
+void LOGE(uint32_t row, uint32_t col, const std::string &msg);
 }
-
-std::string to_string(const llvm::APSInt& apsInt);
-
-std::string to_string(const llvm::APFloat& apFloat);
-
-inline std::string to_string(std::string_view stringView)
-{
-  return std::string(stringView.begin(), stringView.end());
-}
-
-void logErr(int32_t row, int32_t col, std::string msg);
-}
-
 #endif // LCC_UTILITIES_H

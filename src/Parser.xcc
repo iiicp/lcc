@@ -113,19 +113,118 @@ Syntax::TranslationUnit Parser::ParseTranslationUnit() {
   return Syntax::TranslationUnit(std::move(decls));
 }
 
+std::vector<Syntax::DeclarationSpecifier> Parser::ParseDeclarationSpecifierList() {
+  std::vector<Syntax::DeclarationSpecifier> declarationSpecifiers;
+  while (IsFirstInDeclarationSpecifier()) {
+    auto result = ParseDeclarationSpecifier();
+    if (result) {
+      declarationSpecifiers.push_back(std::move(*result));
+    }
+  }
+  return declarationSpecifiers;
+}
+
+std::vector<Syntax::SpecifierQualifier> Parser::ParseSpecifierQualifierList() {
+  std::vector<Syntax::SpecifierQualifier> specifierQualifiers;
+  while (IsFirstInSpecifierQualifier()) {
+    auto result = ParseSpecifierQualifier();
+    if (result) {
+      specifierQualifiers.push_back(std::move(*result));
+    }
+  }
+  return specifierQualifiers;
+}
+
+std::optional<Syntax::Declaration> Parser::FinishDeclaration(
+    std::vector<Syntax::DeclarationSpecifier> &&declarationSpecifiers,
+    std::optional<Syntax::Declarator> alreadyParsedDeclarator) {
+  std::vector<Syntax::Declaration::InitDeclarator> initDeclarators;
+  if (alreadyParsedDeclarator) {
+    if (!Peek(tok::equal)) {
+      initDeclarators.push_back({
+          std::make_unique<Syntax::Declarator>
+              (std::move(*alreadyParsedDeclarator)),nullptr});
+    }else {
+      Consume(tok::semi);
+      auto initializer = ParseInitializer();
+      if (initializer) {
+        initDeclarators.push_back({
+            std::make_unique<Syntax::Declarator>(std::move(*alreadyParsedDeclarator)),
+                std::make_unique<Syntax::Initializer>(std::move(*initializer))});
+      }else {
+        initDeclarators.push_back({
+            std::make_unique<Syntax::Declarator>
+            (std::move(*alreadyParsedDeclarator)),nullptr});
+      }
+    }
+  }
+  else {
+    auto declarator = ParseDeclarator();
+    if (!Peek(tok::equal)) {
+      if (declarator) {
+        initDeclarators.push_back({
+            std::make_unique<Syntax::Declarator>
+            (std::move(*declarator)),nullptr});
+      }
+    }else {
+      Consume(tok::equal);
+      auto initializer = ParseInitializer();
+      if (declarator && initializer) {
+        initDeclarators.push_back(
+            {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+             std::make_unique<Syntax::Initializer>(std::move(*initializer))});
+      } else if (declarator) {
+        initDeclarators.push_back(
+            {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+             nullptr});
+      }
+
+      while (Peek(tok::comma)) {
+        Consume(tok::comma);
+        declarator = ParseDeclarator();
+        if (!Peek(tok::equal)) {
+          if (declarator) {
+            initDeclarators.push_back(
+                {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+                 nullptr});
+          }
+        } else {
+          Consume(tok::equal);
+          initializer = ParseInitializer();
+          if (declarator && initializer) {
+            initDeclarators.push_back(
+                {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+                 std::make_unique<Syntax::Initializer>(
+                     std::move(*initializer))});
+          } else if (declarator) {
+            initDeclarators.push_back(
+                {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+                 nullptr});
+          }
+        }
+      }
+    }
+  }
+  Expect(tok::semi);
+  Consume(tok::semi);
+  return Syntax::Declaration(std::move(declarationSpecifiers), std::move(initDeclarators));
+}
+
 std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
-  auto curr = mTokCursor;
-  // backtracking
-  auto function = ParseFunctionDefinition();
-  if (function) {
-    return Syntax::ExternalDeclaration(std::move(*function));
+  auto declarationSpecifiers = ParseDeclarationSpecifierList();
+  if (Peek(tok::semi)) {
+    return Syntax::Declaration(std::move(declarationSpecifiers), {});
   }
-  mTokCursor = curr;
-  if (auto declaration = ParseDeclaration(); declaration) {
-    return Syntax::ExternalDeclaration(std::move(*declaration));
+  auto declarator = ParseDeclarator();
+  if (Peek(tok::l_brace)) {
+    mScope.pushScope();
+    auto compoundStmt = ParseBlockStmt();
+    mScope.popScope();
+    if (!declarator || !compoundStmt)
+      return {};
   }
-  LCC_UNREACHABLE;
-  return {};
+  return FinishDeclaration(std::move(declarationSpecifiers),
+                           std::move(declarator));
 }
 
 /// declaration: declaration-specifiers init-declarator-list{opt} ;
@@ -495,7 +594,7 @@ std::optional<Syntax::Declarator> Parser::ParseDeclarator() {
   return Syntax::Declarator(std::move(pointers), std::move(*directDeclarator));
 }
 
-std::optional<Syntax::DirectDeclaratorSquare>
+std::optional<Syntax::DirectDeclaratorAssignExpr>
 Parser::ParseDirectDeclaratorSquare(Syntax::DirectDeclarator &declarator) {
   assert(Match(tok::l_square));
   std::vector<Syntax::TypeQualifier> typeQualifiers;
@@ -523,7 +622,7 @@ Parser::ParseDirectDeclaratorSquare(Syntax::DirectDeclarator &declarator) {
   }
   auto assignment = ParseAssignExpr();
   Consume(tok::r_square);
-  return Syntax::DirectDeclaratorSquare(
+  return Syntax::DirectDeclaratorAssignExpr(
       std::make_unique<Syntax::DirectDeclarator>(std::move(declarator)),
       std::move(typeQualifiers),
       assignment ? std::make_unique<Syntax::AssignExpr>(std::move(*assignment))
@@ -560,7 +659,7 @@ std::optional<Syntax::DirectDeclarator> Parser::ParseDirectDeclarator() {
           if (!parameterTypeList)
             return {};
           directDeclarator = std::make_unique<Syntax::DirectDeclarator>(
-              Syntax::DirectDeclaratorParentParameters(
+              Syntax::DirectDeclaratorParentParamTypeList(
                   std::move(*directDeclarator), std::move(*parameterTypeList)));
         } else {
           LCC_UNREACHABLE;
@@ -602,7 +701,7 @@ parameter-type-list:
   parameter-list
   parameter-list , ...
  */
-std::optional<Syntax::ParameterTypeList> Parser::ParseParameterTypeList() {
+std::optional<Syntax::ParamTypeList> Parser::ParseParameterTypeList() {
   auto cur = mTokCursor;
   auto parameterList = ParseParameterList();
   if (!parameterList)
@@ -613,7 +712,7 @@ std::optional<Syntax::ParameterTypeList> Parser::ParseParameterTypeList() {
     assert(Match(tok::ellipsis));
     hasEllipse = true;
   }
-  return Syntax::ParameterTypeList(std::move(*parameterList), hasEllipse);
+  return Syntax::ParamTypeList(std::move(*parameterList), hasEllipse);
 }
 
 /**
@@ -621,7 +720,7 @@ parameter-list:
     parameter-declaration
     parameter-list , parameter-declaration
  */
-std::optional<Syntax::ParameterList> Parser::ParseParameterList() {
+std::optional<Syntax::ParamList> Parser::ParseParameterList() {
   std::vector<Syntax::ParameterDeclaration> parameterDeclarations;
   auto declaration = ParseParameterDeclaration();
   if (!declaration)
@@ -634,7 +733,7 @@ std::optional<Syntax::ParameterList> Parser::ParseParameterList() {
       return {};
     parameterDeclarations.push_back(std::move(*declaration));
   }
-  return Syntax::ParameterList(std::move(parameterDeclarations));
+  return Syntax::ParamList(std::move(parameterDeclarations));
 }
 /**
 parameter-declaration:
@@ -809,9 +908,9 @@ Parser::ParseDirectAbstractDeclarator() {
           return {};
         directAbstractDeclarator =
             std::make_unique<Syntax::DirectAbstractDeclarator>(
-                Syntax::DirectAbstractDeclaratorParameterTypeList(
+                Syntax::DirectAbstractDeclaratorParamTypeList(
                     std::move(directAbstractDeclarator),
-                    std::make_unique<Syntax::ParameterTypeList>(
+                    std::make_unique<Syntax::ParamTypeList>(
                         std::move(*parameterTypeList))));
       }
       /// abstract-declarator first set
@@ -827,7 +926,7 @@ Parser::ParseDirectAbstractDeclarator() {
         /// direct-abstract-declarator{opt} ( parameter-type-list{opt} )
         directAbstractDeclarator =
             std::make_unique<Syntax::DirectAbstractDeclarator>(
-                Syntax::DirectAbstractDeclaratorParameterTypeList(
+                Syntax::DirectAbstractDeclaratorParamTypeList(
                     std::move(directAbstractDeclarator), nullptr));
       }
       assert(Match(tok::r_paren));
@@ -848,14 +947,14 @@ Parser::ParseDirectAbstractDeclarator() {
           }
           directAbstractDeclarator =
               std::make_unique<Syntax::DirectAbstractDeclarator>(
-                  Syntax::DirectAbstractDeclaratorAssignmentExpression(
+                  Syntax::DirectAbstractDeclaratorAssignExpr(
                       std::move(directAbstractDeclarator),
                       std::make_unique<Syntax::AssignExpr>(
                           std::move(*assignment))));
         } else {
           directAbstractDeclarator =
               std::make_unique<Syntax::DirectAbstractDeclarator>(
-                  Syntax::DirectAbstractDeclaratorAssignmentExpression(
+                  Syntax::DirectAbstractDeclaratorAssignExpr(
                       std::move(directAbstractDeclarator), nullptr));
         }
       }
@@ -910,7 +1009,7 @@ std::optional<Syntax::EnumSpecifier> Parser::ParseEnumSpecifier() {
   return Syntax::EnumSpecifier(std::move(name));
 }
 
-std::optional<Syntax::EnumDeclaration>
+std::optional<Syntax::EnumeratorList>
 Parser::ParseEnumDeclaration(std::string enumName) {
   Expect(tok::l_brace);
   Consume(tok::l_brace);
@@ -927,7 +1026,7 @@ Parser::ParseEnumDeclaration(std::string enumName) {
     values.emplace_back(valueName, value);
   }
   assert(Match(tok::r_brace));
-  return Syntax::EnumDeclaration(std::move(enumName), values);
+  return Syntax::EnumeratorList(std::move(enumName), values);
 }
 
 /**
@@ -951,7 +1050,7 @@ std::optional<Syntax::FunctionDefinition> Parser::ParseFunctionDefinition() {
     return {};
   mScope.addToScope(Semantics::declaratorToName(*declarator));
   mScope.pushScope();
-  auto *parameters = std::get_if<Syntax::DirectDeclaratorParentParameters>(
+  auto *parameters = std::get_if<Syntax::DirectDeclaratorParentParamTypeList>(
       &declarator->getDirectDeclarator().getVariant());
   assert(parameters);
   {
@@ -987,7 +1086,7 @@ std::optional<Syntax::FunctionDefinition> Parser::ParseFunctionDefinition() {
               [&](auto &&value) -> std::string { return self(value); },
               value->getDirectDeclarator().getVariant());
         } else if constexpr (!std::is_same_v<
-                                 T, Syntax::DirectDeclaratorParentParameters>) {
+                                 T, Syntax::DirectDeclaratorParentParamTypeList>) {
           return std::visit(
               [&](auto &&value) -> std::string { return self(value); },
               value.getDirectDeclarator().getVariant());
@@ -1779,7 +1878,7 @@ std::optional<Syntax::PostFixExpr> Parser::ParsePostFixExpr() {
         return {};
       }
       stack.push(std::make_unique<Syntax::PostFixExpr>(
-          Syntax::PostFixExprPrimary(std::move(*newPrimary))));
+          Syntax::PostFixExprPrimaryExpr(std::move(*newPrimary))));
     } else if (tokType == tok::l_paren) {
       Consume(tok::l_paren);
       std::vector<Syntax::AssignExpr> params;
@@ -1855,7 +1954,7 @@ std::optional<Syntax::PrimaryExpr> Parser::ParsePrimaryExpr() {
   if (Peek(tok::identifier)) {
     std::string identifier = std::get<std::string>(mTokCursor->getValue());
     Consume(tok::identifier);
-    return Syntax::PrimaryExpr(Syntax::PrimaryExprIdentifier(identifier));
+    return Syntax::PrimaryExpr(Syntax::PrimaryExprIdent(identifier));
   } else if (Peek(tok::char_constant) || Peek(tok::numeric_constant) ||
              Peek(tok::string_literal)) {
     auto cur = mTokCursor;

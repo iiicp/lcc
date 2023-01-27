@@ -170,7 +170,7 @@ Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExprParent &node) {
 }
 
 Semantics::ConstRetType
-Semantics::ConstantEvaluator::visit(const Syntax::PostFixExprPrimary &node) {
+Semantics::ConstantEvaluator::visit(const Syntax::PostFixExprPrimaryExpr &node) {
   return visit(node.getPrimaryExpr());
 }
 
@@ -993,7 +993,7 @@ Semantics::ConstRetType
 Semantics::ConstantEvaluator::visit(const Syntax::PrimaryExpr &node) {
   return std::visit(
       overload{[this](auto &&value) -> ConstRetType { return visit(value); },
-               [](const Syntax::PrimaryExprIdentifier &) -> ConstRetType {
+               [](const Syntax::PrimaryExprIdent &) -> ConstRetType {
                  return FailureReason(
                      "Identifier not allowed in constant expression");
                }},

@@ -12,6 +12,7 @@
 #include "Utilities.h"
 #include <algorithm>
 #include <charconv> // std::from_chars
+#include <set>
 
 namespace lcc {
 
@@ -74,7 +75,8 @@ int c = 0x123lu;
 float a1 = 0x.ffp-3;
  */
 Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
-  std::string_view character = ppToken.getContent();
+  std::string content = ppToken.getContent();
+  std::string_view character = content;
   const char *begin = character.begin(), *end = character.end();
   LCC_ASSERT(std::distance(begin, end) >= 1);
   /// If the number is just "0x", treat the x as a suffix instead of as a hex
@@ -138,16 +140,14 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
   auto suffix = std::string_view(suffixBegin, std::distance(suffixBegin, end));
   bool valid;
   if (!isFloat) {
-    constexpr std::array variants = {"u",   "U",   "ul",  "Ul",  "uL",  "UL",
+    static std::set<std::string_view> variants = {"u",   "U",   "ul",  "Ul",  "uL",  "UL",
                                      "uLL", "ULL", "ull", "Ull", "lu",  "lU",
                                      "Lu",  "LU",  "LLu", "LLU", "llu", "llU",
                                      "l",   "L",   "ll",  "LL",  ""};
-    valid =
-        std::find(variants.begin(), variants.end(), suffix) != variants.end();
+    valid = variants.find(suffix) != variants.end();
   } else {
-    constexpr std::array variants = {"f", "l", "F", "L", ""};
-    valid =
-        std::find(variants.begin(), variants.end(), suffix) != variants.end();
+    static std::set<std::string_view> variants = {"f", "l", "F", "L", ""};
+    valid = variants.find(suffix) != variants.end();
   }
   if (!valid) {
     LOGE(ppToken.getLine(), ppToken.getColumn(), "invalid literal suffix");

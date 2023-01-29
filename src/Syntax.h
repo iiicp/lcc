@@ -334,10 +334,10 @@ private:
   std::unique_ptr<InitializerList> mInitializerList;
 
 public:
-  PostFixExprTypeInitializer(std::unique_ptr<TypeName> &&typeName,
-                             std::unique_ptr<InitializerList> &&initializerList)
-      : mTypeName(std::move(typeName)),
-        mInitializerList(std::move(initializerList)) {}
+  PostFixExprTypeInitializer(TypeName &&typeName,
+                             InitializerList &&initializerList)
+      : mTypeName(std::make_unique<TypeName>(std::move(typeName))),
+        mInitializerList(std::make_unique<InitializerList>(std::move(initializerList))) {}
 
   [[nodiscard]] const InitializerList *getInitializerList() const {
     return mInitializerList.get();
@@ -1348,8 +1348,7 @@ public:
  */
 using DirectDeclarator =
     std::variant<DirectDeclaratorIdent, DirectDeclaratorParent,
-                 DirectDeclaratorAssignExpr,
-                 DirectDeclaratorParentParamTypeList>;
+                 DirectDeclaratorAssignExpr,DirectDeclaratorParentParamTypeList>;
 
 /**
  * direct-declarator:
@@ -1390,10 +1389,9 @@ class DirectDeclaratorParentParamTypeList final : public Node {
   ParamTypeList mParameterTypeList;
 
 public:
-  DirectDeclaratorParentParamTypeList(DirectDeclarator &&directDeclarator,
+  DirectDeclaratorParentParamTypeList(std::unique_ptr<DirectDeclarator> &&directDeclarator,
                               ParamTypeList &&parameterTypeList)
-      : mDirectDeclarator(
-            std::make_unique<DirectDeclarator>(std::move(directDeclarator))),
+      : mDirectDeclarator(std::move(directDeclarator)),
         mParameterTypeList(std::move(parameterTypeList)) {}
 
   [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const {
@@ -1521,7 +1519,7 @@ public:
 class EnumeratorList final : public Node {
 public:
   struct Enumerator {
-    std::string_view name;
+    std::string name;
     std::optional<ConstantExpr> value;
   };
 

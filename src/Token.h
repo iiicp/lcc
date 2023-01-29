@@ -34,9 +34,9 @@ public:
       : mLeadingWhiteSpace(false), mTokenKind(tokenKind), mOffset(offset),
         mLength(length), mSourceFile(sourceFile), mValue(std::move(value)){}
 
-//  [[nodiscard]] std::string_view getRepresentation() const {
-//    return mSourceFile.sourceCode.substr(mOffset, mLength);
-//  }
+  [[nodiscard]] std::string_view getRepresentation() const {
+    return mSourceFile.sourceCode.substr(mOffset, mLength);
+  }
 
   std::string getContent() const {
     return std::visit([](auto &&value) -> std::string {

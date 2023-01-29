@@ -18,12 +18,11 @@
 #include <optional>
 #include <map>
 #include <unordered_map>
-#include "Semantics.h"
 namespace lcc {
 class Parser {
 private:
-  const SourceInterface& mSourceInterface;
-  using TokIter = std::vector<CToken>::const_iterator;
+  std::vector<Token> mTokens;
+  using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
   std::set<tok::TokenKind> mFirstPostFixSet;
@@ -49,46 +48,50 @@ public:
   class Scope {
   private:
     struct Symbol {
-      std::string_view identifier;
+      std::string identifier;
       bool isTypedef{};
     };
-    std::vector<std::unordered_map<std::string_view, Symbol>> mCurrentScope;
+    std::vector<std::unordered_map<std::string, Symbol>> mCurrentScope;
   public:
     Scope() {
       mCurrentScope.emplace_back();
     }
-    void addTypedef(std::string_view name);
-    bool isTypedef(std::string_view name) const;
-    bool isTypedefInScope(std::string_view name) const;
-    void addToScope(std::string_view name);
+    void addTypedef(const std::string& name);
+    bool isTypedef(const std::string& name) const;
+    bool isTypedefInScope(const std::string& name) const;
+    void addToScope(const std::string& name);
     void pushScope();
     void popScope();
   };
 private:
   Scope mScope;
 public:
-  explicit Parser(const CTokenObject & sourceObject);
+  explicit Parser(std::vector<Token> && tokens);
   Syntax::TranslationUnit ParseTranslationUnit();
 
 private:
   std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
-  std::optional<Syntax::FunctionDefinition> ParseFunctionDefinition();
+  std::optional<Syntax::Declaration> FinishDeclaration(
+      std::vector<Syntax::DeclarationSpecifier> &&declarationSpecifiers,
+      std::optional<Syntax::Declarator> alreadyParsedDeclarator = {});
   std::optional<Syntax::Declaration> ParseDeclaration();
   std::optional<Syntax::DeclarationSpecifier> ParseDeclarationSpecifier();
+  std::vector<Syntax::DeclarationSpecifier> ParseDeclarationSpecifierList();
   std::optional<Syntax::SpecifierQualifier> ParseSpecifierQualifier();
+  std::vector<Syntax::SpecifierQualifier> ParseSpecifierQualifierList();
   std::optional<Syntax::Declarator> ParseDeclarator();
-  std::optional<Syntax::DirectDeclaratorSquare> ParseDirectDeclaratorSquare(
-      Syntax::DirectDeclarator& declarator);
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
+  std::optional<Syntax::DirectDeclarator> ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator);
   std::optional<Syntax::AbstractDeclarator> ParseAbstractDeclarator();
   std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclarator();
-  std::optional<Syntax::ParameterTypeList> ParseParameterTypeList();
-  std::optional<Syntax::ParameterList> ParseParameterList();
+  std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclaratorSuffix(std::unique_ptr<Syntax::DirectAbstractDeclarator>&& directAbstractDeclarator);
+  std::optional<Syntax::ParamTypeList> ParseParameterTypeList();
+  std::optional<Syntax::ParamList> ParseParameterList();
   std::optional<Syntax::ParameterDeclaration> ParseParameterDeclaration();
-  std::optional<Syntax::Pointer> ParsePointer();
+  Syntax::Pointer ParsePointer();
   std::optional<Syntax::StructOrUnionSpecifier> ParseStructOrUnionSpecifier();
   std::optional<Syntax::EnumSpecifier> ParseEnumSpecifier();
-  std::optional<Syntax::EnumDeclaration> ParseEnumDeclaration(std::string enumName);
+  std::optional<Syntax::EnumeratorList> ParseEnumDeclaration(std::string enumName);
   std::optional<Syntax::Initializer> ParseInitializer();
   std::optional<Syntax::InitializerList> ParseInitializerList();
 
@@ -124,17 +127,17 @@ private:
   std::optional<Syntax::CastExpr> ParseCastExpr();
   std::optional<Syntax::UnaryExpr> ParseUnaryExpr();
   std::optional<Syntax::PostFixExpr> ParsePostFixExpr();
+  void ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& current);
   std::optional<Syntax::PrimaryExpr> ParsePrimaryExpr();
 
   std::optional<Syntax::TypeName> ParseTypeName();
-  bool IsDeclarationSpecifier();
-  bool IsSpecifierQualifier();
   bool IsAssignment(tok::TokenKind type);
   bool Match(tok::TokenKind tokenType);
   bool Expect(tok::TokenKind tokenType);
   bool Consume(tok::TokenKind tokenType);
   bool ConsumeAny();
   bool Peek(tok::TokenKind tokenType);
+  bool PeekN(int n, tok::TokenKind tokenType);
   bool IsUnaryOp(tok::TokenKind tokenType);
   bool IsPostFixExpr(tok::TokenKind tokenType);
 

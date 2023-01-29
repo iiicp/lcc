@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "Lexer.h"
-//#include "Parser.h"
+#include "Parser.h"
 //#include "CodeGen.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
@@ -29,21 +29,11 @@ int main(int argc, char *argv[]) {
     file.seekg(0,std::ios_base::beg);
     file.read(source.data(),source.size());
 
-    lcc::Lexer lexer(source, "<stdin>", lcc::LanguageOption::PreProcess);
-    auto ppTokens = lexer.tokenize();
-    for (auto &tok : ppTokens) {
-        std::cout << "(" << tok.getLine() << "," << tok.getColumn() << ", " << tok.getContent() << ")" << std::endl;
-    }
-    std::cout << "ctoken begin" << std::endl;
-    auto ctokens = lcc::Lexer::toCTokens(std::move(ppTokens));
-    std::cout << "ctoken" << std::endl;
-    for (auto &tok : ctokens) {
-      std::cout << "(" << tok.getLine() << "," << tok.getColumn() << ", " << tok.getContent() << ")" << std::endl;
-    }
-#if 0
+    lcc::Lexer lexer(source);
+    auto tokens = lexer.tokenize();
     lcc::Parser parser(std::move(tokens));
-    auto program = parser.ParseProgram();
-
+    auto translationUnit = parser.ParseTranslationUnit();
+#if 0
     lcc::CodeGenContext context;
     lcc::CodeGen gen(std::move(program), context);
     assert(!llvm::verifyModule(*context.mModule));

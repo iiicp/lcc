@@ -39,22 +39,5 @@ std::string getDeclaratorName(const Syntax::Declarator& declarator) {
       *assignExpr.getDirectDeclarator());
     }};
   return std::visit(YComb{visitor}, declarator.getDirectDeclarator());
-  //  return matchWithSelf(
-//      declarator.getDirectDeclarator(),
-//      [](auto&&, const Syntax::DirectDeclaratorIdent& name) -> std::string
-//      { return name.getIdentifierLoc(); },
-//      [](auto&& self, const Syntax::DirectDeclaratorParent& declarator) -> std::string
-//      {
-//        return match(declarator.getDeclarator()->getDirectDeclarator(),
-//                          [&self](auto&& value) -> std::string { return self(value); });
-//      },
-//      [](auto&& self, const Syntax::DirectDeclaratorParentParamTypeList& paramTypeList) -> std::string
-//      {
-//        return match(*paramTypeList.getDirectDeclarator(),
-//                          [&self](auto&& value) -> std::string { return self(value); });
-//      },
-//      [](auto&& self, const Syntax::DirectDeclaratorAssignExpr& assignExpr) -> std::string {
-//        return match(*assignExpr.getDirectDeclarator(), [&self](auto&& value) -> std::string { return self(value); });
-//      });
 }
 } // namespace lcc

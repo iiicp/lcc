@@ -83,7 +83,7 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
   /// prefix
   bool isHex = character.size() > 2 &&
                (character.starts_with("0x") || character.starts_with("0X")) &&
-                IsHexDigit(character[2]);
+                (IsHexDigit(character[2]) || character[2] == '.');
   std::vector<char> charSet{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   if (isHex) {
     charSet = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
@@ -481,13 +481,13 @@ std::vector<Token> Lexer::tokenize() {
 
     switch (state) {
     case State::Start: {
-      if ( IsLetter(curChar)) {
+      if (IsLetter(curChar)) {
         state = State::Identifier;
         tokenStartOffset = offset;
         break;
       }
-      if ( IsDigit(curChar) ||
-          (curChar == '.' &&  IsDigit(nextChar))) {
+      if (IsDigit(curChar) ||
+          (curChar == '.' && IsDigit(nextChar))) {
         state = State::Number;
         tokenStartOffset = offset;
         break;
@@ -593,15 +593,17 @@ std::vector<Token> Lexer::tokenize() {
         characters += curChar;
         offset++;
       } else {
-        if ((curChar != 'e' && curChar != 'E') &&
-            (curChar != 'p' && curChar != 'P') &&
-            (curChar != 'f' && curChar != 'F') &&
-            (curChar != 'u' && curChar != 'U') &&
-            (curChar != 'l' && curChar != 'L') && ! IsDigit(curChar) &&
-            (curChar != '.') &&
+        char lower_char = (curChar | toLower);
+        if ((lower_char != 'x' || !(characters.size() == 1 && characters.back() == '0')) &&
+            (lower_char != 'e') &&
+            (lower_char != 'p') &&
+            (lower_char != 'f') &&
+            (lower_char != 'u') &&
+            (lower_char != 'l') && !IsHexDigit(lower_char) &&
+            (lower_char != '.') &&
             (((characters.back() | toLower) != 'e' &&
               (characters.back() | toLower) != 'p') ||
-             (curChar != '+' && curChar != '-'))) {
+             (lower_char != '+' && lower_char != '-'))) {
           InsertToken(tokenStartOffset, offset, tok::pp_number, characters);
           state = State::Start;
         } else {

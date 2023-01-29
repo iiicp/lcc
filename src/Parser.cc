@@ -741,7 +741,8 @@ std::optional<Syntax::ParamList> Parser::ParseParameterList() {
   if (!declaration)
     return {};
   parameterDeclarations.push_back(std::move(*declaration));
-  while (Peek(tok::comma)) {
+  /// fix parse tok::ellipsis
+  while (Peek(tok::comma) && !PeekN(1, tok::ellipsis)) {
     Consume(tok::comma);
     declaration = ParseParameterDeclaration();
     if (!declaration)

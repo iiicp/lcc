@@ -31,6 +31,9 @@ int main(int argc, char *argv[]) {
 
     lcc::Lexer lexer(source);
     auto tokens = lexer.tokenize();
+    for (auto &tok : tokens) {
+      std::cout << tok.getLine() << ", " << tok.getColumn() << ", " << tok.getRepresentation() << std::endl;
+    }
     lcc::Parser parser(std::move(tokens));
     auto translationUnit = parser.ParseTranslationUnit();
 #if 0

@@ -113,11 +113,6 @@ int main() {
 
 ### lcc开发进展
 
-- [x] 2022.11.03  v0.1
-- [x] 2023.01.29  v0.2
-
-[v0.1](https://github.com/iiicp/lcc/wiki/lcc-v0.1)   
-[v0.2](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
-
-
+- [x] 2022.11.03  [v0.1 history](https://github.com/iiicp/lcc/wiki/lcc-v0.1)  
+- [x] 2023.01.29  [v0.2 history](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
 

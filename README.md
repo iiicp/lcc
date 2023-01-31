@@ -117,7 +117,7 @@ int main() {
 - [x] 2023.01.29  v0.2
 
 [v0.1](https://github.com/iiicp/lcc/wiki/lcc-v0.1)   
-[v0.2](https://github.com/iiicp/lcc/wiki/lcc-v0.2-todo)
+[v0.2](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
 
 
 

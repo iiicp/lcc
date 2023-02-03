@@ -72,13 +72,11 @@ public:
 private:
   std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
   std::optional<Syntax::Declaration> FinishDeclaration(
-      std::vector<Syntax::DeclarationSpecifier> &&declarationSpecifiers,
+      Syntax::DeclarationSpecifiers &&declarationSpecifiers,
       std::optional<Syntax::Declarator> alreadyParsedDeclarator = {});
   std::optional<Syntax::Declaration> ParseDeclaration();
-  std::optional<Syntax::DeclarationSpecifier> ParseDeclarationSpecifier();
-  std::vector<Syntax::DeclarationSpecifier> ParseDeclarationSpecifierList();
-  std::optional<Syntax::SpecifierQualifier> ParseSpecifierQualifier();
-  std::vector<Syntax::SpecifierQualifier> ParseSpecifierQualifierList();
+  Syntax::DeclarationSpecifiers ParseDeclarationSpecifiers();
+  Syntax::SpecifierQualifiers ParseSpecifierQualifierList();
   std::optional<Syntax::Declarator> ParseDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator);

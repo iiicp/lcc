@@ -40,4 +40,10 @@ std::string getDeclaratorName(const Syntax::Declarator& declarator) {
     }};
   return std::visit(YComb{visitor}, declarator.getDirectDeclarator());
 }
+
+Syntax::DirectDeclaratorParentParamTypeList *getInnerFuncDeclarator
+    (const Syntax::DirectDeclarator *directDeclarator) {
+  return nullptr;
+}
+
 } // namespace lcc

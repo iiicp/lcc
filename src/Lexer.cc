@@ -532,7 +532,7 @@ std::vector<Token> Lexer::tokenize() {
         break;
       }
       /// Line comments and block comments need to be processed first
-      if ( IsPunctuation(curChar)) {
+      if (IsPunctuation(curChar)) {
         if (curChar == '<' && results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
@@ -578,7 +578,7 @@ std::vector<Token> Lexer::tokenize() {
       break;
     }
     case State::Identifier: {
-      if ( IsLetter(curChar) ||  IsDigit(curChar)) {
+      if (IsLetter(curChar) ||  IsDigit(curChar)) {
         characters += curChar;
         offset++;
       } else {
@@ -594,12 +594,12 @@ std::vector<Token> Lexer::tokenize() {
         offset++;
       } else {
         char lower_char = (curChar | toLower);
-        if ((lower_char != 'x' || !(characters.size() == 1 && characters.back() == '0')) &&
+        if (!IsJudgeNumber(characters, lower_char) &&
             (lower_char != 'e') &&
             (lower_char != 'p') &&
             (lower_char != 'f') &&
             (lower_char != 'u') &&
-            (lower_char != 'l') && !IsHexDigit(lower_char) &&
+            (lower_char != 'l') &&
             (lower_char != '.') &&
             (((characters.back() | toLower) != 'e' &&
               (characters.back() | toLower) != 'p') ||
@@ -874,5 +874,21 @@ std::optional<std::vector<char>> Lexer::ProcessCharacters(std::string_view chara
   }
   result.resize(resultStart);
   return result;
+}
+
+bool Lexer::IsJudgeNumber(const std::string &preCharacters, char curChar) {
+  if (preCharacters.size() == 1 && preCharacters.back() == '0' && (curChar == 'x'|| curChar == 'X')) {
+    return true;
+  }
+
+  if (preCharacters.starts_with("0x") || preCharacters.starts_with("0X")) {
+    return IsHexDigit(curChar);
+  }
+
+  if (preCharacters.starts_with("0")) {
+    return IsOctDigit(curChar);
+  }
+
+  return IsDigit(curChar);
 }
 } // namespace lcc

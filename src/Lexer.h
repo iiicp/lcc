@@ -65,6 +65,7 @@ private:
   static Token::ValueType ParseStringLiteral(const Token &ppToken);
   static std::optional<std::vector<char>> ProcessCharacters(std::string_view characters);
   static std::optional<std::uint32_t> EscapeCharToValue(char escape);
+  static bool IsJudgeNumber(const std::string &preCharacters, char curChar);
 };
 }
 

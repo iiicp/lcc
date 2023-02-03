@@ -45,7 +45,6 @@ class LogOrExpr;
 class ConditionalExpr;
 using ConstantExpr = ConditionalExpr;
 class AssignExpr;
-class AssignExprAssign;
 class Expr;
 
 class ReturnStmt;
@@ -66,6 +65,8 @@ class LabelStmt;
 class TranslationUnit;
 class FunctionDefinition;
 class Declaration;
+class DeclarationSpecifiers;
+class SpecifierQualifiers;
 class StorageClassSpecifier;
 class TypeQualifier;
 class TypeSpecifier;
@@ -84,6 +85,7 @@ class DirectAbstractDeclaratorParamTypeList;
 class DirectAbstractDeclaratorAssignExpr;
 class Pointer;
 class ParamTypeList;
+class ParameterDeclaration;
 class ParamList;
 class InitializerList;
 class Initializer;
@@ -449,7 +451,30 @@ public:
  *      type-specifier
  *      type-qualifier
  */
-using SpecifierQualifier = std::variant<TypeSpecifier, TypeQualifier>;
+
+class SpecifierQualifiers final : public Node {
+private:
+  std::vector<TypeSpecifier> mTypeSpecifiers;
+  std::vector<TypeQualifier> mTypeQualifiers;
+
+public:
+  SpecifierQualifiers() {}
+  void addTypeSpecifier(TypeSpecifier && specifier) {
+    mTypeSpecifiers.push_back(std::move(specifier));
+  }
+  void addTypeQualifier(TypeQualifier && qualifier) {
+    mTypeQualifiers.push_back(std::move(qualifier));
+  }
+  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const {
+    return mTypeSpecifiers;
+  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
+    return mTypeQualifiers;
+  }
+  [[nodiscard]] bool isEmpty() const {
+    return mTypeSpecifiers.empty() && mTypeQualifiers.empty();
+  }
+};
 
 /**
  * type-name:
@@ -457,16 +482,16 @@ using SpecifierQualifier = std::variant<TypeSpecifier, TypeQualifier>;
  */
 class TypeName final : public Node {
 private:
-  std::vector<SpecifierQualifier> mSpecifierQualifiers;
+  SpecifierQualifiers mSpecifierQualifiers;
   std::unique_ptr<AbstractDeclarator> mAbstractDeclarator;
 
 public:
-  TypeName(std::vector<SpecifierQualifier> &&specifierQualifiers,
+  TypeName(SpecifierQualifiers &&specifierQualifiers,
            std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
       : mSpecifierQualifiers(std::move(specifierQualifiers)),
         mAbstractDeclarator(std::move(abstractDeclarator)) {}
 
-  [[nodiscard]] const std::vector<SpecifierQualifier> &getSpecifierQualifiers() const {
+  [[nodiscard]] const SpecifierQualifiers &getSpecifierQualifiers() const {
     return mSpecifierQualifiers;
   }
   [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const {
@@ -1070,8 +1095,52 @@ public:
   FunctionSpecifier() {}
 };
 
-using DeclarationSpecifier = std::variant<StorageClassSpecifier, TypeSpecifier,
-                                          TypeQualifier, FunctionSpecifier>;
+/**
+ * declaration-specifiers:
+        storage-class-specifier declaration-specifiers{opt}
+        type-specifier declaration-specifiers{opt}
+        type-qualifier declaration-specifiers{opt}
+        function-specifier declaration-specifiers{opt}
+ */
+class DeclarationSpecifiers final : public Node {
+private:
+  std::vector<StorageClassSpecifier> mStorageClassSpecifiers;
+  std::vector<TypeSpecifier> mTypeSpecifiers;
+  std::vector<TypeQualifier> mTypeQualifiers;
+  std::vector<FunctionSpecifier> mFunctionSpecifiers;
+
+public:
+  DeclarationSpecifiers() {}
+  void addStorageClassSpecifier(StorageClassSpecifier && specifier) {
+    mStorageClassSpecifiers.push_back(std::move(specifier));
+  }
+  void addTypeSpecifier(TypeSpecifier && specifier) {
+    mTypeSpecifiers.push_back(std::move(specifier));
+  }
+  void addTypeQualifier(TypeQualifier && qualifier) {
+    mTypeQualifiers.push_back(std::move(qualifier));
+  }
+  void addFunctionSpecifier(FunctionSpecifier && specifier) {
+    mFunctionSpecifiers.push_back(std::move(specifier));
+  }
+
+  [[nodiscard]] const std::vector<StorageClassSpecifier> &getStorageClassSpecifiers() const {
+    return mStorageClassSpecifiers;
+  }
+  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const {
+    return mTypeSpecifiers;
+  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
+    return mTypeQualifiers;
+  }
+  [[nodiscard]] const std::vector<FunctionSpecifier> &getFunctionSpecifiers() const {
+    return mFunctionSpecifiers;
+  }
+  [[nodiscard]] bool isEmpty() const {
+    return mStorageClassSpecifiers.empty() && mTypeSpecifiers.empty()
+           && mTypeQualifiers.empty() && mFunctionSpecifiers.empty();
+  }
+};
 
 /**
  * declaration:
@@ -1093,15 +1162,15 @@ public:
   };
 
 private:
-  std::vector<DeclarationSpecifier> mDeclarationSpecifiers;
+  DeclarationSpecifiers mDeclarationSpecifiers;
   std::vector<InitDeclarator> mInitDeclarators;
 
 public:
-  Declaration(std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+  Declaration(DeclarationSpecifiers &&declarationSpecifiers,
               std::vector<InitDeclarator> &&initDeclarators)
       : mDeclarationSpecifiers(std::move(declarationSpecifiers)),
         mInitDeclarators(std::move(initDeclarators)) {}
-  [[nodiscard]] const std::vector<DeclarationSpecifier> &
+  [[nodiscard]] const DeclarationSpecifiers &
   getDeclarationSpecifiers() const {
     return mDeclarationSpecifiers;
   }
@@ -1283,12 +1352,13 @@ public:
  *      declaration-specifiers declarator
  *      declaration-specifiers abstract-declarator{opt}
  */
-struct ParameterDeclaration : public Node {
-  std::vector<DeclarationSpecifier> declarationSpecifiers;
+struct ParameterDeclaration final : public Node {
+public:
+  DeclarationSpecifiers declarationSpecifiers;
   std::variant<std::unique_ptr<Declarator>, std::unique_ptr<AbstractDeclarator>>
       declarator;
-
-  ParameterDeclaration(std::vector<DeclarationSpecifier> declarationSpecifiers,
+public:
+  ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers,
                        std::variant<std::unique_ptr<Declarator>,
                                     std::unique_ptr<AbstractDeclarator>>
                            variant = std::unique_ptr<AbstractDeclarator>{})
@@ -1480,7 +1550,7 @@ private:
 
 public:
   struct StructDeclaration {
-    std::vector<SpecifierQualifier> specifierQualifiers;
+    SpecifierQualifiers specifierQualifiers;
     struct StructDeclarator {
       std::unique_ptr<Declarator> optionalDeclarator;
       std::optional<ConstantExpr> optionalBitfield;
@@ -1667,19 +1737,18 @@ public:
  *  declaration-specifiers declarator declaration-list{opt} compound-statement
  */
 class FunctionDefinition final : public Node {
-  std::vector<DeclarationSpecifier> mDeclarationSpecifiers;
+  DeclarationSpecifiers mDeclarationSpecifiers;
   Declarator mDeclarator;
   BlockStmt mCompoundStatement;
 
 public:
-  FunctionDefinition(std::vector<DeclarationSpecifier> &&declarationSpecifiers,
+  FunctionDefinition(DeclarationSpecifiers &&declarationSpecifiers,
                      Declarator &&declarator, BlockStmt &&compoundStatement)
       : mDeclarationSpecifiers(std::move(declarationSpecifiers)),
         mDeclarator(std::move(declarator)),
         mCompoundStatement(std::move(compoundStatement)) {}
 
-  [[nodiscard]] const std::vector<DeclarationSpecifier> &
-  getDeclarationSpecifiers() const {
+  [[nodiscard]] const DeclarationSpecifiers & getDeclarationSpecifiers() const {
     return mDeclarationSpecifiers;
   }
 

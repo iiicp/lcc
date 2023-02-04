@@ -89,7 +89,7 @@ private:
   Syntax::Pointer ParsePointer();
   std::optional<Syntax::StructOrUnionSpecifier> ParseStructOrUnionSpecifier();
   std::optional<Syntax::EnumSpecifier> ParseEnumSpecifier();
-  std::optional<Syntax::EnumeratorList> ParseEnumDeclaration(std::string enumName);
+  std::optional<Syntax::EnumSpecifier::Enumerator> ParseEnumerator();
   std::optional<Syntax::Initializer> ParseInitializer();
   std::optional<Syntax::InitializerList> ParseInitializerList();
 

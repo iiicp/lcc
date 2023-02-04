@@ -41,9 +41,30 @@ std::string getDeclaratorName(const Syntax::Declarator& declarator) {
   return std::visit(YComb{visitor}, declarator.getDirectDeclarator());
 }
 
-Syntax::DirectDeclaratorParentParamTypeList *getInnerFuncDeclarator
-    (const Syntax::DirectDeclarator *directDeclarator) {
-  return nullptr;
+const Syntax::DirectDeclaratorParentParamTypeList *getFuncDeclarator
+    (const Syntax::Declarator &declarator) {
+ const Syntax::DirectDeclaratorParentParamTypeList * paramTypeList_ = nullptr;
+  auto visitor = overload{
+      [](auto&&, const Syntax::DirectDeclaratorIdent& name) -> std::string {
+        return name.getIdentifierLoc();
+      },
+      [](auto&& self, const Syntax::DirectDeclaratorParent& declarator) -> std::string {
+        return std::visit([&self](auto &&value) -> std::string {
+          return self(value);
+        }, declarator.getDeclarator()->getDirectDeclarator());
+      },
+      [&paramTypeList_](auto&& self, const Syntax::DirectDeclaratorParentParamTypeList& paramTypeList) -> std::string {
+        paramTypeList_ = &paramTypeList;
+        return std::visit([&self](auto &&value) -> std::string {
+          return self(value);
+        }, *paramTypeList.getDirectDeclarator());
+      },
+      [](auto&& self, const Syntax::DirectDeclaratorAssignExpr& assignExpr) -> std::string {
+        return std::visit([&self](auto &&value) -> std::string { return self(value); },
+                          *assignExpr.getDirectDeclarator());
+      }};
+  std::visit(YComb{visitor}, declarator.getDirectDeclarator());
+  return paramTypeList_;
 }
 
 } // namespace lcc

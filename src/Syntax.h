@@ -1544,10 +1544,6 @@ public:
  *      declarator{opt} : constant-expression
  */
 class StructOrUnionSpecifier final : public Node {
-private:
-  std::string mIdentifier;
-  bool mIsUnion;
-
 public:
   struct StructDeclaration {
     SpecifierQualifiers specifierQualifiers;
@@ -1557,19 +1553,20 @@ public:
     };
     std::vector<StructDeclarator> structDeclarators;
   };
-
 private:
+  std::string mId;
+  bool mIsUnion;
   std::vector<StructDeclaration> mStructDeclarations;
 
 public:
-  StructOrUnionSpecifier(bool isUnion, std::string identifier,
+  StructOrUnionSpecifier(bool isUnion, std::string &&identifier,
                          std::vector<StructDeclaration> &&structDeclarations)
-      : mIsUnion(isUnion), mIdentifier(identifier),
+      : mIsUnion(isUnion), mId(std::move(identifier)),
         mStructDeclarations(std::move(structDeclarations)) {}
 
   [[nodiscard]] bool isUnion() const { return mIsUnion; }
 
-  [[nodiscard]] const std::string &getIdentifier() const { return mIdentifier; }
+  [[nodiscard]] const std::string &getName() const { return mId; }
 
   [[nodiscard]] const std::vector<StructDeclaration> &
   getStructDeclarations() const {
@@ -1578,6 +1575,11 @@ public:
 };
 
 /**
+ * enum-specifier:
+ *  enum identifier{opt} { enumerator-list }
+ *  enum identifier{opt} { enumerator-list , }
+ *  enum identifier
+ *
  * enumerator-list:
  *  enumerator
  *  enumerator-list , enumerator
@@ -1585,44 +1587,36 @@ public:
  * enumerator:
  *  enumeration-constant
  *  enumeration-constant = constant-expression
- */
-class EnumeratorList final : public Node {
-public:
-  struct Enumerator {
-    std::string name;
-    std::optional<ConstantExpr> value;
-  };
-
-private:
-  std::vector<Enumerator> mValues;
-  std::string mName;
-
-public:
-  EnumeratorList(std::string name, std::vector<Enumerator> &&values)
-      : mName(std::move(name)), mValues(std::move(values)) {}
-
-  [[nodiscard]] const std::string &getName() const { return mName; }
-
-  [[nodiscard]] const std::vector<Enumerator> &getValues() const {
-    return mValues;
-  }
-};
-
-/**
- * enum-specifier:
- *  enum identifier{opt} { enumerator-list }
- *  enum identifier{opt} { enumerator-list , }
- *  enum identifier
+ *
+ * enumeration-constant:
+ *  identifier
  */
 class EnumSpecifier final : public Node {
-  using variant = std::variant<EnumeratorList, std::string>;
-
-  variant mVariant;
-
 public:
-  EnumSpecifier(variant &&variant) : mVariant(std::move(variant)) {}
+  struct Enumerator {
+    std::string mName;
+    std::optional<ConstantExpr> mValue;
+    Enumerator() = default;
+    Enumerator(std::string&& name, std::optional<ConstantExpr>&& value = {})
+        : mName(std::move(name)), mValue(std::move(value)) {};
+    Enumerator(const Enumerator &) = delete;
+    Enumerator &operator=(const Enumerator &) = delete;
+    Enumerator(Enumerator &&) = default;
+    Enumerator &operator=(Enumerator &&) = default;
+  };
+private:
+  std::string mId;
+  std::vector<Enumerator> mEnumerators;
+public:
+  EnumSpecifier(std::string &&id, std::vector<Enumerator> &&enumerators)
+      : mId(std::move(id)), mEnumerators(std::move(enumerators)) {}
 
-  [[nodiscard]] const variant &getVariant() const { return mVariant; }
+  [[nodiscard]] const std::string &getName() const {
+    return mId;
+  }
+  [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const {
+    return mEnumerators;
+  }
 };
 
 /**

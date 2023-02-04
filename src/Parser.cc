@@ -461,7 +461,7 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
   }
   /// function define
   if (Peek(tok::l_brace)) {
-    auto *parameters = std::get_if<Syntax::DirectDeclaratorParentParamTypeList>(&declarator->getDirectDeclarator());
+    const auto *parameters = getFuncDeclarator(*declarator);//;std::get_if<Syntax::DirectDeclaratorParentParamTypeList>(&declarator->getDirectDeclarator());
     if (!parameters) {
       LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "expect function declarator");
       return {};
@@ -519,81 +519,86 @@ std::optional<Syntax::Declaration> Parser::ParseDeclaration() {
 
 std::optional<Syntax::StructOrUnionSpecifier>
 Parser::ParseStructOrUnionSpecifier() {
-  bool isUnion;
+  bool isUnion = false;
   if (Peek(tok::kw_union)) {
     isUnion = true;
-  } else if (Peek(tok::kw_struct)) {
-    isUnion = true;
-  } else {
-    LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
-           "Expected struct or union keyword at beginning of struct or union "
-           "specifier");
-    return {};
   }
   ConsumeAny();
   std::string name{""};
-  if (Peek(tok::identifier)) {
+  switch (mTokCursor->getTokenKind()) {
+  case tok::identifier: {
     name = mTokCursor->getContent();
     Consume(tok::identifier);
+    if (Peek(tok::l_brace)) {
+      goto lbrace;
+    }
+    return Syntax::StructOrUnionSpecifier(isUnion, std::move(name), {});
   }
-
-  if (!Peek(tok::l_brace)) {
-    if (name.empty()) {
-      LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
-           std::string("Expected identifier after") +
-               (isUnion ? "union" : "struct"));
-      return {};
-    }
-    return Syntax::StructOrUnionSpecifier(isUnion, name, {});
-  }
-  Consume(tok::l_brace);
-  std::vector<Syntax::StructOrUnionSpecifier::StructDeclaration>
-      structDeclarations;
-  while (IsFirstInSpecifierQualifier()) {
-    auto specifierQualifiers = ParseSpecifierQualifierList();
-    if (specifierQualifiers.isEmpty()) {
-      LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
-          "Expected Specifier Qualifiers at beginning of struct declarations");
-    }
-    std::vector<Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator> declarators;
-    auto declarator = ParseDeclarator();
-    if (!declarator) {
-      LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "parse struct declarator error");
-      return {};
-    }
-    if (Peek(tok::colon)) {
-      Consume(tok::colon);
-      auto constant = ParseConditionalExpr();
-      declarators.push_back({std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-                             std::move(constant)});
-    }else {
-      declarators.push_back({std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-                             std::nullopt});
-    }
-    while (Peek(tok::comma)) {
-      Consume(tok::comma);
-      declarator = ParseDeclarator();
+  case tok::l_brace: {
+  lbrace:
+    Consume(tok::l_brace);
+    std::vector<Syntax::StructOrUnionSpecifier::StructDeclaration>
+        structDeclarations;
+    while (IsFirstInSpecifierQualifier()) {
+      auto specifierQualifiers = ParseSpecifierQualifierList();
+      if (specifierQualifiers.isEmpty()) {
+        LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
+             "Expected Specifier Qualifiers at beginning of struct "
+             "declarations");
+      }
+      std::vector<
+          Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator>
+          declarators;
+      auto declarator = ParseDeclarator();
       if (!declarator) {
-        LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "parse struct declarator error");
+        LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
+             "parse struct declarator error");
         return {};
       }
       if (Peek(tok::colon)) {
         Consume(tok::colon);
         auto constant = ParseConditionalExpr();
-        declarators.push_back({std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-                               std::move(constant)});
-      }else {
-        declarators.push_back({std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-                               std::nullopt});
+        declarators.push_back(
+            {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+             std::move(constant)});
+      } else {
+        declarators.push_back(
+            {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+             std::nullopt});
       }
+      while (Peek(tok::comma)) {
+        Consume(tok::comma);
+        declarator = ParseDeclarator();
+        if (!declarator) {
+          LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
+               "parse struct declarator error");
+          return {};
+        }
+        if (Peek(tok::colon)) {
+          Consume(tok::colon);
+          auto constant = ParseConditionalExpr();
+          declarators.push_back(
+              {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+               std::move(constant)});
+        } else {
+          declarators.push_back(
+              {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+               std::nullopt});
+        }
+      }
+      Match(tok::semi);
+      structDeclarations.push_back(
+          {std::move(specifierQualifiers), std::move(declarators)});
     }
-    Match(tok::semi);
-    structDeclarations.push_back(
-        {std::move(specifierQualifiers), std::move(declarators)});
+    Match(tok::r_brace);
+    return Syntax::StructOrUnionSpecifier(isUnion, std::move(name),
+                                          std::move(structDeclarations));
   }
-  Match(tok::r_brace);
-  return Syntax::StructOrUnionSpecifier(isUnion, name,
-                                        std::move(structDeclarations));
+  default:
+    LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
+         "Expect identifier or { after struct/union");
+    return {};
+  }
 }
 
 /// declarator: pointer{opt} direct-declarator
@@ -972,67 +977,74 @@ Parser::ParseDirectAbstractDeclarator() {
 }
 
 /**
-enum-specifier:
-    enum identifier{opt} { enumerator-list }
-    enum identifier{opt} { enumerator-list , }
-    enum identifier
-enumerator-list:
-    enumerator
-    enumerator-list , enumerator
-enumerator:
-    enumeration-constant
-    enumeration-constant = constant-expression
+ * enum-specifier:
+ *  enum identifier{opt} { enumerator-list }
+ *  enum identifier{opt} { enumerator-list , }
+ *  enum identifier
+ *
+ * enumerator-list:
+ *  enumerator
+ *  enumerator-list , enumerator
+ *
+ * enumerator:
+ *  enumeration-constant
+ *  enumeration-constant = constant-expression
+ *
+ * enumeration-constant:
+ *  identifier
  */
 std::optional<Syntax::EnumSpecifier> Parser::ParseEnumSpecifier() {
-  Expect(tok::kw_enum);
   Consume(tok::kw_enum);
 
+  std::vector<Syntax::EnumSpecifier::Enumerator> enumerators;
   std::string name{""};
   if (Peek(tok::identifier)) {
     name = mTokCursor->getContent();
     Consume(tok::identifier);
-  }
-
-  if (!Peek(tok::l_brace)) {
-    if (name.empty()) {
-      LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "expect identifier");
+    if (Peek(tok::l_brace)) {
+      goto enumerator_list;
     }
-    return Syntax::EnumSpecifier(name);
-  }
-
-  if (Peek(tok::l_brace)) {
-    auto declaration = ParseEnumDeclaration(name);
-    if (!declaration)
+  }else if (Peek(tok::l_brace)) {
+  enumerator_list:
+    Consume(tok::l_brace);
+    if (Peek(tok::r_brace)) {
+      Consume(tok::r_brace);
+      LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "Expect identifier before '}' token");
       return {};
-    return Syntax::EnumSpecifier(std::move(*declaration));
+    }
+    enumerators.push_back(std::move(*ParseEnumerator()));
+    while (Peek(tok::comma)) {
+      Consume(tok::comma);
+      if (Peek(tok::r_brace))
+        break;
+      enumerators.push_back(std::move(*ParseEnumerator()));
+    }
+    Match(tok::r_brace);
+  }else {
+    LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "Expect identifier or { after enum");
   }
-  return Syntax::EnumSpecifier(std::move(name));
+  return Syntax::EnumSpecifier(std::move(name), std::move(enumerators));
 }
 
-std::optional<Syntax::EnumeratorList>
-Parser::ParseEnumDeclaration(std::string enumName) {
-  Expect(tok::l_brace);
-  Consume(tok::l_brace);
-
-  std::vector<Syntax::EnumeratorList::Enumerator> values;
-  while (Peek(tok::identifier)) {
-    Expect(tok::identifier);
-    std::string valueName = mTokCursor->getContent();
-    mScope.addToScope(valueName);
-    Consume(tok::identifier);
-    if (Peek(tok::equal)) {
-      Consume(tok::equal);
-      auto constant = ParseConditionalExpr();
-      values.push_back({valueName, std::move(constant)});
-    }else {
-      values.push_back({valueName});
-    }
-    if (Peek(tok::comma)) {
-      Consume(tok::comma);
-    }
+std::optional<Syntax::EnumSpecifier::Enumerator> Parser::ParseEnumerator() {
+  if (!Peek(tok::identifier)) {
+    LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "The enumeration constant must be identifier");
+    return {};
   }
-  Match(tok::r_brace);
-  return Syntax::EnumeratorList(std::move(enumName), std::move(values));
+  std::string enumValueName = mTokCursor->getContent();
+  Consume(tok::identifier);
+  if (Peek(tok::equal)) {
+    Consume(tok::equal);
+    auto start = mTokCursor;
+    auto constant = ParseConditionalExpr();
+    if (!constant) {
+      LOGE(start->getLine(), start->getColumn(), "parse conditional expr error");
+      return {};
+    }
+    return Syntax::EnumSpecifier::Enumerator(std::move(enumValueName), std::move(constant));
+  }else {
+    return Syntax::EnumSpecifier::Enumerator(std::move(enumValueName));
+  }
 }
 
 std::optional<Syntax::BlockStmt> Parser::ParseBlockStmt() {

@@ -13,10 +13,16 @@ llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes Executi
 # find source file
 file(GLOB lcc_src "src/*.cc")
 
+set(LCC_VERSION_STRING "0.3")
+configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/Version.inc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/src/Version.inc)
+
 # compiler and set search include and link llvm lib
 add_executable(${PROJECT_NAME} main.cpp ${lcc_src})
 target_include_directories(${PROJECT_NAME}
         PRIVATE
         src
+        ${CMAKE_CURRENT_BINARY_DIR}/src
         ${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_all})

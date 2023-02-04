@@ -10,85 +10,12 @@
 
 #include "Parser.h"
 #include <algorithm>
-#include <unordered_set>
 #include "Utilities.h"
 
 namespace lcc {
-namespace set {
-template <typename Set>
-static inline Set set_union(const Set &lhs, const Set &rhs) {
-  Set res{lhs};
-  res.insert(rhs.begin(), rhs.end());
-  return std::move(res);
-}
-template <typename Set, typename Key = typename Set::value_type>
-static inline Set set_intersection(const Set &lhs, const Set &rhs) {
-  if (lhs.size() <= rhs.size()) {
-    Set res;
-    for (const Key &key : lhs) {
-      if (rhs.count(key) > 0) {
-        res.insert(key);
-      }
-    }
-    return std::move(res);
-  } else {
-    return set_intersection(rhs, lhs);
-  }
-}
-} // namespace set
-
 Parser::Parser(std::vector<Token> && tokens)
     : mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()),
       mTokEnd(mTokens.cend()) {
-  mFirstPostFixSet = {tok::arrow,   tok::period,    tok::l_square,
-                      tok::l_paren, tok::plus_plus, tok::minus_minus};
-  mAssignmentSet = {tok::equal,       tok::plus_equal,    tok::minus_equal,
-                    tok::slash_equal, tok::star_equal,    tok::percent_equal,
-                    tok::less_equal,  tok::greater_equal, tok::amp_equal,
-                    tok::pipe_equal,  tok::caret_equal};
-  mFirstSpecifierQualifierSet = {
-      tok::kw_void,   tok::kw_char,     tok::kw_short,    tok::kw_int,
-      tok::kw_long,   tok::kw_float,    tok::kw_double,   tok::kw__Bool,
-      tok::kw_signed, tok::kw_unsigned, tok::kw_enum,     tok::kw_struct,
-      tok::kw_union,  tok::kw_const,    tok::kw_restrict, tok::kw_volatile,
-      tok::kw_inline, tok::identifier};
-  mFirstDeclarationSpecifierSet = {
-      tok::kw_typedef,  tok::kw_extern, tok::kw_static,   tok::kw_auto,
-      tok::kw_register, tok::kw_void,   tok::kw_char,     tok::kw_short,
-      tok::kw_int,      tok::kw_long,   tok::kw_float,    tok::kw_double,
-      tok::kw__Bool,    tok::kw_signed, tok::kw_unsigned, tok::kw_enum,
-      tok::kw_struct,   tok::kw_union,  tok::kw_const,    tok::kw_restrict,
-      tok::kw_volatile, tok::kw_inline, tok::identifier};
-  mFirstPointerSet = {tok::star};
-  mFirstParameterListSet = mFirstDeclarationSpecifierSet;
-  mFirstDirectAbstractDeclaratorSet = {tok::l_paren, tok::l_square};
-  mFirstAbstractDeclaratorSet =
-      set::set_union(mFirstPointerSet, mFirstDirectAbstractDeclaratorSet);
-  mFirstParameterTypeListSet = mFirstParameterListSet;
-  mFirstDirectDeclaratorSet = {tok::identifier, tok::l_paren};
-  mFirstDeclaratorSet =
-      set::set_union(mFirstPointerSet, mFirstDirectDeclaratorSet);
-  mFirstDeclarationSet = mFirstDeclarationSpecifierSet;
-  mFirstExpressionSet = {
-      tok::l_paren,       tok::identifier,     tok::numeric_constant,
-      tok::char_constant, tok::string_literal, tok::plus_plus,
-      tok::minus_minus,   tok::minus,          tok::plus,
-      tok::amp,           tok::tilde,          tok::exclaim,
-      tok::kw_sizeof};
-  std::set<tok::TokenKind> st1{tok::l_brace};
-  mFirstInitializerSet = set::set_union(mFirstExpressionSet, st1);
-  std::set<tok::TokenKind> st2{tok::l_square, tok::period};
-  mFirstInitializerListSet = set::set_union(mFirstInitializerSet, st2);
-  std::set<tok::TokenKind> st3{
-      tok::kw_if,       tok::kw_for,   tok::l_brace,  tok::kw_switch,
-      tok::kw_continue, tok::kw_break, tok::kw_case,  tok::kw_default,
-      tok::identifier,  tok::kw_do,    tok::kw_while, tok::kw_return,
-      tok::kw_goto,     tok::semi};
-  mFirstStatementSet = set::set_union(st3, mFirstExpressionSet);
-  mFirstBlockItem = set::set_union(mFirstDeclarationSet, mFirstStatementSet);
-  mFirstFunctionDefinitionSet = mFirstDeclarationSpecifierSet;
-  mFirstExternalDeclarationSet =
-      set::set_union(mFirstDeclarationSet, mFirstFunctionDefinitionSet);
 }
 
 Syntax::TranslationUnit Parser::ParseTranslationUnit() {
@@ -504,14 +431,12 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
 /// declaration: declaration-specifiers init-declarator-list{opt} ;
 std::optional<Syntax::Declaration> Parser::ParseDeclaration() {
   auto declarationSpecifiers = ParseDeclarationSpecifiers();
-  if (declarationSpecifiers.getStorageClassSpecifiers().empty()
-      && declarationSpecifiers.getTypeQualifiers().empty()
-      && declarationSpecifiers.getTypeSpecifiers().empty()) {
+  if (declarationSpecifiers.isEmpty()) {
     LOGE(mTokCursor->getLine(), mTokCursor->getColumn(),
            "Expected declaration specifiers at beginning of declaration");
   }
   if (Peek(tok::semi)) {
-    Consume(tok::semi);
+    ConsumeAny();
     return Syntax::Declaration(std::move(declarationSpecifiers), {});
   }
   return FinishDeclaration(std::move(declarationSpecifiers));
@@ -1089,17 +1014,21 @@ std::optional<Syntax::BlockItem> Parser::ParseBlockItem() {
  */
 std::optional<Syntax::Initializer> Parser::ParseInitializer() {
   if (!Peek(tok::l_brace)) {
+    auto start = mTokCursor;
     auto assignment = ParseAssignExpr();
     if (!assignment) {
-      LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "parse assign expr error");
+      LOGE(start->getLine(), start->getColumn(), "parse assign expr error");
       return {};
     }
     return Syntax::Initializer(std::move(*assignment));
   } else {
     Consume(tok::l_brace);
+    auto start = mTokCursor;
     auto initializerList = ParseInitializerList();
-    if (!initializerList)
+    if (!initializerList) {
+      LOGE(start->getLine(), start->getColumn(), "parse initializer list error");
       return {};
+    }
 
     if (Peek(tok::comma)) {
       Consume(tok::comma);
@@ -1153,31 +1082,34 @@ std::optional<Syntax::InitializerList> Parser::ParseInitializerList() {
 
   while (Peek(tok::comma)) {
     Consume(tok::comma);
-    Syntax::InitializerList::DesignatorList designation;
+    Syntax::InitializerList::DesignatorList designation_t;
     while (Peek(tok::l_square) || Peek(tok::period)) {
       if (Peek(tok::l_square)) {
         Consume(tok::l_square);
         auto constant = ParseConditionalExpr();
         if (!constant)
           return {};
-        designation.emplace_back(std::move(*constant));
+        designation_t.emplace_back(std::move(*constant));
         Match(tok::r_square);
       } else if (Peek(tok::period)) {
         Consume(tok::period);
         Expect(tok::identifier);
-        designation.emplace_back(mTokCursor->getContent());
+        designation_t.emplace_back(mTokCursor->getContent());
         Consume(tok::identifier);
       }
     }
-    if (!designation.empty()) {
+    if (!designation_t.empty()) {
       if (Peek(tok::equal)) {
         Consume(tok::equal);
       }
     }
-    auto initializer = ParseInitializer();
-    if (!initializer)
+    auto start = mTokCursor;
+    auto initializer_t = ParseInitializer();
+    if (!initializer_t) {
+      LOGE(start->getLine(), start->getColumn(), "parse initializer error");
       return {};
-    vector.push_back({std::move(*initializer), std::move(designation)});
+    }
+    vector.push_back({std::move(*initializer_t), std::move(designation_t)});
   }
   return Syntax::InitializerList{std::move(vector)};
 }
@@ -2250,15 +2182,6 @@ void Parser::Scope::addTypedef(const std::string& name) {
   mCurrentScope.back().emplace(name, Symbol{name, true});
 }
 
-bool Parser::Scope::isTypedef(const std::string& name) const {
-  for (auto &iter : mCurrentScope) {
-    if (auto result = iter.find(name); result != iter.end() && result->second.isTypedef) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool Parser::Scope::isTypedefInScope(const std::string& name) const {
   for (auto iter = mCurrentScope.rbegin(); iter != mCurrentScope.rend();
        iter++) {
@@ -2349,7 +2272,8 @@ bool Parser::IsFirstInDeclarator() const {
   return IsFirstInPointer() || IsFirstInDirectDeclarator();
 }
 bool Parser::IsFirstInDirectDeclarator() const {
-  return (mFirstDirectDeclaratorSet.find(mTokCursor->getTokenKind()) != mFirstDirectDeclaratorSet.end());
+  return mTokCursor->getTokenKind() == tok::identifier ||
+         mTokCursor->getTokenKind() == tok::l_paren;
 }
 bool Parser::IsFirstInParameterTypeList() const {
   return IsFirstInParameterList();
@@ -2358,7 +2282,9 @@ bool Parser::IsFirstInAbstractDeclarator() const {
   return IsFirstInPointer() || IsFirstInDirectAbstractDeclarator();
 }
 bool Parser::IsFirstInDirectAbstractDeclarator() const {
-  return (mFirstDirectAbstractDeclaratorSet.find(mTokCursor->getTokenKind()) != mFirstDirectAbstractDeclaratorSet.end());
+  // tok::l_paren, tok::l_square
+  return mTokCursor->getTokenKind() == tok::l_paren ||
+         mTokCursor->getTokenKind() == tok::l_square;
 }
 bool Parser::IsFirstInParameterList() const {
   return IsFirstInDeclarationSpecifier();
@@ -2370,14 +2296,30 @@ bool Parser::IsFirstInBlockItem() const {
   return IsFirstInDeclaration() || IsFirstInStatement();
 }
 bool Parser::IsFirstInInitializer() const {
-  return (mFirstInitializerSet.find(mTokCursor->getTokenKind()) != mFirstInitializerSet.end());
+  return IsFirstInAssignmentExpr() || mTokCursor->getTokenKind() == tok::l_brace;
 }
 bool Parser::IsFirstInInitializerList() const {
-  return (mFirstInitializerListSet.find(mTokCursor->getTokenKind()) != mFirstInitializerListSet.end());
+  // tok::l_square, tok::period
+  return mTokCursor->getTokenKind() == tok::l_square ||
+         mTokCursor->getTokenKind() == tok::period ||
+         IsFirstInInitializer();
 }
 bool Parser::IsFirstInStatement() const {
-  return (mFirstStatementSet.find(mTokCursor->getTokenKind()) != mFirstStatementSet.end())
-      || IsFirstInExpr();
+  return mTokCursor->getTokenKind() == tok::kw_if ||
+         mTokCursor->getTokenKind() == tok::kw_for ||
+         mTokCursor->getTokenKind() == tok::l_brace ||
+         mTokCursor->getTokenKind() == tok::kw_switch ||
+         mTokCursor->getTokenKind() == tok::kw_continue ||
+         mTokCursor->getTokenKind() == tok::kw_case ||
+         mTokCursor->getTokenKind() == tok::kw_default ||
+         mTokCursor->getTokenKind() == tok::identifier ||
+         mTokCursor->getTokenKind() == tok::kw_do ||
+         mTokCursor->getTokenKind() == tok::kw_while ||
+         mTokCursor->getTokenKind() == tok::kw_return ||
+         mTokCursor->getTokenKind() == tok::kw_goto ||
+         mTokCursor->getTokenKind() == tok::semi ||
+         mTokCursor->getTokenKind() == tok::l_brace ||
+         IsFirstInExpr();
 }
 bool Parser::IsFirstInExpr() const {
   return IsFirstInAssignmentExpr();

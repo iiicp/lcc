@@ -25,25 +25,6 @@ private:
   using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
-  std::set<tok::TokenKind> mFirstPostFixSet;
-  std::set<tok::TokenKind> mAssignmentSet;
-  std::set<tok::TokenKind> mFirstSpecifierQualifierSet;
-  std::set<tok::TokenKind> mFirstDeclarationSpecifierSet;
-  std::set<tok::TokenKind> mFirstPointerSet;
-  std::set<tok::TokenKind> mFirstParameterListSet;
-  std::set<tok::TokenKind> mFirstDirectAbstractDeclaratorSet;
-  std::set<tok::TokenKind> mFirstAbstractDeclaratorSet;
-  std::set<tok::TokenKind> mFirstParameterTypeListSet;
-  std::set<tok::TokenKind> mFirstDirectDeclaratorSet;
-  std::set<tok::TokenKind> mFirstDeclaratorSet;
-  std::set<tok::TokenKind> mFirstDeclarationSet;
-  std::set<tok::TokenKind> mFirstExpressionSet;
-  std::set<tok::TokenKind> mFirstInitializerSet;
-  std::set<tok::TokenKind> mFirstInitializerListSet;
-  std::set<tok::TokenKind> mFirstStatementSet;
-  std::set<tok::TokenKind> mFirstBlockItem;
-  std::set<tok::TokenKind> mFirstFunctionDefinitionSet;
-  std::set<tok::TokenKind> mFirstExternalDeclarationSet;
 public:
   class Scope {
   private:
@@ -57,7 +38,6 @@ public:
       mCurrentScope.emplace_back();
     }
     void addTypedef(const std::string& name);
-    bool isTypedef(const std::string& name) const;
     bool isTypedefInScope(const std::string& name) const;
     void addToScope(const std::string& name);
     void pushScope();

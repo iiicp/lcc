@@ -12,6 +12,7 @@
 
 #include "Utilities.h"
 #include <iostream>
+#include "llvm/Support/raw_ostream.h"
 
 namespace lcc {
 void LOGE(uint32_t row, uint32_t col, const std::string &msg) {

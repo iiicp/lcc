@@ -3,6 +3,7 @@
 #include "Version.h"
 #include "Lexer.h"
 #include "Parser.h"
+#include "DumpTool.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
@@ -20,23 +21,13 @@ static llvm::cl::opt<bool>
     DumpTokens("dumpTokens",
             llvm::cl::desc("<Enable Token output on terminals>"));
 static llvm::cl::opt<bool>
-    DumpAST("DumpAST",
+    DumpAST("dumpAst",
                llvm::cl::desc("<Enable Ast output on terminals>"));
 
 void printVersion(llvm::raw_ostream &OS) {
   OS << Head << " " << lcc::getLccVersion() << "\n";
   OS.flush();
   exit(EXIT_SUCCESS);
-}
-
-void dumpTokens(const std::vector<lcc::Token> &tokens) {
-  for (auto &tok : tokens) {
-    llvm::outs() << tok.getLine() << ", " << tok.getColumn() << ", " << tok.getRepresentation() << "\n";
-  }
-}
-
-void dumpAst(lcc::Syntax::TranslationUnit &unit) {
-
 }
 
 int main(int argc, char *argv[]) {
@@ -57,12 +48,12 @@ int main(int argc, char *argv[]) {
       lcc::Lexer lexer(source);
       auto tokens = lexer.tokenize();
       if (DumpTokens) {
-        dumpTokens(tokens);
+        lcc::dump::dumpTokens(tokens);
       }
       lcc::Parser parser(std::move(tokens));
       auto translationUnit = parser.ParseTranslationUnit();
       if (DumpAST) {
-        dumpAst(translationUnit);
+        lcc::dump::dumpAst(translationUnit);
       }
     }
 

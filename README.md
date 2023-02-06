@@ -2,6 +2,11 @@
 
 ### 基于LLVM的C编译器--lcc
 
+#### 当前进展
+
+lcc-v0.3 开发中...
+
+
 #### 编译步骤
 
 一，安装LLVM12 or LLVM14 or LLVM15
@@ -113,11 +118,6 @@ int main() {
 
 ### lcc开发进展
 
-- [x] 2022.11.03  v0.1
-- [x] 2023.01.29  v0.2
-
-[v0.1](https://github.com/iiicp/lcc/wiki/lcc-v0.1)   
-[v0.2](https://github.com/iiicp/lcc/wiki/lcc-v0.2-todo)
-
-
+- [x] 2022.11.03  [v0.1 history](https://github.com/iiicp/lcc/wiki/lcc-v0.1)  
+- [x] 2023.01.29  [v0.2 history](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
 

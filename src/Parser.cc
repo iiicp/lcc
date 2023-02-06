@@ -395,20 +395,24 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
     }
     mScope.pushScope();
     auto &parameterDeclarations = parameters->getParameterTypeList().getParameterList().getParameterDeclarations();
-    for (auto &[declaratorSpecifiers, parameterDeclarator] : parameterDeclarations) {
+    /// todo check repeat param name
+    for (auto &[declSpecifiers, parameterDeclarator] : parameterDeclarations) {
       /// check is void
-      if (declaratorSpecifiers.getStorageClassSpecifiers().size() == 0 &&
-          declaratorSpecifiers.getTypeQualifiers().size() == 0 &&
-          declaratorSpecifiers.getFunctionSpecifiers().size() == 0 &&
-          parameterDeclarations.size() == 1 && declaratorSpecifiers.getTypeSpecifiers().size() == 1) {
+      auto isVoidType = [&parameterDeclarations](const Syntax::DeclarationSpecifiers &declSpec) {
+        return declSpec.getStorageClassSpecifiers().size() == 0 &&
+               declSpec.getTypeQualifiers().size() == 0 &&
+               declSpec.getFunctionSpecifiers().size() == 0 &&
+               declSpec.getTypeSpecifiers().size() == 1 && (parameterDeclarations.size() == 1);
+      };
+      if (isVoidType(declSpecifiers)) {
         auto* primitive = std::get_if<Syntax::TypeSpecifier::PrimitiveTypeSpecifier>(
-            &declaratorSpecifiers.getTypeSpecifiers()[0].getVariant());
+            &declSpecifiers.getTypeSpecifiers()[0].getVariant());
         if (primitive && *primitive == Syntax::TypeSpecifier::PrimitiveTypeSpecifier::Void) {
           break;
         }
       }
       if (std::holds_alternative<std::unique_ptr<Syntax::AbstractDeclarator>>(parameterDeclarator)) {
-        LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "func define need param name");
+        LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "miss param name");
       }
       auto& decl = std::get<std::unique_ptr<Syntax::Declarator>>(parameterDeclarator);
       mScope.addToScope(getDeclaratorName(*decl));

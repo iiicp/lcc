@@ -1,123 +1,99 @@
+# lcc: A Based Of LLVM C Compiler
+
+This is the source code Tutorial. Lcc is based llvm c99 compiler. You can click [this][1] to visit my video and this compiler tutorial.
+
+This project will implement almost all ISO C99 syntax and can work on Windows, Linux and Mac OS X.
+
+ISO C 99 Doc link (pdf file): [C99](https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf)
+
+## Current Status: 
+
+|  Module     | Status      |     
+|  ----       | ----        |   
+| Preprocess  | working...  |   
+| Lexer       | 100%        |      
+| Parser      | 95%         |       
+| Semantics   | working... |       
+| CodeGen     | working... |    
+
+## Test Status:
+
+catch2 will be integrated in the future
 
 
-### 基于LLVM的C编译器--lcc
+## Compile and Run
 
-#### 当前进展
+### Install the latest LLVM library or Build LLVM manually
 
-lcc-v0.3 开发中...
+一：Install the latest LLVM library
 
+```   
+Mac:
+----------------------
+1, install homebrew 
+reference: https://brew.sh/
+or reference: https://brew.idayer.com/
 
-#### 编译步骤
+2, brew install llvm
 
-一，安装LLVM12 or LLVM14 or LLVM15
-
-Mac平台
-
-```bash
-1, 安装homebrew
-可以使用国内源: https://brew.idayer.com/
-
-2, 安装LLVM14
-brew install llvm@14
-```
-
-Linux平台
-
-```bash
+Linux:
+----------------------
 1, sudo apt-get update
 2, sudo apt-get -y install llvm-12
+
+Windows:
+----------------------
+reference:  https://blog.csdn.net/kingfox/article/details/117450533
 ```
 
-Windows平台
+二：Build LLVM manually
 
 ```
-// 安装过程都是默认操作
-1, 安装 msys2 x64，官网 https://www.msys2.org/
-2, 打开msys2-shell，运行 pacman -Sy
-3，运行 pacman -Syu
-4, 重新运行 msys2-shell，运行 pacman -Su
-5，安装64bit clang, 运行 pacman -S mingw-w64-clang-x86_64-toolchain
-6，安装32bit clang, 运行 pacman -S mingw-w64-clang-i686-toolchain
-7，命令行检查clang, llvm版本
-
-// windows LLVM_DIR PATH
-eg: C:\msys64\clang64\lib\cmake\llvm
+git clone https://github.com/llvm/llvm-project.git
+cd llvm-project/llvm  && mkdir llvm_install_dir && mkdir build
+cd build
+cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../llvm_install_dir ../llvm
 ```
 
 
+### How to use lcc
 
-二，安装CMake工具
-
-Mac平台
-
-```
-brew install cmake
-```
-
-Linux平台
-
-```
-sudo apt install cmake
-```
-
-Windows平台
-
-```
-https://cmake.org/download/
-// 安装ninja
-https://github.com/ninja-build/ninja/releases
-```
-
-
-
-三，Clone仓库
+一：Compile
 
 ```
 1, git clone git@github.com:iiicp/lcc.git
-
-2, CMake进行构建
-cd lcc
-mkdir build
-cd build 
-cmake .. -DLLVM_DIR="Path to Your LLVM CMake dir"
-// eg: cmake ..-DLLVM_DIR=/opt/homebrew/opt/llvm@14/lib/cmake/llvm
-make 
-
-3, 使用lcc
-./lcc ../tests/c/stmt.c
+2, cd lcc && mkdir build && cd build 
+3, cmake -GNinja -DLLVM_DIR="Path to Your LLVM CMake dir" ..
+4, ninja 
 ```
 
+二：Run
 
-
-### lcc开发效果
-
-现在lcc可以通过jit解释运行如下代码.
-
-```c
-int fib(int n) {
-  if (n == 1 || n == 2)
-    return 1;
-  return fib(n-1) + fib(n-2);
-}
-
-int main() {
-  return fib(5);
-}
+lcc support --dumpTokens and --dumpAst command line options
+```  
+./lcc --help
+./lcc --dumpTokens ../tests/c/stmt.c
+./lcc --dumpAst ../tests/c/stmt.c 
 ```
 
-也可以解释运行如下代码.
+## lcc unsupported c99 language features
 
-```c
-int main() {
-  int a = 3;
-  int *b = &a;
-  *b = 100;
-  return a;
-}
-```
+1. unicode char     
+2. _Complex      
+3. direct-declarator ( identifier-list{opt} )     
+eg: int f(a, b) int a,b {return a+b;}
 
-### lcc开发进展
 
-- [x] 2022.11.03  [v0.1 history](https://github.com/iiicp/lcc/wiki/lcc-v0.1)  
-- [x] 2023.01.29  [v0.2 history](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
+## lcc develop history
 
+- 2022.11.03  [v0.1 history](https://github.com/iiicp/lcc/wiki/lcc-v0.1)
+- 2023.01.29  [v0.2 history](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
+
+
+## Reference   
+
+- [cld](https://github.com/zero9178/cld)        
+- [chibicc](https://github.com/rui314/chibicc)        
+- [ucc](https://github.com/sheisc/ucc162.3)   
+
+[1]: https://space.bilibili.com/181099947

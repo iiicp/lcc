@@ -13,7 +13,7 @@
 #define LCC_DUMPTOOL_H
 #include "Syntax.h"
 namespace lcc::dump {
-void PrintContent(std::string content, bool needNewLine = false);
+
 void dumpTokens(const std::vector<lcc::Token> &tokens);
 void dumpAst(const Syntax::TranslationUnit &unit);
 

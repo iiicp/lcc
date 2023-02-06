@@ -25,14 +25,14 @@ void DecAlign() {
   LeftAlign--;
 }
 
-void PrintContent(std::string content, bool needNewLine) {
+void Print(const std::string &content) {
   std::string ws(LeftAlign, ' ');
-  llvm::outs() << ws << content;
-  if (needNewLine) {
-    llvm::outs() << "\n";
-  }else {
-    llvm::outs() << " ";
-  }
+  llvm::outs() << ws << content << " ";
+}
+
+void Println(const std::string &content) {
+  std::string ws(LeftAlign, ' ');
+  llvm::outs() << ws << content << "\n";
 }
 
 void dumpTokens(const std::vector<lcc::Token> &tokens) {
@@ -46,7 +46,7 @@ void dumpAst(const lcc::Syntax::TranslationUnit &unit) {
 }
 
 void visitor(const Syntax::TranslationUnit &unit) {
-  PrintContent("TranslationUnit");
+  Print("TranslationUnit");
   llvm::outs() << &unit << " " << unit.getGlobals().size() << "\n";
   for (auto &externalDecl : unit.getGlobals()) {
     std::visit(overload{
@@ -64,7 +64,7 @@ void visitor(const Syntax::TranslationUnit &unit) {
   }
 }
 void visitor(const Syntax::Declaration &declaration) {
-  PrintContent("Declaration");
+  Print("Declaration");
   llvm::outs() << &declaration << "\n";
   IncAlign();
   visitor(declaration.getDeclarationSpecifiers());
@@ -79,7 +79,7 @@ void visitor(const Syntax::Declaration &declaration) {
   DecAlign();
 }
 void visitor(const Syntax::FunctionDefinition &functionDefinition) {
-  PrintContent("FunctionDefinition");
+  Print("FunctionDefinition");
   llvm::outs() << &functionDefinition << "\n";
   IncAlign();
   visitor(functionDefinition.getDeclarationSpecifiers());
@@ -88,7 +88,7 @@ void visitor(const Syntax::FunctionDefinition &functionDefinition) {
   DecAlign();
 }
 void visitor(const Syntax::DeclarationSpecifiers &declarationSpecifiers) {
-  PrintContent("DeclarationSpecifiers");
+  Print("DeclarationSpecifiers");
   llvm::outs() << &declarationSpecifiers << "\n";
   IncAlign();
   for (const auto &storage : declarationSpecifiers.getStorageClassSpecifiers()) {
@@ -103,7 +103,7 @@ void visitor(const Syntax::DeclarationSpecifiers &declarationSpecifiers) {
   DecAlign();
 }
 void visitor(const Syntax::Declarator &declarator) {
-  PrintContent("Declarator");
+  Print("Declarator");
   llvm::outs() << &declarator << "\n";
   IncAlign();
   for (const auto &point : declarator.getPointers()) {
@@ -114,7 +114,7 @@ void visitor(const Syntax::Declarator &declarator) {
 }
 
 void visitor(const Syntax::AbstractDeclarator &abstractDeclarator) {
-  PrintContent("AbstractDeclarator");
+  Print("AbstractDeclarator");
   llvm::outs() << &abstractDeclarator << "\n";
   IncAlign();
   for (const auto &point : abstractDeclarator.getPointers()) {
@@ -127,7 +127,7 @@ void visitor(const Syntax::AbstractDeclarator &abstractDeclarator) {
 }
 
 void visitor(const Syntax::Initializer &initializer) {
-  PrintContent("Initializer");
+  Print("Initializer");
   llvm::outs() << &initializer << "\n";
   IncAlign();
   std::visit(overload{
@@ -140,7 +140,7 @@ void visitor(const Syntax::Initializer &initializer) {
 }
 
 void visitor(const Syntax::InitializerList &initializerList) {
-  PrintContent("InitializerList");
+  Print("InitializerList");
   llvm::outs() << &initializerList << "\n";
   IncAlign();
   for (const auto &vec : initializerList.getInitializerList()) {
@@ -150,7 +150,7 @@ void visitor(const Syntax::InitializerList &initializerList) {
              visitor(constantExpr);
           },
           [](const std::string &ident) {
-             PrintContent(ident, true);
+             Println(ident);
           },
       }, designator);
     }
@@ -160,24 +160,24 @@ void visitor(const Syntax::InitializerList &initializerList) {
 }
 
 void visitor(const Syntax::StorageClassSpecifier &storageClassSpecifier) {
-  PrintContent("StorageClassSpecifier");
+  Print("StorageClassSpecifier");
   llvm::outs() << &storageClassSpecifier << "\n";
   IncAlign();
   switch (storageClassSpecifier.getSpecifier()) {
   case Syntax::StorageClassSpecifier::Typedef:
-    PrintContent("Typedef", true);
+    Println("Typedef");
     break;
   case Syntax::StorageClassSpecifier::Extern:
-    PrintContent("Extern", true);
+    Println("Extern");
     break;
   case Syntax::StorageClassSpecifier::Static:
-    PrintContent("Static", true);
+    Println("Static");
     break;
   case Syntax::StorageClassSpecifier::Auto:
-    PrintContent("Auto", true);
+    Println("Auto");
     break;
   case Syntax::StorageClassSpecifier::Register:
-    PrintContent("Register", true);
+    Println("Register");
     break;
   default:
     break;
@@ -185,18 +185,18 @@ void visitor(const Syntax::StorageClassSpecifier &storageClassSpecifier) {
   DecAlign();
 }
 void visitor(const Syntax::TypeQualifier &typeQualifier) {
-  PrintContent("TypeQualifier");
+  Print("TypeQualifier");
   llvm::outs() << &typeQualifier << "\n";
   IncAlign();
   switch (typeQualifier.getQualifier()) {
   case Syntax::TypeQualifier::Const:
-    PrintContent("Const", true);
+    Println("Const");
     break;
   case Syntax::TypeQualifier::Volatile:
-    PrintContent("Volatile", true);
+    Println("Volatile");
     break;
   case Syntax::TypeQualifier::Restrict:
-    PrintContent("Restrict", true);
+    Println("Restrict");
     break;
   default:
     break;
@@ -204,71 +204,71 @@ void visitor(const Syntax::TypeQualifier &typeQualifier) {
   DecAlign();
 }
 void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
-  PrintContent("TypeSpecifier");
+  Print("TypeSpecifier");
   llvm::outs() << &typeSpecifier << "\n";
   IncAlign();
   std::visit(overload{
       [](const Syntax::TypeSpecifier::PrimitiveTypeSpecifier & primitiveTypeSpecifier) {
-            PrintContent("PrimitiveTypeSpecifier");
+            Print("PrimitiveTypeSpecifier");
             llvm::outs() << &primitiveTypeSpecifier << "\n";
             switch (primitiveTypeSpecifier) {
             case Syntax::TypeSpecifier::Void: {
               IncAlign();
-              PrintContent("Void", true);
+              Println("Void");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Char: {
               IncAlign();
-              PrintContent("Char", true);
+              Println("Char");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Bool: {
               IncAlign();
-              PrintContent("Bool", true);
+              Println("Bool");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Short: {
               IncAlign();
-              PrintContent("Short", true);
+              Println("Short");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Int: {
               IncAlign();
-              PrintContent("Int", true);
+              Println("Int");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Long: {
               IncAlign();
-              PrintContent("Long", true);
+              Println("Long");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Float: {
               IncAlign();
-              PrintContent("Float", true);
+              Println("Float");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Double: {
               IncAlign();
-              PrintContent("Double", true);
+              Println("Double");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Unsigned: {
               IncAlign();
-              PrintContent("Unsigned", true);
+              Println("Unsigned");
               DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Signed: {
               IncAlign();
-              PrintContent("Signed", true);
+              Println("Signed");
               DecAlign();
               break;
             }
@@ -277,7 +277,7 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
             }
           },
       [](const std::unique_ptr<Syntax::StructOrUnionSpecifier> & structOrUnionSpecifier) {
-           PrintContent("StructOrUnionSpecifier");
+           Print("StructOrUnionSpecifier");
            llvm::outs() << &structOrUnionSpecifier << " " << structOrUnionSpecifier->isUnion() << ", "
                         << structOrUnionSpecifier->getName() << "\n";
            {
@@ -297,12 +297,12 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
            }
       },
       [](const std::unique_ptr<Syntax::EnumSpecifier> & enumSpecifier) {
-           PrintContent("EnumSpecifier");
+           Print("EnumSpecifier");
            llvm::outs() << &enumSpecifier << " " << enumSpecifier->getName() << "\n";
            {
               IncAlign();
               for (const auto &enumerator : enumSpecifier->getEnumerators()) {
-                PrintContent(enumerator.mName);
+                Print(enumerator.mName);
                 if (enumerator.mValue) {
                   visitor(enumerator.mValue.value());
                 }
@@ -317,15 +317,15 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
   DecAlign();
 }
 void visitor(const Syntax::FunctionSpecifier &functionSpecifier ) {
-  PrintContent("FunctionSpecifier");
+  Print("FunctionSpecifier");
   llvm::outs() << &functionSpecifier << "\n";
   IncAlign();
-  PrintContent("inline", true);
+  Println("inline");
   DecAlign();
 }
 
 void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers) {
-  PrintContent("SpecifierQualifiers");
+  Print("SpecifierQualifiers");
   llvm::outs() << &specifierQualifiers << "\n";
   IncAlign();
   for (const auto &qualifier : specifierQualifiers.getTypeQualifiers()) {
@@ -338,7 +338,7 @@ void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers) {
 }
 
 void visitor(const Syntax::Pointer &pointer) {
-  PrintContent("Pointer");
+  Print("Pointer");
   llvm::outs() << &pointer << "\n";
   IncAlign();
   for (const auto &p : pointer.getTypeQualifiers()) {
@@ -348,26 +348,26 @@ void visitor(const Syntax::Pointer &pointer) {
 }
 
 void visitor(const Syntax::DirectDeclarator &directDeclarator) {
-//  PrintContent("DirectDeclarator");
+//  Print("DirectDeclarator");
 //  llvm::outs() << &directDeclarator << "\n";
   IncAlign();
   std::visit(overload{
       [](const Syntax::DirectDeclaratorIdent &ident) {
-         PrintContent("DirectDeclaratorIdent");
+         Print("DirectDeclaratorIdent");
          llvm::outs() << &ident << "\n";
          IncAlign();
-         PrintContent(ident.getIdentifierLoc(), true);
+         Println(ident.getIdentifierLoc());
          DecAlign();
       },
       [](const Syntax::DirectDeclaratorParent &directDeclaratorParent) {
-         PrintContent("DirectDeclaratorParent");
+         Print("DirectDeclaratorParent");
          llvm::outs() << &directDeclaratorParent << "\n";
          IncAlign();
          visitor(*directDeclaratorParent.getDeclarator());
          DecAlign();
       },
       [](const Syntax::DirectDeclaratorAssignExpr &directDeclaratorAssignExpr) {
-         PrintContent("DirectDeclaratorAssignExpr");
+         Print("DirectDeclaratorAssignExpr");
          llvm::outs() << &directDeclaratorAssignExpr << "\n";
          IncAlign();
          visitor(*directDeclaratorAssignExpr.getDirectDeclarator());
@@ -375,7 +375,7 @@ void visitor(const Syntax::DirectDeclarator &directDeclarator) {
          DecAlign();
       },
       [](const Syntax::DirectDeclaratorParentParamTypeList &directDeclaratorParentParamTypeList) {
-         PrintContent("DirectDeclaratorParentParamTypeList");
+         Print("DirectDeclaratorParentParamTypeList");
          llvm::outs() << &directDeclaratorParentParamTypeList << "\n";
          IncAlign();
          visitor(*directDeclaratorParentParamTypeList.getDirectDeclarator());
@@ -387,19 +387,19 @@ void visitor(const Syntax::DirectDeclarator &directDeclarator) {
 }
 
 void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
-//  PrintContent("DirectAbstractDeclarator");
+//  Print("DirectAbstractDeclarator");
 //  llvm::outs() << &directAbstractDeclarator << "\n";
   IncAlign();
   std::visit(overload{
                  [](const Syntax::DirectAbstractDeclaratorParent &directAbstractDeclaratorParent) {
-                   PrintContent("DirectAbstractDeclaratorParent");
+                   Print("DirectAbstractDeclaratorParent");
                    llvm::outs() << &directAbstractDeclaratorParent << "\n";
                    IncAlign();
                    visitor(*directAbstractDeclaratorParent.getAbstractDeclarator());
                    DecAlign();
                  },
                  [](const Syntax::DirectAbstractDeclaratorAssignExpr &directAbstractDeclaratorAssignExpr) {
-                   PrintContent("DirectAbstractDeclaratorAssignExpr");
+                   Print("DirectAbstractDeclaratorAssignExpr");
                    llvm::outs() << &directAbstractDeclaratorAssignExpr << "\n";
                    IncAlign();
                    if (directAbstractDeclaratorAssignExpr.getDirectAbstractDeclarator()) {
@@ -410,7 +410,7 @@ void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
                    DecAlign();
                  },
                  [](const Syntax::DirectAbstractDeclaratorParamTypeList &directAbstractDeclaratorParamTypeList) {
-                   PrintContent("DirectAbstractDeclaratorParamTypeList");
+                   Print("DirectAbstractDeclaratorParamTypeList");
                    llvm::outs() << &directAbstractDeclaratorParamTypeList << "\n";
                    IncAlign();
                    if (directAbstractDeclaratorParamTypeList.getDirectAbstractDeclarator()) {
@@ -426,7 +426,7 @@ void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
 }
 
 void visitor(const Syntax::ParamTypeList &paramTypeList) {
-  PrintContent("ParamTypeList");
+  Print("ParamTypeList");
   llvm::outs() << &paramTypeList << "\n";
   IncAlign();
   visitor(paramTypeList.getParameterList());
@@ -437,7 +437,7 @@ void visitor(const Syntax::ParamTypeList &paramTypeList) {
 }
 
 void visitor(const Syntax::ParamList &paramList) {
-  PrintContent("ParamList");
+  Print("ParamList");
   llvm::outs() << &paramList << "\n";
   IncAlign();
   for (const auto &paramDecl : paramList.getParameterDeclarations()) {
@@ -455,7 +455,7 @@ void visitor(const Syntax::ParamList &paramList) {
 }
 
 void visitor(const Syntax::BlockStmt &blockStmt) {
-  PrintContent("BlockStmt");
+  Print("BlockStmt");
   llvm::outs() << &blockStmt << "\n";
   IncAlign();
   for (const auto &blockItem : blockStmt.getBlockItems()) {
@@ -465,7 +465,7 @@ void visitor(const Syntax::BlockStmt &blockStmt) {
 }
 
 void visitor(const Syntax::BlockItem &blockItem) {
-//  PrintContent("BlockItem");
+//  Print("BlockItem");
 //  llvm::outs() << &blockItem << "\n";
   IncAlign();
   std::visit(overload{
@@ -514,7 +514,7 @@ void visitor(const Syntax::Stmt &stmt) {
 }
 
 void visitor(const Syntax::IfStmt &ifStmt){
-  PrintContent("IfStmt");
+  Print("IfStmt");
   llvm::outs() << &ifStmt << "\n";
   IncAlign();
   std::string ws(LeftAlign, ' ');
@@ -526,7 +526,7 @@ void visitor(const Syntax::IfStmt &ifStmt){
   DecAlign();
 }
 void visitor(const Syntax::ForStmt &forStmt){
-  PrintContent("ForStmt");
+  Print("ForStmt");
   llvm::outs() << &forStmt << "\n";
   IncAlign();
   std::visit(overload{
@@ -543,7 +543,7 @@ void visitor(const Syntax::ForStmt &forStmt){
   DecAlign();
 }
 void visitor(const Syntax::WhileStmt &whileStmt){
-  PrintContent("WhileStmt");
+  Print("WhileStmt");
   llvm::outs() << &whileStmt << "\n";
   IncAlign();
   visitor(whileStmt.getExpression());
@@ -553,7 +553,7 @@ void visitor(const Syntax::WhileStmt &whileStmt){
   DecAlign();
 }
 void visitor(const Syntax::DoWhileStmt &doWhileStmt){
-  PrintContent("DoWhileStmt");
+  Print("DoWhileStmt");
   llvm::outs() << &doWhileStmt << "\n";
   IncAlign();
   if (doWhileStmt.getStatement()) {
@@ -563,15 +563,15 @@ void visitor(const Syntax::DoWhileStmt &doWhileStmt){
   DecAlign();
 }
 void visitor(const Syntax::BreakStmt &breakStmt){
-  PrintContent("BreakStmt");
+  Print("BreakStmt");
   llvm::outs() << &breakStmt << "\n";
 }
 void visitor(const Syntax::ContinueStmt &continueStmt){
-  PrintContent("ContinueStmt");
+  Print("ContinueStmt");
   llvm::outs() << &continueStmt << "\n";
 }
 void visitor(const Syntax::SwitchStmt &switchStmt){
-  PrintContent("SwitchStmt");
+  Print("SwitchStmt");
   llvm::outs() << &switchStmt << "\n";
   IncAlign();
   visitor(switchStmt.getExpression());
@@ -581,7 +581,7 @@ void visitor(const Syntax::SwitchStmt &switchStmt){
   DecAlign();
 }
 void visitor(const Syntax::CaseStmt &caseStmt){
-  PrintContent("CaseStmt");
+  Print("CaseStmt");
   llvm::outs() << &caseStmt << "\n";
   IncAlign();
   visitor(caseStmt.getConstantExpr());
@@ -591,7 +591,7 @@ void visitor(const Syntax::CaseStmt &caseStmt){
   DecAlign();
 }
 void visitor(const Syntax::DefaultStmt &defaultStmt){
-  PrintContent("DefaultStmt");
+  Print("DefaultStmt");
   llvm::outs() << &defaultStmt << "\n";
   IncAlign();
   if (defaultStmt.getStatement()) {
@@ -600,28 +600,28 @@ void visitor(const Syntax::DefaultStmt &defaultStmt){
   DecAlign();
 }
 void visitor(const Syntax::GotoStmt &gotoStmt){
-  PrintContent("GotoStmt");
+  Print("GotoStmt");
   llvm::outs() << &gotoStmt << "\n";
   IncAlign();
-  PrintContent(gotoStmt.getIdentifier(), true);
+  Println(gotoStmt.getIdentifier());
   DecAlign();
 }
 void visitor(const Syntax::LabelStmt &labelStmt){
-  PrintContent("LabelStmt");
+  Print("LabelStmt");
   llvm::outs() << &labelStmt << "\n";
   IncAlign();
-  PrintContent(labelStmt.getIdentifier(), true);
+  Println(labelStmt.getIdentifier());
   DecAlign();
 }
 void visitor(const Syntax::ExprStmt &exprStmt){
-  PrintContent("ExprStmt");
+  Print("ExprStmt");
   llvm::outs() << &exprStmt << "\n";
   if (exprStmt.getOptionalExpression()) {
     visitor(*exprStmt.getOptionalExpression());
   }
 }
 void visitor(const Syntax::ReturnStmt &returnStmt){
-  PrintContent("ReturnStmt");
+  Print("ReturnStmt");
   llvm::outs() << &returnStmt << "\n";
   if (returnStmt.getExpression()) {
     visitor(*returnStmt.getExpression());
@@ -629,7 +629,7 @@ void visitor(const Syntax::ReturnStmt &returnStmt){
 }
 
 void visitor(const Syntax::Expr &expr) {
-  PrintContent("Expr");
+  Print("Expr");
   llvm::outs() << &expr << "\n";
   IncAlign();
   for (const auto &assignExpr : expr.getAssignExpressions()) {
@@ -639,54 +639,54 @@ void visitor(const Syntax::Expr &expr) {
 }
 
 void visitor(const Syntax::AssignExpr &assignExpr) {
-  PrintContent("AssignExpr");
+  Print("AssignExpr");
   llvm::outs() << &assignExpr << "\n";
   IncAlign();
   visitor(assignExpr.getConditionalExpr());
   for (const auto &pair : assignExpr.getOptionalConditionalExpr()) {
     switch (pair.first) {
     case Syntax::AssignExpr::Assign: {
-      PrintContent("Assign");
+      Print("Assign");
       break;
     }
     case Syntax::AssignExpr::PlusAssign: {
-      PrintContent("PlusAssign");
+      Print("PlusAssign");
       break;
     }
     case Syntax::AssignExpr::MinusAssign: {
-      PrintContent("MinusAssign");
+      Print("MinusAssign");
       break;
     }
     case Syntax::AssignExpr::MultiplyAssign: {
-      PrintContent("MultiplyAssign");
+      Print("MultiplyAssign");
       break;
     }
     case Syntax::AssignExpr::DivideAssign: {
-      PrintContent("DivideAssign");
+      Print("DivideAssign");
       break;
     }
     case Syntax::AssignExpr::ModuloAssign: {
-      PrintContent("ModuloAssign");
+      Print("ModuloAssign");
       break;
     }
     case Syntax::AssignExpr::LeftShiftAssign: {
-      PrintContent("LeftShiftAssign");
+      Print("LeftShiftAssign");
       break;
     }
     case Syntax::AssignExpr::RightShiftAssign: {
-      PrintContent("RightShiftAssign");
+      Print("RightShiftAssign");
       break;
     }
     case Syntax::AssignExpr::BitAndAssign: {
-      PrintContent("BitAndAssign");
+      Print("BitAndAssign");
       break;
     }
     case Syntax::AssignExpr::BitOrAssign: {
-      PrintContent("BitOrAssign");
+      Print("BitOrAssign");
       break;
     }
     case Syntax::AssignExpr::BitXorAssign: {
-      PrintContent("BitXorAssign");
+      Print("BitXorAssign");
       break;
     }
     default:
@@ -699,7 +699,7 @@ void visitor(const Syntax::AssignExpr &assignExpr) {
 
 /// conditionalExpr
 void visitor(const Syntax::ConstantExpr &constantExpr) {
-  PrintContent("ConditionalExpr");
+  Print("ConditionalExpr");
   llvm::outs() << &constantExpr << "\n";
   IncAlign();
   visitor(constantExpr.getLogicalOrExpression());
@@ -712,7 +712,7 @@ void visitor(const Syntax::ConstantExpr &constantExpr) {
   DecAlign();
 }
 void visitor(const Syntax::LogOrExpr &logOrExpr){
-  PrintContent("LogOrExpr");
+  Print("LogOrExpr");
   llvm::outs() << &logOrExpr << "\n";
   IncAlign();
   visitor(logOrExpr.getAndExpression());
@@ -722,7 +722,7 @@ void visitor(const Syntax::LogOrExpr &logOrExpr){
   DecAlign();
 }
 void visitor(const Syntax::LogAndExpr &logAndExpr){
-  PrintContent("LogAndExpr");
+  Print("LogAndExpr");
   llvm::outs() << &logAndExpr << "\n";
   IncAlign();
   visitor(logAndExpr.getBitOrExpression());
@@ -732,7 +732,7 @@ void visitor(const Syntax::LogAndExpr &logAndExpr){
   DecAlign();
 }
 void visitor(const Syntax::BitOrExpr &bitOrExpr){
-  PrintContent("BitOrExpr");
+  Print("BitOrExpr");
   llvm::outs() << &bitOrExpr << "\n";
   IncAlign();
   visitor(bitOrExpr.getBitXorExpression());
@@ -742,7 +742,7 @@ void visitor(const Syntax::BitOrExpr &bitOrExpr){
   DecAlign();
 }
 void visitor(const Syntax::BitXorExpr &bitXorExpr){
-  PrintContent("BitXorExpr");
+  Print("BitXorExpr");
   llvm::outs() << &bitXorExpr << "\n";
   IncAlign();
   visitor(bitXorExpr.getBitAndExpr());
@@ -752,7 +752,7 @@ void visitor(const Syntax::BitXorExpr &bitXorExpr){
   DecAlign();
 }
 void visitor(const Syntax::BitAndExpr &bitAndExpr){
-  PrintContent("BitAndExpr");
+  Print("BitAndExpr");
   llvm::outs() << &bitAndExpr << "\n";
   IncAlign();
   visitor(bitAndExpr.getEqualExpr());
@@ -762,18 +762,18 @@ void visitor(const Syntax::BitAndExpr &bitAndExpr){
   DecAlign();
 }
 void visitor(const Syntax::EqualExpr &equalExpr){
-  PrintContent("EqualExpr");
+  Print("EqualExpr");
   llvm::outs() << &equalExpr << "\n";
   IncAlign();
   visitor(equalExpr.getRelationalExpr());
   for (const auto &relationExpr: equalExpr.getOptionalRelationalExpr()) {
     switch (relationExpr.first) {
     case Syntax::EqualExpr::Equal: {
-      PrintContent("Equal");
+      Print("Equal");
       break;
     }
     case Syntax::EqualExpr::NotEqual: {
-      PrintContent("NotEqual");
+      Print("NotEqual");
       break;
     }
     default:
@@ -784,26 +784,26 @@ void visitor(const Syntax::EqualExpr &equalExpr){
   DecAlign();
 }
 void visitor(const Syntax::RelationalExpr &relationalExpr){
-  PrintContent("RelationalExpr");
+  Print("RelationalExpr");
   llvm::outs() << &relationalExpr << "\n";
   IncAlign();
   visitor(relationalExpr.getShiftExpr());
   for (const auto &shiftExpr: relationalExpr.getOptionalShiftExpressions()) {
     switch (shiftExpr.first) {
     case Syntax::RelationalExpr::LessThan: {
-      PrintContent("LessThan");
+      Print("LessThan");
       break;
     }
     case Syntax::RelationalExpr::LessThanOrEqual: {
-      PrintContent("LessThanOrEqual");
+      Print("LessThanOrEqual");
       break;
     }
     case Syntax::RelationalExpr::GreaterThan: {
-      PrintContent("GreaterThan");
+      Print("GreaterThan");
       break;
     }
     case Syntax::RelationalExpr::GreaterThanOrEqual: {
-      PrintContent("GreaterThanOrEqual");
+      Print("GreaterThanOrEqual");
       break;
     }
     default:
@@ -814,18 +814,18 @@ void visitor(const Syntax::RelationalExpr &relationalExpr){
   DecAlign();
 }
 void visitor(const Syntax::ShiftExpr &shiftExpr){
-  PrintContent("ShiftExpr");
+  Print("ShiftExpr");
   llvm::outs() << &shiftExpr << "\n";
   IncAlign();
   visitor(shiftExpr.getAdditiveExpr());
   for (const auto &additiveExpr: shiftExpr.getOptAdditiveExps()) {
     switch (additiveExpr.first) {
     case Syntax::ShiftExpr::Left: {
-      PrintContent("Shift Left");
+      Print("Shift Left");
       break;
     }
     case Syntax::ShiftExpr::Right: {
-      PrintContent("Shift Right");
+      Print("Shift Right");
       break;
     }
     default:
@@ -836,18 +836,18 @@ void visitor(const Syntax::ShiftExpr &shiftExpr){
   DecAlign();
 }
 void visitor(const Syntax::AdditiveExpr &additiveExpr){
-  PrintContent("AdditiveExpr");
+  Print("AdditiveExpr");
   llvm::outs() << &additiveExpr << "\n";
   IncAlign();
   visitor(additiveExpr.getMultiExpr());
   for (const auto &multiExpr: additiveExpr.getOptionalMultiExpr()) {
     switch (multiExpr.first) {
     case Syntax::AdditiveExpr::Minus: {
-      PrintContent("Minus");
+      Print("Minus");
       break;
     }
     case Syntax::AdditiveExpr::Plus: {
-      PrintContent("Plus");
+      Print("Plus");
       break;
     }
     default:
@@ -858,22 +858,22 @@ void visitor(const Syntax::AdditiveExpr &additiveExpr){
   DecAlign();
 }
 void visitor(const Syntax::MultiExpr &multiExpr){
-  PrintContent("MultiExpr");
+  Print("MultiExpr");
   llvm::outs() << &multiExpr << "\n";
   IncAlign();
   visitor(multiExpr.getCastExpr());
   for (const auto &castExpr: multiExpr.getOptionalCastExpr()) {
     switch (castExpr.first) {
     case Syntax::MultiExpr::Multiply: {
-      PrintContent("Multiply");
+      Print("Multiply");
       break;
     }
     case Syntax::MultiExpr::Divide: {
-      PrintContent("Divide");
+      Print("Divide");
       break;
     }
     case Syntax::MultiExpr::Modulo: {
-      PrintContent("Modulo");
+      Print("Modulo");
       break;
     }
     default:

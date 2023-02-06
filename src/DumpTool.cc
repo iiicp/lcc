@@ -150,7 +150,9 @@ void visitor(const Syntax::InitializerList &initializerList) {
              visitor(constantExpr);
           },
           [](const std::string &ident) {
+             IncAlign();
              Println(ident);
+             DecAlign();
           },
       }, designator);
     }
@@ -211,70 +213,52 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
       [](const Syntax::TypeSpecifier::PrimitiveTypeSpecifier & primitiveTypeSpecifier) {
             Print("PrimitiveTypeSpecifier");
             llvm::outs() << &primitiveTypeSpecifier << "\n";
+            IncAlign();
             switch (primitiveTypeSpecifier) {
             case Syntax::TypeSpecifier::Void: {
-              IncAlign();
               Println("Void");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Char: {
-              IncAlign();
               Println("Char");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Bool: {
-              IncAlign();
               Println("Bool");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Short: {
-              IncAlign();
               Println("Short");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Int: {
-              IncAlign();
               Println("Int");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Long: {
-              IncAlign();
               Println("Long");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Float: {
-              IncAlign();
               Println("Float");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Double: {
-              IncAlign();
               Println("Double");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Unsigned: {
-              IncAlign();
               Println("Unsigned");
-              DecAlign();
               break;
             }
             case Syntax::TypeSpecifier::Signed: {
-              IncAlign();
               Println("Signed");
-              DecAlign();
               break;
             }
             default:
               break;
             }
+            DecAlign();
           },
       [](const std::unique_ptr<Syntax::StructOrUnionSpecifier> & structOrUnionSpecifier) {
            Print("StructOrUnionSpecifier");
@@ -431,7 +415,7 @@ void visitor(const Syntax::ParamTypeList &paramTypeList) {
   IncAlign();
   visitor(paramTypeList.getParameterList());
   if (paramTypeList.hasEllipse()) {
-    llvm::outs() << "...\n";
+    Println("...");
   }
   DecAlign();
 }
@@ -517,7 +501,6 @@ void visitor(const Syntax::IfStmt &ifStmt){
   Print("IfStmt");
   llvm::outs() << &ifStmt << "\n";
   IncAlign();
-  std::string ws(LeftAlign, ' ');
   visitor(ifStmt.getExpression());
   visitor(*ifStmt.getThenStmt());
   if (ifStmt.getElseStmt()) {
@@ -884,9 +867,197 @@ void visitor(const Syntax::MultiExpr &multiExpr){
   DecAlign();
 }
 void visitor(const Syntax::CastExpr &castExpr){
+  Print("CastExpr");
+  llvm::outs() << &castExpr << "\n";
+  IncAlign();
+  std::visit(overload{
+      [](const Syntax::UnaryExpr &unaryExpr) {visitor(unaryExpr);},
+      [](const std::pair<Syntax::TypeName, std::unique_ptr<Syntax::CastExpr>> &pair) {
+         visitor(pair.first);
+         visitor(*pair.second);
+      }
+  }, castExpr.getVariant());
+  DecAlign();
 }
-void visitor(const Syntax::UnaryExpr &unaryExpr){}
-void visitor(const Syntax::TypeName &typeName){}
-void visitor(const Syntax::PostFixExpr &postFixExpr){}
-void visitor(const Syntax::PrimaryExpr &primaryExpr){}
+void visitor(const Syntax::UnaryExpr &unaryExpr){
+  IncAlign();
+  std::visit(overload{
+    [](const Syntax::UnaryExprPostFixExpr &unaryExprPostFixExpr) {
+       Print("UnaryExprPostFixExpr");
+       llvm::outs() << &unaryExprPostFixExpr << "\n";
+       IncAlign();
+       visitor(unaryExprPostFixExpr.getPostExpr());
+       DecAlign();
+    },
+    [](const Syntax::UnaryExprUnaryOperator &unaryExprUnaryOperator) {
+       Print("UnaryExprUnaryOperator");
+       llvm::outs() << &unaryExprUnaryOperator << "\n";
+       IncAlign();
+       switch (unaryExprUnaryOperator.getOperator()) {
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::Increment: {
+         Println("Increment");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::Decrement: {
+         Println("Decrement");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::Ampersand: {
+         Println("Ampersand");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::Asterisk:{
+         Println("Asterisk");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::Plus:{
+         Println("Plus");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::Minus:{
+         Println("Minus");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::BitNot:{
+         Println("BitNot");
+         break;
+       }
+       case Syntax::UnaryExprUnaryOperator::UnaryOperator::LogicalNot:{
+         Println("LogicalNot");
+         break;
+       }
+       default:
+         break;
+       }
+       visitor(*unaryExprUnaryOperator.getCastExpr());
+       DecAlign();
+    },
+    [](const Syntax::UnaryExprSizeOf &unaryExprSizeOf) {
+       Print("UnaryExprSizeOf");
+       llvm::outs() << &unaryExprSizeOf << "\n";
+       IncAlign();
+       std::visit(overload{
+         [](const std::unique_ptr<Syntax::UnaryExpr>& unaryExpr){visitor(*unaryExpr);},
+         [](const std::unique_ptr<Syntax::TypeName>& typeName){visitor(*typeName);},
+       },
+       unaryExprSizeOf.getVariant());
+       DecAlign();
+    },
+  }, unaryExpr);
+  DecAlign();
+}
+void visitor(const Syntax::TypeName &typeName){
+  Print("TypeName");
+  llvm::outs() << &typeName << "\n";
+  IncAlign();
+  visitor(typeName.getSpecifierQualifiers());
+  if (typeName.getAbstractDeclarator())
+    visitor(*typeName.getAbstractDeclarator());
+  DecAlign();
+}
+void visitor(const Syntax::PostFixExpr &postFixExpr){
+  std::visit(overload{
+     [](const Syntax::PostFixExprPrimaryExpr &primaryExpr) {
+          IncAlign();
+          Print("PostFixExprPrimaryExpr");
+          llvm::outs() << &primaryExpr << "\n";
+          visitor(primaryExpr.getPrimaryExpr());
+          DecAlign();
+     },
+     [](const Syntax::PostFixExprSubscript &subscript) {
+         IncAlign();
+         Print("PostFixExprSubscript");
+         llvm::outs() << &subscript << "\n";
+         visitor(*subscript.getPostFixExpr());
+         visitor(subscript.getExpr());
+         DecAlign();
+     },
+     [](const Syntax::PostFixExprFuncCall &funcCall) {
+         IncAlign();
+         Print("PostFixExprFuncCall");
+         llvm::outs() << &funcCall << "\n";
+         visitor(*funcCall.getPostFixExpr());
+         for (const auto &assignExpr : funcCall.getOptionalAssignExpressions()) {
+           visitor(assignExpr);
+         }
+         DecAlign();
+     },
+     [](const Syntax::PostFixExprDot &dot) {
+         IncAlign();
+         Print("PostFixExprDot");
+         llvm::outs() << &dot << "\n";
+         visitor(*dot.getPostFixExpr());
+         Println(dot.getIdentifier());
+         DecAlign();
+       },
+     [](const Syntax::PostFixExprArrow &arrow) {
+         IncAlign();
+         Print("PostFixExprArrow");
+         llvm::outs() << &arrow << "\n";
+         visitor(*arrow.getPostFixExpr());
+         Println(arrow.getIdentifier());
+         DecAlign();
+       },
+     [](const Syntax::PostFixExprIncrement &increment) {
+         IncAlign();
+         Print("PostFixExprIncrement");
+         llvm::outs() << &increment << "\n";
+         visitor(*increment.getPostFixExpr());
+         DecAlign();
+     },
+     [](const Syntax::PostFixExprDecrement &decrement) {
+         IncAlign();
+         Print("PostFixExprDecrement");
+         llvm::outs() << &decrement << "\n";
+         visitor(*decrement.getPostFixExpr());
+         DecAlign();
+     },
+     [](const Syntax::PostFixExprTypeInitializer &typeInitializer) {
+         IncAlign();
+         Print("PostFixExprTypeInitializer");
+         llvm::outs() << &typeInitializer << "\n";
+         visitor(*typeInitializer.getTypeName());
+         visitor(*typeInitializer.getInitializerList());
+         DecAlign();
+     },
+  }, postFixExpr);
+}
+void visitor(const Syntax::PrimaryExpr &primaryExpr){
+  std::visit(overload{
+     [](const Syntax::PrimaryExprIdent& ident) {
+       IncAlign();
+       Print("PrimaryExprIdent");
+       llvm::outs() << &ident << "\n";
+       {
+         IncAlign();
+         Println(ident.getIdentifier());
+         DecAlign();
+       }
+       DecAlign();
+     },
+     [](const Syntax::PrimaryExprConstant& constant) {
+       IncAlign();
+       Print("PrimaryExprConstant");
+       llvm::outs() << &constant << "\n";
+       std::visit([](auto &&value) {
+         IncAlign();
+         using T = std::decay_t<decltype(value)>;
+         if constexpr (std::is_same_v<T, std::string>) {
+           Println(value);
+         }else {
+           Println(std::to_string(value));
+         }
+         DecAlign();
+       }, constant.getValue());
+       DecAlign();
+     },
+     [](const Syntax::PrimaryExprParent& parent) {
+         IncAlign();
+         Print("PrimaryExprParent");
+         llvm::outs() << &parent << "\n";
+         visitor(parent.getExpr());
+         DecAlign();
+     },
+  }, primaryExpr);
+}
 }

@@ -332,7 +332,7 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
         (std::move(*declarator)),nullptr});
   }else {
     Consume(tok::equal);
-    auto start = mTokCursor;
+    start = mTokCursor;
     auto initializer = ParseInitializer();
     if (!initializer) {
       LOGE(*start, "parse initializer error");
@@ -345,11 +345,15 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
 
   while (Peek(tok::comma)) {
     Consume(tok::comma);
-    auto start = mTokCursor;
+    start = mTokCursor;
     declarator = ParseDeclarator();
     if (!declarator) {
       LOGE(*start, "parse declarator error");
       return {};
+    }
+    if (!isTypedef) {
+      auto name = getDeclaratorName(*declarator);
+      mScope.addToScope(name);
     }
     if (!Peek(tok::equal)) {
       initDeclarators.push_back(
@@ -357,7 +361,7 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
            nullptr});
     } else {
       Consume(tok::equal);
-      auto start = mTokCursor;
+      start = mTokCursor;
       auto initializer = ParseInitializer();
       if (!initializer) {
         LOGE(*start, "parse initializer error");
@@ -497,6 +501,7 @@ Parser::ParseStructOrUnionSpecifier() {
         LOGE(*start,"parse struct declarator error");
         return {};
       }
+      mScope.addToScope(getDeclaratorName(*declarator));
       if (Peek(tok::colon)) {
         Consume(tok::colon);
         auto constant = ParseConditionalExpr();
@@ -516,6 +521,7 @@ Parser::ParseStructOrUnionSpecifier() {
           LOGE(*start, "parse struct declarator error");
           return {};
         }
+        mScope.addToScope(getDeclaratorName(*declarator));
         if (Peek(tok::colon)) {
           Consume(tok::colon);
           auto constant = ParseConditionalExpr();
@@ -974,6 +980,7 @@ std::optional<Syntax::EnumSpecifier::Enumerator> Parser::ParseEnumerator() {
     return {};
   }
   std::string_view enumValueName = mTokCursor->getStrTokName();
+  mScope.addToScope(enumValueName);
   Consume(tok::identifier);
   if (Peek(tok::equal)) {
     Consume(tok::equal);

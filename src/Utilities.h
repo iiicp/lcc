@@ -63,7 +63,7 @@ struct YComb
 template <typename G>
 YComb(G) -> YComb<G>;
 
-std::string getDeclaratorName(const Syntax::Declarator& declarator);
+std::string_view getDeclaratorName(const Syntax::Declarator& declarator);
 const Syntax::DirectDeclaratorParentParamTypeList *getFuncDeclarator(const Syntax::Declarator &declarator);
 }
 #endif // LCC_UTILITIES_H

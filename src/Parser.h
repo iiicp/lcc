@@ -29,17 +29,17 @@ public:
   class Scope {
   private:
     struct Symbol {
-      std::string identifier;
+      std::string_view identifier;
       bool isTypedef{};
     };
-    std::vector<std::unordered_map<std::string, Symbol>> mCurrentScope;
+    std::vector<std::unordered_map<std::string_view, Symbol>> mCurrentScope;
   public:
     Scope() {
       mCurrentScope.emplace_back();
     }
-    void addTypedef(const std::string& name);
-    bool isTypedefInScope(const std::string& name) const;
-    void addToScope(const std::string& name);
+    void addTypedef(std::string_view name);
+    bool isTypedefInScope(std::string_view name) const;
+    void addToScope(std::string_view name);
     void pushScope();
     void popScope();
   };

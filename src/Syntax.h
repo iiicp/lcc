@@ -13,7 +13,7 @@
 #define LCC_SYNTAX_H
 #include "Token.h"
 #include <optional>
-#include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 namespace lcc::Syntax {
@@ -123,11 +123,11 @@ public:
  */
 class PrimaryExprIdent final : public Node {
 private:
-  std::string mIdent;
+  std::string_view mIdent;
 
 public:
-  PrimaryExprIdent(std::string identifier) : mIdent(std::move(identifier)){};
-  [[nodiscard]] const std::string &getIdentifier() const { return mIdent; }
+  PrimaryExprIdent(std::string_view identifier) : mIdent(identifier){};
+  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdent; }
 };
 
 /*
@@ -137,7 +137,7 @@ public:
 class PrimaryExprConstant final : public Node {
 public:
   using Variant = std::variant<std::int32_t, std::uint32_t, std::int64_t,
-                               std::uint64_t, float, double, std::string>;
+                               std::uint64_t, float, double, std::string_view>;
 
 private:
   Variant mValue;
@@ -259,18 +259,18 @@ public:
 class PostFixExprDot final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
-  std::string mIdentifier;
+  std::string_view mIdentifier;
 
 public:
   PostFixExprDot(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                 std::string identifier)
+                 std::string_view identifier)
       : mPostFixExpr(std::move(postFixExpr)),
         mIdentifier(std::move(identifier)) {}
 
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
     return mPostFixExpr.get();
   }
-  [[nodiscard]] const std::string &getIdentifier() const { return mIdentifier; }
+  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
 };
 
 /**
@@ -280,17 +280,17 @@ public:
 class PostFixExprArrow final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
-  std::string mIdentifier;
+  std::string_view mIdentifier;
 
 public:
   PostFixExprArrow(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                   std::string identifier)
+                   std::string_view identifier)
       : mPostFixExpr(std::move(postFixExpr)),
         mIdentifier(std::move(identifier)) {}
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
     return mPostFixExpr.get();
   }
-  [[nodiscard]] const std::string &getIdentifier() const { return mIdentifier; }
+  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
 };
 
 /**
@@ -961,11 +961,11 @@ public:
  */
 class LabelStmt final : public Node {
 private:
-  std::string mIdentifier;
+  std::string_view mIdentifier;
 
 public:
-  LabelStmt(std::string identifier) : mIdentifier(std::move(identifier)) {}
-  [[nodiscard]] const std::string &getIdentifier() const { return mIdentifier; }
+  LabelStmt(std::string_view identifier) : mIdentifier(identifier) {}
+  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
 };
 
 /**
@@ -974,11 +974,11 @@ public:
  */
 class GotoStmt final : public Node {
 private:
-  std::string mIdentifier;
+  std::string_view mIdentifier;
 
 public:
-  GotoStmt(std::string identifier) : mIdentifier(std::move(identifier)) {}
-  [[nodiscard]] const std::string &getIdentifier() const { return mIdentifier; }
+  GotoStmt(std::string_view identifier) : mIdentifier(identifier) {}
+  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
 };
 
 /**
@@ -1425,13 +1425,13 @@ using DirectDeclarator =
  *  identifier
  */
 class DirectDeclaratorIdent final : public Node {
-  std::string mIdentifierLoc;
+  std::string_view mIdent;
 
 public:
-  DirectDeclaratorIdent(std::string identifierLoc)
-      : mIdentifierLoc(std::move(identifierLoc)) {}
+  DirectDeclaratorIdent(std::string_view ident)
+      : mIdent(ident) {}
 
-  [[nodiscard]] std::string getIdentifierLoc() const { return mIdentifierLoc; }
+  [[nodiscard]] const std::string_view& getIdent() const { return mIdent; }
 };
 
 /**
@@ -1554,19 +1554,19 @@ public:
     std::vector<StructDeclarator> structDeclarators;
   };
 private:
-  std::string mId;
+  std::string_view mId;
   bool mIsUnion;
   std::vector<StructDeclaration> mStructDeclarations;
 
 public:
-  StructOrUnionSpecifier(bool isUnion, std::string &&identifier,
+  StructOrUnionSpecifier(bool isUnion, std::string_view identifier,
                          std::vector<StructDeclaration> &&structDeclarations)
-      : mIsUnion(isUnion), mId(std::move(identifier)),
+      : mIsUnion(isUnion), mId(identifier),
         mStructDeclarations(std::move(structDeclarations)) {}
 
   [[nodiscard]] bool isUnion() const { return mIsUnion; }
 
-  [[nodiscard]] const std::string &getName() const { return mId; }
+  [[nodiscard]] std::string_view getTag() const { return mId; }
 
   [[nodiscard]] const std::vector<StructDeclaration> &
   getStructDeclarations() const {
@@ -1594,24 +1594,24 @@ public:
 class EnumSpecifier final : public Node {
 public:
   struct Enumerator {
-    std::string mName;
+    std::string_view mName;
     std::optional<ConstantExpr> mValue;
     Enumerator() = default;
-    Enumerator(std::string&& name, std::optional<ConstantExpr>&& value = {})
-        : mName(std::move(name)), mValue(std::move(value)) {};
+    Enumerator(std::string_view name, std::optional<ConstantExpr>&& value = {})
+        : mName(name), mValue(std::move(value)) {};
     Enumerator(const Enumerator &) = delete;
     Enumerator &operator=(const Enumerator &) = delete;
     Enumerator(Enumerator &&) = default;
     Enumerator &operator=(Enumerator &&) = default;
   };
 private:
-  std::string mId;
+  std::string_view mId;
   std::vector<Enumerator> mEnumerators;
 public:
-  EnumSpecifier(std::string &&id, std::vector<Enumerator> &&enumerators)
-      : mId(std::move(id)), mEnumerators(std::move(enumerators)) {}
+  EnumSpecifier(std::string_view id, std::vector<Enumerator> &&enumerators)
+      : mId(id), mEnumerators(std::move(enumerators)) {}
 
-  [[nodiscard]] const std::string &getName() const {
+  [[nodiscard]] const std::string_view &getName() const {
     return mId;
   }
   [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const {
@@ -1694,7 +1694,7 @@ public:
  */
 class InitializerList final : public Node {
 public:
-  using Designator = std::variant<ConstantExpr, std::string>;
+  using Designator = std::variant<ConstantExpr, std::string_view>;
 
   using DesignatorList = std::vector<Designator>;
 

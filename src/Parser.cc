@@ -155,7 +155,7 @@ next_specifier:
     break;
   }
   case tok::identifier: {
-    auto name = mTokCursor->getContent();
+    auto name = mTokCursor->getStrTokName();
     if (!seeTy && mScope.isTypedefInScope(name)) {
       Consume(tok::identifier);
       declarationSpecifiers.addTypeSpecifier(Syntax::TypeSpecifier(name));
@@ -265,7 +265,7 @@ next_specifier:
     break;
   }
   case tok::identifier: {
-    auto name = mTokCursor->getContent();
+    auto name = mTokCursor->getStrTokName();
     if (!seeTy && mScope.isTypedefInScope(name)) {
       Consume(tok::identifier);
       specifierQualifiers.addTypeSpecifier(Syntax::TypeSpecifier(name));
@@ -453,15 +453,15 @@ Parser::ParseStructOrUnionSpecifier() {
     isUnion = true;
   }
   ConsumeAny();
-  std::string name{""};
+  std::string_view tagName;
   switch (mTokCursor->getTokenKind()) {
   case tok::identifier: {
-    name = mTokCursor->getContent();
+    tagName = mTokCursor->getStrTokName();
     Consume(tok::identifier);
     if (Peek(tok::l_brace)) {
       goto lbrace;
     }
-    return Syntax::StructOrUnionSpecifier(isUnion, std::move(name), {});
+    return Syntax::StructOrUnionSpecifier(isUnion, tagName, {});
   }
   case tok::l_brace: {
   lbrace:
@@ -520,7 +520,7 @@ Parser::ParseStructOrUnionSpecifier() {
           {std::move(specifierQualifiers), std::move(declarators)});
     }
     Match(tok::r_brace);
-    return Syntax::StructOrUnionSpecifier(isUnion, std::move(name),
+    return Syntax::StructOrUnionSpecifier(isUnion, tagName,
                                           std::move(structDeclarations));
   }
   default:
@@ -615,7 +615,7 @@ std::optional<Syntax::DirectDeclarator> Parser::ParseDirectDeclarator() {
   std::unique_ptr<Syntax::DirectDeclarator> directDeclarator;
 
   if (Peek(tok::identifier)) {
-    auto name = mTokCursor->getContent();
+    auto name = mTokCursor->getStrTokName();
     Consume(tok::identifier);
     directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorIdent(name));
   }else if (Peek(tok::l_paren)) {
@@ -926,9 +926,9 @@ std::optional<Syntax::EnumSpecifier> Parser::ParseEnumSpecifier() {
   Consume(tok::kw_enum);
 
   std::vector<Syntax::EnumSpecifier::Enumerator> enumerators;
-  std::string name{""};
+  std::string_view tagName;
   if (Peek(tok::identifier)) {
-    name = mTokCursor->getContent();
+    tagName = mTokCursor->getStrTokName();
     Consume(tok::identifier);
     if (Peek(tok::l_brace)) {
       goto enumerator_list;
@@ -952,7 +952,7 @@ std::optional<Syntax::EnumSpecifier> Parser::ParseEnumSpecifier() {
   }else {
     LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "Expect identifier or { after enum");
   }
-  return Syntax::EnumSpecifier(std::move(name), std::move(enumerators));
+  return Syntax::EnumSpecifier(tagName, std::move(enumerators));
 }
 
 std::optional<Syntax::EnumSpecifier::Enumerator> Parser::ParseEnumerator() {
@@ -960,7 +960,7 @@ std::optional<Syntax::EnumSpecifier::Enumerator> Parser::ParseEnumerator() {
     LOGE(mTokCursor->getLine(), mTokCursor->getColumn(), "The enumeration constant must be identifier");
     return {};
   }
-  std::string enumValueName = mTokCursor->getContent();
+  std::string_view enumValueName = mTokCursor->getStrTokName();
   Consume(tok::identifier);
   if (Peek(tok::equal)) {
     Consume(tok::equal);
@@ -970,9 +970,9 @@ std::optional<Syntax::EnumSpecifier::Enumerator> Parser::ParseEnumerator() {
       LOGE(start->getLine(), start->getColumn(), "parse conditional expr error");
       return {};
     }
-    return Syntax::EnumSpecifier::Enumerator(std::move(enumValueName), std::move(constant));
+    return Syntax::EnumSpecifier::Enumerator(enumValueName, std::move(constant));
   }else {
-    return Syntax::EnumSpecifier::Enumerator(std::move(enumValueName));
+    return Syntax::EnumSpecifier::Enumerator(enumValueName);
   }
 }
 
@@ -1070,7 +1070,7 @@ std::optional<Syntax::InitializerList> Parser::ParseInitializerList() {
     } else if (Peek(tok::period)) {
       Consume(tok::period);
       Expect(tok::identifier);
-      designation.emplace_back(mTokCursor->getContent());
+      designation.emplace_back(mTokCursor->getStrTokName());
       Consume(tok::identifier);
     }
   }
@@ -1098,7 +1098,7 @@ std::optional<Syntax::InitializerList> Parser::ParseInitializerList() {
       } else if (Peek(tok::period)) {
         Consume(tok::period);
         Expect(tok::identifier);
-        designation_t.emplace_back(mTokCursor->getContent());
+        designation_t.emplace_back(mTokCursor->getStrTokName());
         Consume(tok::identifier);
       }
     }
@@ -1153,8 +1153,7 @@ std::optional<Syntax::Stmt> Parser::ParseStmt() {
       Consume(tok::identifier);
       if (Peek(tok::colon)) {
         Consume(tok::colon);
-        auto name = start->getContent();
-        return Syntax::Stmt(Syntax::LabelStmt(name));
+        return Syntax::Stmt(Syntax::LabelStmt(start->getStrTokName()));
       }else {
         mTokCursor = start;
         return ParseExprStmt();
@@ -1363,7 +1362,7 @@ std::optional<Syntax::Stmt> Parser::ParseDefaultStmt() {
 std::optional<Syntax::Stmt> Parser::ParseGotoStmt() {
   Consume(tok::kw_goto);
   Expect(tok::identifier);
-  auto name = mTokCursor->getContent();
+  auto name = mTokCursor->getStrTokName();
   Consume(tok::identifier);
   Match(tok::semi);
   return Syntax::Stmt(Syntax::GotoStmt(name));
@@ -1974,14 +1973,14 @@ void Parser::ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& curren
     } else if (tokType == tok::period) {
       Consume(tok::period);
       Expect(tok::identifier);
-      std::string identifier = mTokCursor->getContent();
+      auto identifier = mTokCursor->getStrTokName();
       Match(tok::identifier);
       current = std::make_unique<Syntax::PostFixExpr>(
           Syntax::PostFixExprDot(std::move(current), identifier));
     } else if (tokType == tok::arrow) {
       Consume(tok::arrow);
       Expect(tok::identifier);
-      auto name = mTokCursor->getContent();
+      auto name = mTokCursor->getStrTokName();
       Match(tok::identifier);
       current = std::make_unique<Syntax::PostFixExpr>(
           Syntax::PostFixExprArrow(std::move(current), name));
@@ -2006,7 +2005,7 @@ std::optional<Syntax::PostFixExpr> Parser::ParsePostFixExpr() {
   auto start = mTokCursor;
   std::optional<Syntax::PrimaryExpr> newPrimary;
   if (Peek(tok::identifier)) {
-    std::string name = mTokCursor->getContent();
+    auto name = mTokCursor->getStrTokName();
     Consume(tok::identifier);
     newPrimary = Syntax::PrimaryExpr(Syntax::PrimaryExprIdent(name));
   }else if (Peek(tok::char_constant) || Peek(tok::numeric_constant) || Peek(tok::string_literal)) {
@@ -2069,7 +2068,7 @@ std::optional<Syntax::PostFixExpr> Parser::ParsePostFixExpr() {
 
 std::optional<Syntax::PrimaryExpr> Parser::ParsePrimaryExpr() {
   if (Peek(tok::identifier)) {
-    std::string identifier = mTokCursor->getContent();
+    std::string_view identifier = mTokCursor->getStrTokName();
     Consume(tok::identifier);
     return Syntax::PrimaryExpr(Syntax::PrimaryExprIdent(identifier));
   } else if (Peek(tok::char_constant) || Peek(tok::numeric_constant) ||
@@ -2182,11 +2181,11 @@ bool Parser::IsPostFixExpr(tok::TokenKind tokenType) {
           tokenType == tok::numeric_constant);
 }
 
-void Parser::Scope::addTypedef(const std::string& name) {
+void Parser::Scope::addTypedef(std::string_view name) {
   mCurrentScope.back().emplace(name, Symbol{name, true});
 }
 
-bool Parser::Scope::isTypedefInScope(const std::string& name) const {
+bool Parser::Scope::isTypedefInScope(std::string_view name) const {
   for (auto iter = mCurrentScope.rbegin(); iter != mCurrentScope.rend();
        iter++) {
     if (auto result = iter->find(name); result != iter->end()) {
@@ -2196,7 +2195,7 @@ bool Parser::Scope::isTypedefInScope(const std::string& name) const {
   return false;
 }
 
-void Parser::Scope::addToScope(const std::string& name) {
+void Parser::Scope::addToScope(std::string_view name) {
   mCurrentScope.back().emplace(name, Symbol{name, false});
 }
 
@@ -2242,7 +2241,7 @@ bool Parser::IsFirstInDeclarationSpecifier() const {
   case tok::kw_volatile:
   case tok::kw_inline: return true;
   case tok::identifier:
-    return mScope.isTypedefInScope(std::get<std::string>(mTokCursor->getValue()));
+    return mScope.isTypedefInScope(mTokCursor->getStrTokName());
   default:
     return false;
   }
@@ -2267,7 +2266,7 @@ bool Parser::IsFirstInSpecifierQualifier() const {
   case tok::kw_volatile:
   case tok::kw_inline: return true;
   case tok::identifier:
-    return mScope.isTypedefInScope(std::get<std::string>(mTokCursor->getValue()));
+    return mScope.isTypedefInScope(mTokCursor->getStrTokName());
   default:
     return false;
   }

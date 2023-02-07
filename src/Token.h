@@ -51,6 +51,11 @@ public:
     }, mValue);
   }
 
+  std::string_view getStrTokName() const {
+    assert(std::holds_alternative<std::string>(mValue));
+    return std::get<std::string>(mValue);
+  }
+
   [[nodiscard]] uint32_t getLine() const {
     auto result = std::lower_bound(mSourceFile.lineStartOffsets.begin(), mSourceFile.lineStartOffsets.end(), mOffset);
     return std::distance(mSourceFile.lineStartOffsets.begin(), result) + (*result == mOffset ? 1 : 0);

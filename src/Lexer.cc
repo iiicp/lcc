@@ -501,7 +501,7 @@ std::vector<Token> Lexer::tokenize() {
         if (results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
-            results[results.size() - 1].getContent() == "include") {
+            results[results.size() - 1].getStrTokName() == "include") {
           state = State::AfterInclude;
           delimiter = '"';
           tokenStartOffset = offset++;

@@ -25,12 +25,22 @@ void DecAlign() {
   LeftAlign--;
 }
 
-void Print(const std::string &content) {
+//void Print(const std::string &content) {
+//  std::string ws(LeftAlign, ' ');
+//  llvm::outs() << ws << content << " ";
+//}
+
+//void Println(const std::string &content) {
+//  std::string ws(LeftAlign, ' ');
+//  llvm::outs() << ws << content << "\n";
+//}
+
+void Print(std::string_view content) {
   std::string ws(LeftAlign, ' ');
   llvm::outs() << ws << content << " ";
 }
 
-void Println(const std::string &content) {
+void Println(std::string_view content) {
   std::string ws(LeftAlign, ' ');
   llvm::outs() << ws << content << "\n";
 }
@@ -149,7 +159,7 @@ void visitor(const Syntax::InitializerList &initializerList) {
           [](const Syntax::ConstantExpr &constantExpr) {
              visitor(constantExpr);
           },
-          [](const std::string &ident) {
+          [](const std::string_view &ident) {
              IncAlign();
              Println(ident);
              DecAlign();
@@ -263,7 +273,7 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
       [](const std::unique_ptr<Syntax::StructOrUnionSpecifier> & structOrUnionSpecifier) {
            Print("StructOrUnionSpecifier");
            llvm::outs() << &structOrUnionSpecifier << " " << structOrUnionSpecifier->isUnion() << ", "
-                        << structOrUnionSpecifier->getName() << "\n";
+                        << structOrUnionSpecifier->getTag() << "\n";
            {
              IncAlign();
              for (const auto &structDeclaration : structOrUnionSpecifier->getStructDeclarations()) {
@@ -340,7 +350,7 @@ void visitor(const Syntax::DirectDeclarator &directDeclarator) {
          Print("DirectDeclaratorIdent");
          llvm::outs() << &ident << "\n";
          IncAlign();
-         Println(ident.getIdentifierLoc());
+         Println(ident.getIdent());
          DecAlign();
       },
       [](const Syntax::DirectDeclaratorParent &directDeclaratorParent) {
@@ -1042,7 +1052,7 @@ void visitor(const Syntax::PrimaryExpr &primaryExpr){
        std::visit([](auto &&value) {
          IncAlign();
          using T = std::decay_t<decltype(value)>;
-         if constexpr (std::is_same_v<T, std::string>) {
+         if constexpr (std::is_same_v<T, std::string_view>) {
            Println(value);
          }else {
            Println(std::to_string(value));

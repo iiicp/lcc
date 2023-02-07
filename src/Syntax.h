@@ -77,12 +77,14 @@ class Declarator;
 class DirectDeclaratorIdent;
 class DirectDeclaratorParent;
 class DirectDeclaratorAssignExpr;
-class DirectDeclaratorParentParamTypeList;
+class DirectDeclaratorAsterisk;
+class DirectDeclaratorParamTypeList;
 class TypeName;
 class AbstractDeclarator;
 class DirectAbstractDeclaratorParent;
 class DirectAbstractDeclaratorParamTypeList;
 class DirectAbstractDeclaratorAssignExpr;
+class DirectAbstractDeclaratorAsterisk;
 class Pointer;
 class ParamTypeList;
 class ParameterDeclaration;
@@ -1248,6 +1250,7 @@ public:
 using DirectAbstractDeclarator =
     std::variant<DirectAbstractDeclaratorParent,
                  DirectAbstractDeclaratorAssignExpr,
+                 DirectAbstractDeclaratorAsterisk,
                  DirectAbstractDeclaratorParamTypeList>;
 
 /**
@@ -1277,22 +1280,50 @@ public:
  */
 class DirectAbstractDeclaratorAssignExpr final : public Node {
   std::unique_ptr<DirectAbstractDeclarator> mDirectAbstractDeclarator;
+  std::vector<TypeQualifier> mTypeQualifiers;
   std::unique_ptr<AssignExpr> mAssignmentExpression;
+  bool mHasStatic{false};
 
 public:
   DirectAbstractDeclaratorAssignExpr(
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
-      std::unique_ptr<AssignExpr> &&assignmentExpression)
+      std::vector<TypeQualifier> &&typeQualifiers,
+      std::unique_ptr<AssignExpr> &&assignmentExpression,
+      bool hasStatic)
       : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
-        mAssignmentExpression(std::move(assignmentExpression)) {}
+        mTypeQualifiers(std::move(typeQualifiers)),
+        mAssignmentExpression(std::move(assignmentExpression)),
+        mHasStatic(hasStatic){}
 
   [[nodiscard]] const DirectAbstractDeclarator *
   getDirectAbstractDeclarator() const {
     return mDirectAbstractDeclarator.get();
   }
 
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
+    return mTypeQualifiers;
+  }
+
   [[nodiscard]] const AssignExpr *getAssignmentExpression() const {
     return mAssignmentExpression.get();
+  }
+
+  [[nodiscard]] bool hasStatic() const {
+    return mHasStatic;
+  }
+};
+
+/// direct-abstract-declarator{opt} [*]
+class DirectAbstractDeclaratorAsterisk final : public Node {
+  std::unique_ptr<DirectAbstractDeclarator> mDirectAbstractDeclarator;
+public:
+  DirectAbstractDeclaratorAsterisk(
+      std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator)
+      : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)){}
+
+  [[nodiscard]] const DirectAbstractDeclarator *
+  getDirectAbstractDeclarator() const {
+    return mDirectAbstractDeclarator.get();
   }
 };
 
@@ -1418,7 +1449,8 @@ public:
  */
 using DirectDeclarator =
     std::variant<DirectDeclaratorIdent, DirectDeclaratorParent,
-                 DirectDeclaratorAssignExpr,DirectDeclaratorParentParamTypeList>;
+                 DirectDeclaratorAssignExpr,DirectDeclaratorAsterisk,
+                 DirectDeclaratorParamTypeList>;
 
 /**
  * direct-declarator:
@@ -1454,12 +1486,12 @@ public:
  * direct-declarator:
  *  direct-declarator ( parameter-type-list )
  */
-class DirectDeclaratorParentParamTypeList final : public Node {
+class DirectDeclaratorParamTypeList final : public Node {
   std::unique_ptr<DirectDeclarator> mDirectDeclarator;
   ParamTypeList mParameterTypeList;
 
 public:
-  DirectDeclaratorParentParamTypeList(std::unique_ptr<DirectDeclarator> &&directDeclarator,
+  DirectDeclaratorParamTypeList(std::unique_ptr<DirectDeclarator> &&directDeclarator,
                               ParamTypeList &&parameterTypeList)
       : mDirectDeclarator(std::move(directDeclarator)),
         mParameterTypeList(std::move(parameterTypeList)) {}
@@ -1482,21 +1514,57 @@ public:
 class DirectDeclaratorAssignExpr final : public Node {
   std::unique_ptr<DirectDeclarator> mDirectDeclarator;
   std::unique_ptr<AssignExpr> mAssignmentExpression;
-
+  std::vector<TypeQualifier> mTypeQualifierList;
+  bool mHasStatic{false};
 public:
   DirectDeclaratorAssignExpr(
       std::unique_ptr<DirectDeclarator> &&directDeclarator,
-      std::unique_ptr<AssignExpr> &&assignmentExpression)
+      std::vector<TypeQualifier> &&typeQualifierList,
+      std::unique_ptr<AssignExpr> &&assignmentExpression,
+      bool hasStatic)
       : mDirectDeclarator(std::move(directDeclarator)),
-        mAssignmentExpression(std::move(assignmentExpression)) {}
+        mTypeQualifierList(std::move(typeQualifierList)),
+        mAssignmentExpression(std::move(assignmentExpression)),
+        mHasStatic(hasStatic){}
 
   [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const {
     return mDirectDeclarator.get();
   }
 
-  [[nodiscard]] const std::unique_ptr<AssignExpr> &
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const {
+    return mTypeQualifierList;
+  }
+
+  [[nodiscard]] const AssignExpr *
   getAssignmentExpression() const {
-    return mAssignmentExpression;
+    return mAssignmentExpression == nullptr ? nullptr : mAssignmentExpression.get();
+  }
+
+  [[nodiscard]] bool hasStatic() const {
+    return mHasStatic;
+  }
+};
+
+/**
+ * direct-declarator:
+ *   direct-declarator [ type-qualifier-list{opt} * ]
+ */
+class DirectDeclaratorAsterisk final : public Node {
+  std::unique_ptr<DirectDeclarator> mDirectDeclarator;
+  std::vector<TypeQualifier> mTypeQualifierList;
+public:
+  DirectDeclaratorAsterisk(
+      std::unique_ptr<DirectDeclarator> &&directDeclarator,
+      std::vector<TypeQualifier> &&typeQualifierList)
+      : mDirectDeclarator(std::move(directDeclarator)),
+        mTypeQualifierList(std::move(typeQualifierList)){}
+
+  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const {
+    return mDirectDeclarator.get();
+  }
+
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const {
+    return mTypeQualifierList;
   }
 };
 

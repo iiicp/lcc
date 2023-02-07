@@ -402,7 +402,7 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
   }
   /// function define
   if (Peek(tok::l_brace)) {
-    const auto *parameters = getFuncDeclarator(*declarator);//;std::get_if<Syntax::DirectDeclaratorParentParamTypeList>(&declarator->getDirectDeclarator());
+    const auto *parameters = getFuncDeclarator(*declarator);//;std::get_if<Syntax::DirectDeclaratorParamTypeList>(&declarator->getDirectDeclarator());
     if (!parameters) {
       LOGE(*start, "expect function declarator");
       return {};
@@ -564,26 +564,41 @@ std::optional<Syntax::Declarator> Parser::ParseDeclarator() {
   return Syntax::Declarator(std::move(pointers), std::move(*directDeclarator));
 }
 
+/**
+direct-declarator:
+    identifier
+    ( declarator )
+    direct-declarator [ type-qualifier-list{opt} assignment-expression{opt} ]
+    direct-declarator [ static type-qualifier-list{opt} assignment-expression]
+    direct-declarator [type-qualifier-list static assignment-expression]
+    direct-declarator [type-qualifier-list{opt} *]
+    direct-declarator ( parameter-type-list )
+    direct-declarator ( identifier-list{opt} )
+ */
 std::optional<Syntax::DirectDeclarator>
 Parser::ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator) {
+  LCC_ASSERT(directDeclarator);
   while (Peek(tok::l_paren) || Peek(tok::l_square)) {
     switch (mTokCursor->getTokenKind()) {
     case tok::l_paren: {
       Consume(tok::l_paren);
       if (IsFirstInParameterTypeList()) {
+        auto start = mTokCursor;
         auto parameterTypeList = ParseParameterTypeList();
-        if (!parameterTypeList)
+        if (!parameterTypeList) {
+          LOGE(*start, "expect param type list");
           return {};
+        }
         directDeclarator = std::make_unique<Syntax::DirectDeclarator>(
-            Syntax::DirectDeclaratorParentParamTypeList(std::move(directDeclarator),
+            Syntax::DirectDeclaratorParamTypeList(std::move(directDeclarator),
                                                         std::move(*parameterTypeList))
         );
       }else {
         if (!Peek(tok::r_paren)) {
-          LOGE(*mTokCursor, "expect declaration specifier");
+          LOGE(*mTokCursor, "expect )");
         }
         directDeclarator = std::make_unique<Syntax::DirectDeclarator>(
-    Syntax::DirectDeclaratorParentParamTypeList(std::move(directDeclarator),
+    Syntax::DirectDeclaratorParamTypeList(std::move(directDeclarator),
                                                 Syntax::ParamTypeList(Syntax::ParamList({}), false)));
       }
       Match(tok::r_paren);
@@ -593,21 +608,103 @@ Parser::ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& 
       Consume(tok::l_square);
       LCC_ASSERT(directDeclarator);
       auto start = mTokCursor;
-      if (IsFirstInAssignmentExpr()) {
+      if (Peek(tok::kw_static)) {
+        Consume(tok::kw_static);
+        std::vector<Syntax::TypeQualifier> typeQualifiers;
+        while (Peek(tok::kw_const) || Peek(tok::kw_volatile)
+               || Peek(tok::kw_restrict)) {
+          switch (mTokCursor->getTokenKind()) {
+          case tok::kw_const: {
+            typeQualifiers.push_back(
+                Syntax::TypeQualifier(Syntax::TypeQualifier::Const));
+            break;
+          }
+          case tok::kw_volatile: {
+            typeQualifiers.push_back(
+                Syntax::TypeQualifier(Syntax::TypeQualifier::Volatile));
+            break;
+          }
+          case tok::kw_restrict: {
+            typeQualifiers.push_back(
+                Syntax::TypeQualifier(Syntax::TypeQualifier::Restrict));
+            break;
+          }
+          default:
+            break;
+          }
+          ConsumeAny();
+        }
         start = mTokCursor;
         auto assignment = ParseAssignExpr();
         if (!assignment) {
-          LOGE(*start, "parse assign expr error");
+          LOGE(*start, "expect assign expr");
         }
-        if (assignment && directDeclarator) {
-          directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorAssignExpr(
-              std::move(directDeclarator),
-              std::make_unique<Syntax::AssignExpr>(std::move(*assignment))));
-        }
-      }else {
-        LOGE(*start, "expect assign expr error");
+        directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorAssignExpr(
+            std::move(directDeclarator), std::move(typeQualifiers),
+            std::make_unique<Syntax::AssignExpr>(std::move(*assignment)), true));
+        Match(tok::r_square);
+        break;
       }
-      Match(tok::r_square);
+
+      std::vector<Syntax::TypeQualifier> typeQualifiers;
+      while (Peek(tok::kw_const) || Peek(tok::kw_volatile)
+             || Peek(tok::kw_restrict)) {
+        switch (mTokCursor->getTokenKind()) {
+        case tok::kw_const: {
+          typeQualifiers.push_back(
+              Syntax::TypeQualifier(Syntax::TypeQualifier::Const));
+          break;
+        }
+        case tok::kw_volatile: {
+          typeQualifiers.push_back(
+              Syntax::TypeQualifier(Syntax::TypeQualifier::Volatile));
+          break;
+        }
+        case tok::kw_restrict: {
+          typeQualifiers.push_back(
+              Syntax::TypeQualifier(Syntax::TypeQualifier::Restrict));
+          break;
+        }
+        default:
+          break;
+        }
+        ConsumeAny();
+      }
+      if (Peek(tok::kw_static)) {
+        Consume(tok::kw_static);
+        auto start = mTokCursor;
+        auto assignment = ParseAssignExpr();
+        if (!assignment) {
+          LOGE(*start, "expect assign expr");
+        }
+        directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorAssignExpr(
+            std::move(directDeclarator), std::move(typeQualifiers),
+            std::make_unique<Syntax::AssignExpr>(std::move(*assignment)), true));
+        Match(tok::r_square);
+      }else if (Peek(tok::star)) {
+        Consume(tok::star);
+        directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorAsterisk(
+            std::move(directDeclarator), std::move(typeQualifiers)));
+        Match(tok::r_square);
+      }else if (IsFirstInAssignmentExpr()) {
+        start = mTokCursor;
+        auto assignment = ParseAssignExpr();
+        if (!assignment) {
+          LOGE(*start, "expect assign expr");
+        }
+        directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorAssignExpr(
+            std::move(directDeclarator), std::move(typeQualifiers),
+            std::make_unique<Syntax::AssignExpr>(std::move(*assignment)), false));
+        Match(tok::r_square);
+      }else {
+        if (!Peek(tok::r_square)) {
+          LOGE(*mTokCursor, "expect ]");
+        }
+        directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorAssignExpr(
+            std::move(directDeclarator), std::move(typeQualifiers),
+            nullptr, false));
+        Match(tok::r_square);
+      }
       break;
     }
     default:
@@ -642,13 +739,13 @@ std::optional<Syntax::DirectDeclarator> Parser::ParseDirectDeclarator() {
     auto start = mTokCursor;
     auto declarator = ParseDeclarator();
     if (!declarator) {
-      LOGE(*start, "parse declarator failed");
+      LOGE(*start, "parse declarator error");
     }
     directDeclarator = std::make_unique<Syntax::DirectDeclarator>(
         Syntax::DirectDeclaratorParent(std::make_unique<Syntax::Declarator>(std::move(*declarator))));
     Match(tok::r_paren);
   }else {
-    LOGE(*mTokCursor, "parse direct declarator error");
+    LOGE(*mTokCursor, "expect identifier or (");
   }
 
   return ParseDirectDeclaratorSuffix(std::move(directDeclarator));
@@ -660,10 +757,12 @@ parameter-type-list:
   parameter-list , ...
  */
 std::optional<Syntax::ParamTypeList> Parser::ParseParameterTypeList() {
-  auto cur = mTokCursor;
+  auto start = mTokCursor;
   auto parameterList = ParseParameterList();
-  if (!parameterList)
+  if (!parameterList) {
+    LOGE(*start, "expect param list");
     return {};
+  }
   bool hasEllipse = false;
   if (Peek(tok::comma)) {
     Consume(tok::comma);
@@ -680,16 +779,22 @@ parameter-list:
  */
 std::optional<Syntax::ParamList> Parser::ParseParameterList() {
   std::vector<Syntax::ParameterDeclaration> parameterDeclarations;
+  auto start = mTokCursor;
   auto declaration = ParseParameterDeclaration();
-  if (!declaration)
+  if (!declaration) {
+    LOGE(*start, "expect param declaration");
     return {};
+  }
   parameterDeclarations.push_back(std::move(*declaration));
   /// fix parse tok::ellipsis
   while (Peek(tok::comma) && !PeekN(1, tok::ellipsis)) {
     Consume(tok::comma);
+    start = mTokCursor;
     declaration = ParseParameterDeclaration();
-    if (!declaration)
+    if (!declaration) {
+      LOGE(*start, "expect param declaration");
       return {};
+    }
     parameterDeclarations.push_back(std::move(*declaration));
   }
   return Syntax::ParamList(std::move(parameterDeclarations));
@@ -708,8 +813,11 @@ abstract-declarator:
 */
 std::optional<Syntax::ParameterDeclaration>
 Parser::ParseParameterDeclaration() {
+  auto start = mTokCursor;
   auto declarationSpecifiers = ParseDeclarationSpecifiers();
-  LCC_ASSERT(!declarationSpecifiers.isEmpty());
+  if (declarationSpecifiers.isEmpty()) {
+    LOGE(*start, "expect declaration specifier");
+  }
   bool hasStar = false;
   auto result = std::find_if(mTokCursor, mTokEnd,
                              [&hasStar](const Token &token) -> bool {
@@ -817,29 +925,46 @@ Syntax::Pointer Parser::ParsePointer() {
    pointer{opt} direct-abstract-declarator
  */
 std::optional<Syntax::AbstractDeclarator> Parser::ParseAbstractDeclarator() {
-  auto cur = mTokCursor;
   std::vector<Syntax::Pointer> pointers;
   while (Peek(tok::star)) {
     auto result = ParsePointer();
     pointers.push_back(std::move(result));
   }
+  if (!pointers.empty() && !IsFirstInDirectAbstractDeclarator()) {
+    return Syntax::AbstractDeclarator(std::move(pointers));
+  }
+  auto start = mTokCursor;
   auto result = ParseDirectAbstractDeclarator();
   if (!result) {
+    LOGE(*start, "expect direct abstract declarator");
     return {};
   }
   return Syntax::AbstractDeclarator(std::move(pointers), std::move(result));
 }
 
-std::optional<Syntax::DirectAbstractDeclarator> Parser::ParseDirectAbstractDeclaratorSuffix(std::unique_ptr<Syntax::DirectAbstractDeclarator>&& directAbstractDeclarator) {
+/**
+ * direct-abstract-declarator:
+ *      ( abstract-declarator )
+ *      direct-abstract-declarator{opt} [ type-qualifier-list{opt} assignment-expression{opt} ]
+ *      direct-abstract-declarator{opt} [ static type-qualifier-list{opt} assignment-expression ]
+ *      direct-abstract-declarator{opt} [ type-qualifier-list static assignment-expression ]
+ *      direct-abstract-declarator{opt} [*]
+ *      direct-abstract-declarator{opt} ( parameter-type-list{opt} )
+ */
+std::optional<Syntax::DirectAbstractDeclarator>
+Parser::ParseDirectAbstractDeclaratorSuffix(std::unique_ptr<Syntax::DirectAbstractDeclarator>&& directAbstractDeclarator) {
   while (Peek(tok::l_paren) || Peek(tok::l_square)) {
     switch (mTokCursor->getTokenKind()) {
     case tok::l_paren: {
       Consume(tok::l_paren);
       /// direct-abstract-declarator{opt} ( parameter-type-list{opt} )
-      if (IsFirstInDeclarationSpecifier()) {
+      if (IsFirstInParameterTypeList()) {
+        auto start = mTokCursor;
         auto parameterTypeList = ParseParameterTypeList();
-        if (!parameterTypeList)
+        if (!parameterTypeList) {
+          LOGE(*start, "expect param type list");
           return {};
+        }
         directAbstractDeclarator =
             std::make_unique<Syntax::DirectAbstractDeclarator>(
                 Syntax::DirectAbstractDeclaratorParamTypeList(
@@ -848,16 +973,20 @@ std::optional<Syntax::DirectAbstractDeclarator> Parser::ParseDirectAbstractDecla
                         std::move(*parameterTypeList))));
       }
       /// abstract-declarator first set
+      /// ( abstract-declarator )
       else if (IsFirstInAbstractDeclarator()) {
+        auto start = mTokCursor;
         auto abstractDeclarator = ParseAbstractDeclarator();
-        if (!abstractDeclarator)
+        if (!abstractDeclarator) {
+          LOGE(*start, "expect abstract declarator");
           return {};
+        }
         directAbstractDeclarator =
             std::make_unique<Syntax::DirectAbstractDeclarator>(
                 std::make_unique<Syntax::AbstractDeclarator>(
                     std::move(*abstractDeclarator)));
       } else {
-        /// direct-abstract-declarator{opt} ( parameter-type-list{opt} )
+        /// direct-abstract-declarator{opt} (  )
         directAbstractDeclarator =
             std::make_unique<Syntax::DirectAbstractDeclarator>(
                 Syntax::DirectAbstractDeclaratorParamTypeList(
@@ -868,38 +997,132 @@ std::optional<Syntax::DirectAbstractDeclarator> Parser::ParseDirectAbstractDecla
     }
     case tok::l_square: {
       Consume(tok::l_square);
+      /// direct-abstract-declarator{opt} [*]
       if (Peek(tok::star)) {
         Consume(tok::star);
         directAbstractDeclarator =
             std::make_unique<Syntax::DirectAbstractDeclarator>(
-                std::move(*directAbstractDeclarator));
+                Syntax::DirectAbstractDeclaratorAsterisk(
+                    std::move(directAbstractDeclarator)));
+        Match(tok::r_square);
+        break;
+      }
+
+      /// direct-abstract-declarator{opt} [ static type-qualifier-list{opt} assignment-expression ]
+      if (Peek(tok::kw_static)) {
+        Consume(tok::kw_static);
+        std::vector<Syntax::TypeQualifier> typeQualifiers;
+        while (Peek(tok::kw_const) || Peek(tok::kw_volatile) ||
+               Peek(tok::kw_restrict)) {
+          switch (mTokCursor->getTokenKind()) {
+          case tok::kw_const: {
+            typeQualifiers.push_back(
+                Syntax::TypeQualifier(Syntax::TypeQualifier::Const));
+            break;
+          }
+          case tok::kw_volatile: {
+            typeQualifiers.push_back(
+                Syntax::TypeQualifier(Syntax::TypeQualifier::Volatile));
+            break;
+          }
+          case tok::kw_restrict: {
+            typeQualifiers.push_back(
+                Syntax::TypeQualifier(Syntax::TypeQualifier::Restrict));
+            break;
+          }
+          default:
+            break;
+          }
+          ConsumeAny();
+        }
+        auto start = mTokCursor;
+        auto assignExpr = ParseAssignExpr();
+        if (!assignExpr) {
+          LOGE(*start, "expect assign expr");
+        }
+        directAbstractDeclarator =
+            std::make_unique<Syntax::DirectAbstractDeclarator>(
+                Syntax::DirectAbstractDeclaratorAssignExpr(
+                    std::move(directAbstractDeclarator),
+                    std::move(typeQualifiers),
+                    std::make_unique<Syntax::AssignExpr>(
+                        std::move(*assignExpr)),
+                    true));
+        Match(tok::r_square);
+        break;
+      }
+
+      std::vector<Syntax::TypeQualifier> typeQualifiers;
+      while (Peek(tok::kw_const) || Peek(tok::kw_volatile) ||
+             Peek(tok::kw_restrict)) {
+        switch (mTokCursor->getTokenKind()) {
+        case tok::kw_const: {
+          typeQualifiers.push_back(
+              Syntax::TypeQualifier(Syntax::TypeQualifier::Const));
+          break;
+        }
+        case tok::kw_volatile: {
+          typeQualifiers.push_back(
+              Syntax::TypeQualifier(Syntax::TypeQualifier::Volatile));
+          break;
+        }
+        case tok::kw_restrict: {
+          typeQualifiers.push_back(
+              Syntax::TypeQualifier(Syntax::TypeQualifier::Restrict));
+          break;
+        }
+        default:
+          break;
+        }
+        ConsumeAny();
+      }
+      if (Peek(tok::kw_static)) {
+        Consume(tok::kw_static);
+        auto start = mTokCursor;
+        auto assignExpr = ParseAssignExpr();
+        if (!assignExpr) {
+          LOGE(*start, "expect assign expr");
+        }
+        directAbstractDeclarator =
+            std::make_unique<Syntax::DirectAbstractDeclarator>(
+                Syntax::DirectAbstractDeclaratorAssignExpr(
+                    std::move(directAbstractDeclarator),
+                    std::move(typeQualifiers),
+                    std::make_unique<Syntax::AssignExpr>(
+                        std::move(*assignExpr)),
+                    true));
+        Match(tok::r_square);
       } else {
         if (!Peek(tok::r_square)) {
+          auto start = mTokCursor;
           auto assignment = ParseAssignExpr();
           if (!assignment) {
+            LOGE(*start, "expect assign expr");
             return {};
           }
           directAbstractDeclarator =
               std::make_unique<Syntax::DirectAbstractDeclarator>(
                   Syntax::DirectAbstractDeclaratorAssignExpr(
                       std::move(directAbstractDeclarator),
+                      std::move(typeQualifiers),
                       std::make_unique<Syntax::AssignExpr>(
-                          std::move(*assignment))));
+                          std::move(*assignment)),
+                      false));
         } else {
           directAbstractDeclarator =
               std::make_unique<Syntax::DirectAbstractDeclarator>(
                   Syntax::DirectAbstractDeclaratorAssignExpr(
-                      std::move(directAbstractDeclarator), nullptr));
+                      std::move(directAbstractDeclarator),
+                      std::move(typeQualifiers), nullptr, false));
         }
+        Match(tok::r_square);
+        break;
       }
-      Match(tok::r_square);
-      break;
     }
     default:
-      goto Exit;
+      break;
     }
   }
-Exit:
   LCC_ASSERT(directAbstractDeclarator);
   return std::move(*directAbstractDeclarator);
 }
@@ -911,12 +1134,10 @@ Exit:
 
  direct-abstract-declarator:
     ( abstract-declarator )
-    direct-abstract-declarator{opt} [ type-qualifier-list{opt}
-assignment-expression{opt} ]
-    direct-abstract-declarator{opt} [ static type-qualifier-list{opt}
-assignment-expression ]
-    direct-abstract-declarator{opt} [ type-qualifier-list static
-assignment-expression ] direct-abstract-declarator{opt} [ * ]
+    direct-abstract-declarator{opt} [ type-qualifier-list{opt} assignment-expression{opt} ]
+    direct-abstract-declarator{opt} [ static type-qualifier-list{opt} assignment-expression ]
+    direct-abstract-declarator{opt} [ type-qualifier-list static assignment-expression ]
+    direct-abstract-declarator{opt} [ * ]
     direct-abstract-declarator{opt} ( parameter-type-list{opt} )
  */
 std::optional<Syntax::DirectAbstractDeclarator>

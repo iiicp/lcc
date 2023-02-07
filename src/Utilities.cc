@@ -35,7 +35,7 @@ std::string_view getDeclaratorName(const Syntax::Declarator& declarator) {
           return self(value);
         }, declarator.getDeclarator()->getDirectDeclarator());
       },
-    [](auto&& self, const Syntax::DirectDeclaratorParentParamTypeList& paramTypeList) -> std::string_view {
+    [](auto&& self, const Syntax::DirectDeclaratorParamTypeList & paramTypeList) -> std::string_view {
       return std::visit([&self](auto &&value) -> std::string_view {
           return self(value);
         }, *paramTypeList.getDirectDeclarator());
@@ -43,13 +43,17 @@ std::string_view getDeclaratorName(const Syntax::Declarator& declarator) {
     [](auto&& self, const Syntax::DirectDeclaratorAssignExpr& assignExpr) -> std::string_view {
       return std::visit([&self](auto &&value) -> std::string_view { return self(value); },
       *assignExpr.getDirectDeclarator());
+    },
+    [](auto&& self, const Syntax::DirectDeclaratorAsterisk& asterisk) -> std::string_view {
+      return std::visit([&self](auto &&value) -> std::string_view { return self(value); },
+                          *asterisk.getDirectDeclarator());
     }};
   return std::visit(YComb{visitor}, declarator.getDirectDeclarator());
 }
 
-const Syntax::DirectDeclaratorParentParamTypeList *getFuncDeclarator
+const Syntax::DirectDeclaratorParamTypeList *getFuncDeclarator
     (const Syntax::Declarator &declarator) {
- const Syntax::DirectDeclaratorParentParamTypeList * paramTypeList_ = nullptr;
+ const Syntax::DirectDeclaratorParamTypeList * paramTypeList_ = nullptr;
   auto visitor = overload{
       [](auto&&, const Syntax::DirectDeclaratorIdent& name) -> std::string_view {
         return name.getIdent();
@@ -59,7 +63,8 @@ const Syntax::DirectDeclaratorParentParamTypeList *getFuncDeclarator
           return self(value);
         }, declarator.getDeclarator()->getDirectDeclarator());
       },
-      [&paramTypeList_](auto&& self, const Syntax::DirectDeclaratorParentParamTypeList& paramTypeList) -> std::string_view {
+      [&paramTypeList_](auto&& self, const Syntax::DirectDeclaratorParamTypeList
+                                        & paramTypeList) -> std::string_view {
         paramTypeList_ = &paramTypeList;
         return std::visit([&self](auto &&value) -> std::string_view {
           return self(value);
@@ -68,7 +73,11 @@ const Syntax::DirectDeclaratorParentParamTypeList *getFuncDeclarator
       [](auto&& self, const Syntax::DirectDeclaratorAssignExpr& assignExpr) -> std::string_view {
         return std::visit([&self](auto &&value) -> std::string_view { return self(value); },
                           *assignExpr.getDirectDeclarator());
-      }};
+      },
+     [](auto&& self, const Syntax::DirectDeclaratorAsterisk& asterisk) -> std::string_view {
+       return std::visit([&self](auto &&value) -> std::string_view { return self(value); },
+                         *asterisk.getDirectDeclarator());
+     }};
   std::visit(YComb{visitor}, declarator.getDirectDeclarator());
   return paramTypeList_;
 }

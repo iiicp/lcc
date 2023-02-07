@@ -365,17 +365,36 @@ void visitor(const Syntax::DirectDeclarator &directDeclarator) {
          llvm::outs() << &directDeclaratorAssignExpr << "\n";
          IncAlign();
          visitor(*directDeclaratorAssignExpr.getDirectDeclarator());
-         visitor(*directDeclaratorAssignExpr.getAssignmentExpression());
+         if (directDeclaratorAssignExpr.hasStatic()) {
+           Println("has static");
+         }
+         for (const auto &typeQualifier : directDeclaratorAssignExpr.getTypeQualifierList()) {
+           visitor(typeQualifier);
+         }
+         if (directDeclaratorAssignExpr.getAssignmentExpression()) {
+           visitor(*directDeclaratorAssignExpr.getAssignmentExpression());
+         }
          DecAlign();
       },
-      [](const Syntax::DirectDeclaratorParentParamTypeList &directDeclaratorParentParamTypeList) {
-         Print("DirectDeclaratorParentParamTypeList");
+      [](const Syntax::DirectDeclaratorParamTypeList
+                 &directDeclaratorParentParamTypeList) {
+         Print("DirectDeclaratorParamTypeList");
          llvm::outs() << &directDeclaratorParentParamTypeList << "\n";
          IncAlign();
          visitor(*directDeclaratorParentParamTypeList.getDirectDeclarator());
          visitor(directDeclaratorParentParamTypeList.getParameterTypeList());
          DecAlign();
       },
+     [](const Syntax::DirectDeclaratorAsterisk &directDeclaratorAsterisk) {
+       Print("DirectDeclaratorAsterisk");
+       llvm::outs() << &directDeclaratorAsterisk << "\n";
+       IncAlign();
+       visitor(*directDeclaratorAsterisk.getDirectDeclarator());
+       for (const auto &typeQualifier : directDeclaratorAsterisk.getTypeQualifierList()) {
+         visitor(typeQualifier);
+       }
+       DecAlign();
+     },
   }, directDeclarator);
   DecAlign();
 }
@@ -400,7 +419,16 @@ void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
                      visitor(*directAbstractDeclaratorAssignExpr
                                   .getDirectAbstractDeclarator());
                    }
-                   visitor(*directAbstractDeclaratorAssignExpr.getAssignmentExpression());
+                   if (directAbstractDeclaratorAssignExpr.hasStatic()) {
+                     Println("has static");
+                   }
+                   for (const auto &typeQualifier : directAbstractDeclaratorAssignExpr.getTypeQualifiers()) {
+                     visitor(typeQualifier);
+                   }
+                   if (directAbstractDeclaratorAssignExpr.getAssignmentExpression()) {
+                     visitor(*directAbstractDeclaratorAssignExpr
+                                  .getAssignmentExpression());
+                   }
                    DecAlign();
                  },
                  [](const Syntax::DirectAbstractDeclaratorParamTypeList &directAbstractDeclaratorParamTypeList) {
@@ -413,6 +441,16 @@ void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
                    }
                    if (directAbstractDeclaratorParamTypeList.getParameterTypeList())
                     visitor(*directAbstractDeclaratorParamTypeList.getParameterTypeList());
+                   DecAlign();
+                 },
+                 [](const Syntax::DirectAbstractDeclaratorAsterisk &directAbstractDeclaratorAsterisk) {
+                   Print("DirectAbstractDeclaratorAsterisk");
+                   llvm::outs() << &directAbstractDeclaratorAsterisk << "\n";
+                   IncAlign();
+                   if (directAbstractDeclaratorAsterisk.getDirectAbstractDeclarator()) {
+                     visitor(*directAbstractDeclaratorAsterisk
+                                  .getDirectAbstractDeclarator());
+                   }
                    DecAlign();
                  },
              }, directAbstractDeclarator);

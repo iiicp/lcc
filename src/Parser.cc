@@ -11,6 +11,7 @@
 #include "Parser.h"
 #include <algorithm>
 #include "Utilities.h"
+#include <set>
 
 namespace lcc {
 Parser::Parser(std::vector<Token> && tokens)
@@ -313,40 +314,48 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
               std::make_unique<Syntax::Initializer>(std::move(*initializer))});
     }
   }
+
+  if (Peek(tok::semi))
+    goto End;
+
   if(Peek(tok::comma)) {
     Consume(tok::comma);
   }
-  auto start = mTokCursor;
-  auto declarator = ParseDeclarator();
-  if (!declarator) {
-    LOGE(*start, "expect declarator");
-    return {};
-  }
-  if (!isTypedef) {
-    auto name = getDeclaratorName(*declarator);
-    mScope.addToScope(name);
-  }
-  if (!Peek(tok::equal)) {
-    initDeclarators.push_back({
-        std::make_unique<Syntax::Declarator>
-        (std::move(*declarator)),nullptr});
-  }else {
-    Consume(tok::equal);
-    start = mTokCursor;
-    auto initializer = ParseInitializer();
-    if (!initializer) {
-      LOGE(*start, "expect initializer");
+
+  {
+    /// handle first declarator
+    auto start = mTokCursor;
+    auto declarator = ParseDeclarator();
+    if (!declarator) {
+      LOGE(*start, "expect declarator");
       return {};
     }
-    initDeclarators.push_back(
-        {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-         std::make_unique<Syntax::Initializer>(std::move(*initializer))});
+    if (!isTypedef) {
+      auto name = getDeclaratorName(*declarator);
+      mScope.addToScope(name);
+    }
+    if (!Peek(tok::equal)) {
+      initDeclarators.push_back(
+          {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+           nullptr});
+    } else {
+      Consume(tok::equal);
+      start = mTokCursor;
+      auto initializer = ParseInitializer();
+      if (!initializer) {
+        LOGE(*start, "expect initializer");
+        return {};
+      }
+      initDeclarators.push_back(
+          {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
+           std::make_unique<Syntax::Initializer>(std::move(*initializer))});
+    }
   }
 
   while (Peek(tok::comma)) {
     Consume(tok::comma);
-    start = mTokCursor;
-    declarator = ParseDeclarator();
+    auto start = mTokCursor;
+    auto declarator = ParseDeclarator();
     if (!declarator) {
       LOGE(*start, "expect declarator");
       return {};
@@ -373,6 +382,8 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
                std::move(*initializer))});
     }
   }
+
+End:
   Consume(tok::semi);
   if (isTypedef) {
     for (auto& iter : initDeclarators) {
@@ -425,7 +436,7 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
           break;
         }
       }
-      if (std::holds_alternative<std::unique_ptr<Syntax::AbstractDeclarator>>(parameterDeclarator)) {
+      if (std::holds_alternative<std::optional<std::unique_ptr<Syntax::AbstractDeclarator>>>(parameterDeclarator)) {
         LOGE(*start, "miss param name");
       }
       auto& decl = std::get<std::unique_ptr<Syntax::Declarator>>(parameterDeclarator);
@@ -799,6 +810,65 @@ std::optional<Syntax::ParamList> Parser::ParseParameterList() {
   }
   return Syntax::ParamList(std::move(parameterDeclarations));
 }
+std::optional<Syntax::ParameterDeclaration>
+Parser::ParseParameterDeclarationSuffix(Syntax::DeclarationSpecifiers &declarationSpecifiers) {
+  auto start = mTokCursor;
+  auto peekIsDeclarator = [this]()->bool{
+    /// consume pointer
+    while (Peek(tok::star)) {
+      ParsePointer();
+    }
+    if (!Peek(tok::identifier) && !Peek(tok::l_paren) && !Peek(tok::l_square)) {
+      /// ε  mean abstract declarator
+      return false;
+    }
+    /**
+      first direct dec set
+          tok::identifier, tok::l_paren
+      first direct abstract dec set
+          tok::l_paren, tok::l_square
+     */
+    if (Peek(tok::identifier)) {
+      return true;
+    }else if (Peek(tok::l_square)) {
+      return false;
+    }else {
+      Expect(tok::l_paren);
+      while (Peek(tok::l_paren)) {
+        ConsumeAny();
+        switch (mTokCursor->getTokenKind()) {
+        case tok::identifier:
+          return true;
+        case tok::l_square:
+          return false;
+        default: {
+          if (!Peek(tok::l_paren))
+            LOGE(*mTokCursor, "expect (");
+          break;
+        }
+        }
+      }
+    }
+    return false;
+  };
+  if (peekIsDeclarator()) {
+    mTokCursor = start;
+    auto dec = ParseDeclarator();
+    if (!dec) {
+      LOGE(*start, "expect declarator");
+    }
+    return Syntax::ParameterDeclaration(std::move(declarationSpecifiers),
+                                        std::make_unique<Syntax::Declarator>(std::move(*dec)));
+  }else {
+    mTokCursor = start;
+    auto absDec = ParseAbstractDeclarator();
+    if (!absDec) {
+      LOGE(*start, "expect abstract declarator");
+    }
+    return Syntax::ParameterDeclaration(std::move(declarationSpecifiers),
+                                        std::make_unique<Syntax::AbstractDeclarator>(std::move(*absDec)));
+  }
+}
 /**
 parameter-declaration:
     declaration-specifiers declarator
@@ -818,76 +888,14 @@ Parser::ParseParameterDeclaration() {
   if (declarationSpecifiers.isEmpty()) {
     LOGE(*start, "expect declaration specifier");
   }
-  bool hasStar = false;
-  auto result = std::find_if(mTokCursor, mTokEnd,
-                             [&hasStar](const Token &token) -> bool {
-                               if (token.getTokenKind() == tok::star) {
-                                 if (hasStar == false) {
-                                   hasStar = true;
-                                 }
-                                 return false;
-                               }
-                               return true;
-                             });
-  /// begin == end or all star
-  if (result == mTokEnd) {
-    LCC_UNREACHABLE;
-  }
-  if (result->getTokenKind() == tok::l_square) {
-    auto abstractDeclarator = ParseAbstractDeclarator();
-    if (!abstractDeclarator)
-      return {};
+  /// abstract-declarator{opt}
+  if (Peek(tok::comma) || Peek(tok::r_paren)) {
     return Syntax::ParameterDeclaration(
         std::move(declarationSpecifiers),
-        std::make_unique<Syntax::AbstractDeclarator>(
-            std::move(*abstractDeclarator)));
+        std::nullopt);
   }
-  else if (result->getTokenKind() == tok::identifier) {
-    auto declarator = ParseDeclarator();
-    if (!declarator)
-      return {};
-    return Syntax::ParameterDeclaration(
-        std::move(declarationSpecifiers),
-        std::make_unique<Syntax::Declarator>(std::move(*declarator)));
-  }
-  else if (result->getTokenKind() == tok::l_paren) {
-    while (result->getTokenKind() == tok::l_paren) {
-      result++;
-      if (result->getTokenKind() == tok::identifier) {
-        auto declarator = ParseDeclarator();
-        if (!declarator)
-          return {};
-        return Syntax::ParameterDeclaration(
-            std::move(declarationSpecifiers),
-            std::make_unique<Syntax::Declarator>(std::move(*declarator)));
-      } else if (result->getTokenKind() != tok::l_paren) {
-        auto abstractDeclarator = ParseAbstractDeclarator();
-        if (!abstractDeclarator)
-          return {};
-        return Syntax::ParameterDeclaration(
-            std::move(declarationSpecifiers),
-            std::make_unique<Syntax::AbstractDeclarator>(
-                std::move(*abstractDeclarator)));
-      }
-    }
-  }
-  else {
-    if (hasStar) {
-      auto abstractDeclarator = ParseAbstractDeclarator();
-      if (!abstractDeclarator)
-        return {};
-      return Syntax::ParameterDeclaration(
-          std::move(declarationSpecifiers),
-          std::make_unique<Syntax::AbstractDeclarator>(
-              std::move(*abstractDeclarator)));
-    } else {
-      /// abstract-declarator{opt}
-      return Syntax::ParameterDeclaration(
-          std::move(declarationSpecifiers),
-          std::unique_ptr<Syntax::AbstractDeclarator>());
-    }
-  }
-  return {};
+
+  return ParseParameterDeclarationSuffix(declarationSpecifiers);
 }
 
 /**

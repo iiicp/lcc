@@ -478,8 +478,9 @@ void visitor(const Syntax::ParamList &paramList) {
         [](const std::unique_ptr<Syntax::Declarator> &declarator) {
            visitor(*declarator);
         },
-        [](const std::unique_ptr<Syntax::AbstractDeclarator> &abstractDeclarator) {
-           visitor(*abstractDeclarator);
+        [](const std::optional<std::unique_ptr<Syntax::AbstractDeclarator>> &abstractDeclarator) {
+            if (abstractDeclarator.has_value())
+              visitor(*abstractDeclarator.value());
         },
     }, paramDecl.declarator);
   }

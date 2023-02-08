@@ -66,6 +66,7 @@ private:
   std::optional<Syntax::ParamTypeList> ParseParameterTypeList();
   std::optional<Syntax::ParamList> ParseParameterList();
   std::optional<Syntax::ParameterDeclaration> ParseParameterDeclaration();
+  std::optional<Syntax::ParameterDeclaration> ParseParameterDeclarationSuffix(Syntax::DeclarationSpecifiers &declarationSpecifiers);
   Syntax::Pointer ParsePointer();
   std::optional<Syntax::StructOrUnionSpecifier> ParseStructOrUnionSpecifier();
   std::optional<Syntax::EnumSpecifier> ParseEnumSpecifier();

@@ -1386,13 +1386,13 @@ public:
 struct ParameterDeclaration final : public Node {
 public:
   DeclarationSpecifiers declarationSpecifiers;
-  std::variant<std::unique_ptr<Declarator>, std::unique_ptr<AbstractDeclarator>>
+  std::variant<std::unique_ptr<Declarator>, std::optional<std::unique_ptr<AbstractDeclarator>>>
       declarator;
 public:
   ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers,
                        std::variant<std::unique_ptr<Declarator>,
-                                    std::unique_ptr<AbstractDeclarator>>
-                           variant = std::unique_ptr<AbstractDeclarator>{})
+                       std::optional<std::unique_ptr<AbstractDeclarator>>>
+                           variant = {std::nullopt})
       : declarationSpecifiers(std::move(declarationSpecifiers)),
         declarator(std::move(variant)) {}
 };

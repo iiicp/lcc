@@ -9,6 +9,9 @@ struct S {
 
 float f(int, float, struct S s);
 
+struct s g1(int);
+struct s g2();
+
 typedef struct Person{
   const char *name;
   int age;
@@ -30,4 +33,7 @@ Person *copyPerson2(Person *other) {
   p->name = other->name;
   p->age = other->age;
   return p;
+}
+int main() {
+  return 0;
 }

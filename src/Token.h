@@ -95,6 +95,10 @@ public:
   void setLeadingWhitespace(bool leadingWhitespace) {
     mLeadingWhiteSpace = leadingWhitespace;
   }
+
+  [[nodiscard]] const SourceFile &getSourceFile() const {
+    return mSourceFile;
+  }
 };
 
 } // namespace lcc::lexer

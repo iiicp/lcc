@@ -418,6 +418,7 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
       LOGE(*start, "expect function declarator");
       return {};
     }
+    /// func param and block stmt share a scope
     mScope.pushScope();
     auto &parameterDeclarations = parameters->getParameterTypeList().getParameterList().getParameterDeclarations();
     /// todo check repeat param name
@@ -493,6 +494,7 @@ Parser::ParseStructOrUnionSpecifier() {
   case tok::l_brace: {
   lbrace:
     Consume(tok::l_brace);
+    mScope.pushScope();
     std::vector<Syntax::StructOrUnionSpecifier::StructDeclaration>
         structDeclarations;
     while (IsFirstInSpecifierQualifier()) {
@@ -549,6 +551,7 @@ Parser::ParseStructOrUnionSpecifier() {
       structDeclarations.push_back(
           {std::move(specifierQualifiers), std::move(declarators)});
     }
+    mScope.popScope();
     Match(tok::r_brace);
     return Syntax::StructOrUnionSpecifier(isUnion, tagName,
                                           std::move(structDeclarations));
@@ -743,6 +746,9 @@ std::optional<Syntax::DirectDeclarator> Parser::ParseDirectDeclarator() {
 
   if (Peek(tok::identifier)) {
     auto name = mTokCursor->getStrTokName();
+    if (mScope.checkIsTypedefInCurrentScope(name)) {
+      LOGE(*mTokCursor, "expect identifier, but get a typedef type");
+    }
     Consume(tok::identifier);
     directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorIdent(name));
   }else if (Peek(tok::l_paren)) {
@@ -1209,6 +1215,9 @@ std::optional<Syntax::EnumSpecifier::Enumerator> Parser::ParseEnumerator() {
     return {};
   }
   std::string_view enumValueName = mTokCursor->getStrTokName();
+  if (mScope.checkIsTypedefInCurrentScope(enumValueName)) {
+    LOGE(*mTokCursor, "expect identifier, but get a typedef type");
+  }
   mScope.addToScope(enumValueName);
   Consume(tok::identifier);
   if (Peek(tok::equal)) {
@@ -2446,6 +2455,13 @@ bool Parser::Scope::isTypedefInScope(std::string_view name) const {
       return result->second.isTypedef;
     }
   }
+  return false;
+}
+
+bool Parser::Scope::checkIsTypedefInCurrentScope(std::string_view name) const {
+  auto iter = mCurrentScope.rbegin();
+  if (auto result = iter->find(name); result != iter->end())
+    return true;
   return false;
 }
 

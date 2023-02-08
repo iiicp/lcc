@@ -39,6 +39,7 @@ public:
     }
     void addTypedef(std::string_view name);
     bool isTypedefInScope(std::string_view name) const;
+    bool checkIsTypedefInCurrentScope(std::string_view name) const;
     void addToScope(std::string_view name);
     void pushScope();
     void popScope();

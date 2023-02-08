@@ -20,7 +20,7 @@ void LOGE(uint32_t row, uint32_t col, const std::string &msg) {
 }
 
 void LOGE(const Token& tok, const std::string &msg) {
-  llvm::errs() << tok.getLine() << ":" << tok.getColumn() << ", " << msg << "\n";
+  llvm::errs() << tok.getSourceFile().sourcePath << ":" << tok.getLine() << ":" << tok.getColumn() << ", " << msg << "\n";
   LCC_ASSERT(0);
 }
 

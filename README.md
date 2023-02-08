@@ -8,11 +8,11 @@ ISO C 99 Doc link (pdf file): [C99](https://www.open-std.org/jtc1/sc22/wg14/www/
 
 ## Current Status: 
 
-|  Module     | Status      |     
-|  ----       | ----        |   
-| Preprocess  | working...  |   
-| Lexer       | 100%        |      
-| Parser      | 95%         |       
+|  Module     | Status     |     
+|  ----       |------------|   
+| Preprocess  | working... |   
+| Lexer       | 100%       |      
+| Parser      | 99.99%     |       
 | Semantics   | working... |       
 | CodeGen     | working... |    
 

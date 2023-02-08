@@ -2,7 +2,7 @@
 typedef long LONG;
 
 /// symbol LONG in the global scope
-int LONG;
+//int LONG;
 
 enum E{
 /// symbol LONG in the global scope

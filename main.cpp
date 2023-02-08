@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
             << BufferError.message() << "\n";
       }
       std::string source((*FileOrErr)->getBuffer());
-      lcc::Lexer lexer(source);
+      lcc::Lexer lexer(source, F, lcc::LanguageOption::C);
       auto tokens = lexer.tokenize();
       if (DumpTokens) {
         lcc::dump::dumpTokens(tokens);

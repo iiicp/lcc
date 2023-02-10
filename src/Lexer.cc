@@ -410,6 +410,7 @@ tok::TokenKind Lexer::ParsePunctuation(uint32_t & offset, char curChar, char nex
       type = tok::pipe_equal;
     } else {
       type = tok::pipe;
+      ++offset;
     }
     break;
   }

@@ -16,6 +16,7 @@
 #include <vector>
 #include <variant>
 #include <algorithm>
+#include <cassert>
 namespace lcc{
 class Token {
 private:

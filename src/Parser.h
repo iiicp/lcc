@@ -25,6 +25,7 @@ private:
   using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
+  bool mIsCheckTypedefType{false};
 public:
   class Scope {
   private:
@@ -155,6 +156,14 @@ private:
   bool IsFirstInUnaryExpr() const;
   bool IsFirstInPostFixExpr() const;
   bool IsFirstInPrimaryExpr() const;
+
+  void SetCheckTypedefType(bool state) {
+    mIsCheckTypedefType = state;
+  }
+
+  [[nodiscard]] bool IsCheckTypedefType() const {
+    return mIsCheckTypedefType;
+  }
 };
 }
 #endif // LCC_PARSER_H

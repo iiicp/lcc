@@ -4,10 +4,10 @@ typedef long LONG;
 /// symbol LONG in the global scope
 //int LONG;
 
-enum E{
-/// symbol LONG in the global scope
-LONG,
-};
+//enum E{
+///// symbol LONG in the global scope
+//LONG,
+//};
 
 /// symbol S in the struct/enum tag scope
 struct S{

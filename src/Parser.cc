@@ -325,7 +325,9 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
   {
     /// handle first declarator
     auto start = mTokCursor;
+    SetCheckTypedefType(true);
     auto declarator = ParseDeclarator();
+    SetCheckTypedefType(false);
     if (!declarator) {
       LOGE(*start, "expect declarator");
       return {};
@@ -355,7 +357,9 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
   while (Peek(tok::comma)) {
     Consume(tok::comma);
     auto start = mTokCursor;
+    SetCheckTypedefType(true);
     auto declarator = ParseDeclarator();
+    SetCheckTypedefType(false);
     if (!declarator) {
       LOGE(*start, "expect declarator");
       return {};
@@ -406,7 +410,9 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
     return Syntax::Declaration(std::move(declarationSpecifiers), {});
   }
   start = mTokCursor;
+  SetCheckTypedefType(true);
   auto declarator = ParseDeclarator();
+  SetCheckTypedefType(false);
   if (!declarator) {
     LOGE(*start, "expect declarator");
     return {};
@@ -509,7 +515,9 @@ Parser::ParseStructOrUnionSpecifier() {
           Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator>
           declarators;
       start = mTokCursor;
+      SetCheckTypedefType(true);
       auto declarator = ParseDeclarator();
+      SetCheckTypedefType(false);
       if (!declarator) {
         LOGE(*start,"expect declarator");
         return {};
@@ -529,7 +537,9 @@ Parser::ParseStructOrUnionSpecifier() {
       while (Peek(tok::comma)) {
         Consume(tok::comma);
         start = mTokCursor;
+        SetCheckTypedefType(true);
         declarator = ParseDeclarator();
+        SetCheckTypedefType(false);
         if (!declarator) {
           LOGE(*start, "expect declarator");
           return {};
@@ -746,8 +756,10 @@ std::optional<Syntax::DirectDeclarator> Parser::ParseDirectDeclarator() {
 
   if (Peek(tok::identifier)) {
     auto name = mTokCursor->getStrTokName();
-    if (mScope.checkIsTypedefInCurrentScope(name)) {
-      LOGE(*mTokCursor, "expect identifier, but get a typedef type");
+    if (IsCheckTypedefType()) {
+      if (mScope.checkIsTypedefInCurrentScope(name)) {
+        LOGE(*mTokCursor, "expect identifier, but get a typedef type");
+      }
     }
     Consume(tok::identifier);
     directDeclarator = std::make_unique<Syntax::DirectDeclarator>(Syntax::DirectDeclaratorIdent(name));
@@ -1296,7 +1308,8 @@ std::optional<Syntax::Initializer> Parser::ParseInitializer() {
       Consume(tok::comma);
     }
     Match(tok::r_brace);
-    return Syntax::Initializer{std::move(*initializerList)};
+    auto q = std::make_unique<Syntax::InitializerList>(std::move(*initializerList));
+    return Syntax::Initializer(std::move(q));
   }
 }
 
@@ -1597,13 +1610,19 @@ std::optional<Syntax::Stmt> Parser::ParseSwitchStmt() {
 /// case constantExpr: stmt
 std::optional<Syntax::Stmt> Parser::ParseCaseStmt() {
   Consume(tok::kw_case);
+  auto start = mTokCursor;
   auto expr = ParseConditionalExpr();
-  if (!expr)
+  if (!expr) {
+    LOGE(*start, "expect constant expr");
     return {};
+  }
   Match(tok::colon);
+  start = mTokCursor;
   auto stmt = ParseStmt();
-  if (!stmt)
+  if (!stmt) {
+    LOGE(*start, "expect stmt");
     return {};
+  }
   return Syntax::Stmt(Syntax::CaseStmt(
       std::move(*expr), std::make_unique<Syntax::Stmt>(std::move(*stmt))));
 }
@@ -2189,14 +2208,14 @@ void Parser::ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& curren
     auto tokType = mTokCursor->getTokenKind();
     if (tokType == tok::l_paren) {
       Consume(tok::l_paren);
-      std::vector<Syntax::AssignExpr> params;
+      std::vector<std::unique_ptr<Syntax::AssignExpr>> params;
       if (!Peek(tok::r_paren)) {
         auto start = mTokCursor;
         auto assignment = ParseAssignExpr();
         if (!assignment) {
           LOGE(*start, "expect assign expr");
         }
-        params.push_back(std::move(*assignment));
+        params.push_back(std::make_unique<Syntax::AssignExpr>(std::move(*assignment)));
       }
       while (!Peek(tok::r_paren)) {
         Match(tok::comma);
@@ -2205,7 +2224,7 @@ void Parser::ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& curren
         if (!assignment) {
           LOGE(*start, "expect assign expr");
         }
-        params.push_back(std::move(*assignment));
+        params.push_back(std::make_unique<Syntax::AssignExpr>(std::move(*assignment)));
       }
       Consume(tok::r_paren);
       if (current) {
@@ -2461,7 +2480,7 @@ bool Parser::Scope::isTypedefInScope(std::string_view name) const {
 bool Parser::Scope::checkIsTypedefInCurrentScope(std::string_view name) const {
   auto iter = mCurrentScope.rbegin();
   if (auto result = iter->find(name); result != iter->end())
-    return true;
+    return result->second.isTypedef;
   return false;
 }
 
@@ -2583,6 +2602,7 @@ bool Parser::IsFirstInStatement() const {
          mTokCursor->getTokenKind() == tok::l_brace ||
          mTokCursor->getTokenKind() == tok::kw_switch ||
          mTokCursor->getTokenKind() == tok::kw_continue ||
+         mTokCursor->getTokenKind() == tok::kw_break ||
          mTokCursor->getTokenKind() == tok::kw_case ||
          mTokCursor->getTokenKind() == tok::kw_default ||
          mTokCursor->getTokenKind() == tok::identifier ||

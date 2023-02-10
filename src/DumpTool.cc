@@ -143,8 +143,8 @@ void visitor(const Syntax::Initializer &initializer) {
   std::visit(overload{
       [](const Syntax::AssignExpr &assignExpr) {
          visitor(assignExpr);
-      },[](const Syntax::InitializerList &initializerList) {
-       visitor(initializerList);}
+      },[](const std::unique_ptr<Syntax::InitializerList> &initializerList) {
+       visitor(*initializerList);}
   }, initializer.getVariant());
   DecAlign();
 }
@@ -1027,7 +1027,7 @@ void visitor(const Syntax::PostFixExpr &postFixExpr){
          llvm::outs() << &funcCall << "\n";
          visitor(*funcCall.getPostFixExpr());
          for (const auto &assignExpr : funcCall.getOptionalAssignExpressions()) {
-           visitor(assignExpr);
+           visitor(*assignExpr);
          }
          DecAlign();
      },

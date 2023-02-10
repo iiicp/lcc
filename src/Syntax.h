@@ -89,8 +89,8 @@ class Pointer;
 class ParamTypeList;
 class ParameterDeclaration;
 class ParamList;
-class InitializerList;
 class Initializer;
+class InitializerList;
 
 class Node {
 public:
@@ -100,23 +100,6 @@ public:
   Node &operator=(const Node &) = delete;
   Node(Node &&) = default;
   Node &operator=(Node &&) = default;
-};
-
-/**
- expression:
-    assignment-expression
-    expression , assignment-expression
- */
-class Expr final : public Node {
-private:
-  std::vector<AssignExpr> mAssignExpressions;
-
-public:
-  Expr(std::vector<AssignExpr> assignExpressions)
-      : mAssignExpressions(std::move(assignExpressions)) {}
-  [[nodiscard]] const std::vector<AssignExpr> &getAssignExpressions() const {
-    return mAssignExpressions;
-  }
 };
 
 /*
@@ -155,11 +138,11 @@ public:
  */
 class PrimaryExprParent final : public Node {
 private:
-  Expr mExpr;
+  std::unique_ptr<Expr> mExpr;
 
 public:
-  PrimaryExprParent(Expr &&expr) : mExpr(std::move(expr)){};
-  [[nodiscard]] const Expr &getExpr() const { return mExpr; }
+  PrimaryExprParent(Expr &&expr) : mExpr(std::make_unique<Expr>(std::move(expr))){};
+  [[nodiscard]] const Expr &getExpr() const { return *mExpr; }
 };
 
 /*
@@ -214,16 +197,17 @@ public:
 class PostFixExprSubscript final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
-  Expr mExpr;
+  std::unique_ptr<Expr> mExpr;
 
 public:
   PostFixExprSubscript(std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr)
-      : mPostFixExpr(std::move(postFixExpr)), mExpr(std::move(expr)) {}
+      : mPostFixExpr(std::move(postFixExpr)),
+        mExpr(std::make_unique<Expr>(std::move(expr))) {}
 
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
     return mPostFixExpr.get();
   }
-  [[nodiscard]] const Expr &getExpr() const { return mExpr; }
+  [[nodiscard]] const Expr &getExpr() const { return *mExpr; }
 };
 
 /**
@@ -237,18 +221,18 @@ public:
 class PostFixExprFuncCall final : public Node {
 private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
-  std::vector<AssignExpr> mOptParams;
+  std::vector<std::unique_ptr<AssignExpr>> mOptParams;
 
 public:
   PostFixExprFuncCall(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                      std::vector<AssignExpr> &&optParams)
+                      std::vector<std::unique_ptr<AssignExpr>> &&optParams)
       : mPostFixExpr(std::move(postFixExpr)), mOptParams(std::move(optParams)) {
   }
 
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
     return mPostFixExpr.get();
   }
-  [[nodiscard]] const std::vector<AssignExpr> &
+  [[nodiscard]] const std::vector<std::unique_ptr<AssignExpr>> &
   getOptionalAssignExpressions() const {
     return mOptParams;
   }
@@ -428,6 +412,42 @@ public:
   UnaryExprSizeOf(Variant &&variant) : mValue(std::move(variant)){};
 
   [[nodiscard]] const Variant &getVariant() const { return mValue; }
+};
+
+/**
+ * type-specifier:
+ *  void char short int long float double signed unsigned _Bool
+ *  struct-or-union-specifier
+ *  enum-specifier
+ *  typedef-name
+ */
+class TypeSpecifier final : public Node {
+public:
+  enum PrimitiveTypeSpecifier {
+    Void = 0b1,
+    Char = 0b10,
+    Short = 0b100,
+    Int = 0b1000,
+    Long = 0b10000,
+    Float = 0b1000000,
+    Double = 0b10000000,
+    Signed = 0b100000000,
+    Unsigned = 0b1000000000,
+    Bool = 0b10000000000,
+  };
+
+private:
+  using variant =
+      std::variant<PrimitiveTypeSpecifier,
+                   std::unique_ptr<StructOrUnionSpecifier>,
+                   std::unique_ptr<EnumSpecifier>, std::string_view>;
+
+  variant mVariant;
+
+public:
+  TypeSpecifier(variant &&variant) : mVariant(std::move(variant)) {}
+
+  [[nodiscard]] const variant &getVariant() const { return mVariant; }
 };
 
 /**
@@ -856,6 +876,25 @@ public:
       std::pair<AssignmentOperator, ConditionalExpr>> &
   getOptionalConditionalExpr() const {
     return mOptConditionExpr;
+  }
+};
+
+
+/**
+ expression:
+    assignment-expression
+    expression , assignment-expression
+ */
+class Expr final : public Node {
+private:
+  std::vector<AssignExpr> mAssignExpressions;
+
+public:
+  Expr(std::vector<AssignExpr> assignExpressions)
+      : mAssignExpressions(std::move(assignExpressions)) {}
+
+  const std::vector<AssignExpr> &getAssignExpressions() const {
+    return mAssignExpressions;
   }
 };
 
@@ -1353,6 +1392,23 @@ public:
 };
 
 /**
+ * pointer:
+ *  type-qualifier-list{opt}
+ *  type-qualifier-list{opt} pointer
+ */
+class Pointer final : public Node {
+  std::vector<TypeQualifier> mTypeQualifiers;
+
+public:
+  Pointer(std::vector<TypeQualifier> &&typeQualifiers)
+      : mTypeQualifiers(std::move(typeQualifiers)) {}
+
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
+    return mTypeQualifiers;
+  }
+};
+
+/**
  * abstract-declarator:
  *  pointer
  *  pointer{opt} direct-abstract-declarator
@@ -1688,56 +1744,19 @@ public:
 };
 
 /**
- * type-specifier:
- *  void char short int long float double signed unsigned _Bool
- *  struct-or-union-specifier
- *  enum-specifier
- *  typedef-name
+ * initializer:
+ *  assignment-expression
+ *  { initializer-list }
+ *  { initializer-list , }
  */
-class TypeSpecifier final : public Node {
-public:
-  enum PrimitiveTypeSpecifier {
-    Void = 0b1,
-    Char = 0b10,
-    Short = 0b100,
-    Int = 0b1000,
-    Long = 0b10000,
-    Float = 0b1000000,
-    Double = 0b10000000,
-    Signed = 0b100000000,
-    Unsigned = 0b1000000000,
-    Bool = 0b10000000000,
-  };
-
-private:
-  using variant =
-      std::variant<PrimitiveTypeSpecifier,
-                   std::unique_ptr<StructOrUnionSpecifier>,
-                   std::unique_ptr<EnumSpecifier>, std::string_view>;
-
+class Initializer final : public Node {
+  using variant = std::variant<AssignExpr, std::unique_ptr<InitializerList>>;
   variant mVariant;
 
 public:
-  TypeSpecifier(variant &&variant) : mVariant(std::move(variant)) {}
+  Initializer(variant &&variant) : mVariant(std::move(variant)) {}
 
   [[nodiscard]] const variant &getVariant() const { return mVariant; }
-};
-
-/**
- * pointer:
- *  type-qualifier-list{opt}
- *  type-qualifier-list{opt} pointer
- */
-class Pointer final : public Node {
-  std::vector<TypeQualifier> mTypeQualifiers;
-
-public:
-  Pointer(std::vector<TypeQualifier> &&typeQualifiers)
-      : mTypeQualifiers(std::move(typeQualifiers)) {}
-
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
-    return mTypeQualifiers;
-  }
 };
 
 /**
@@ -1776,22 +1795,6 @@ public:
       : mInitializer(std::move(initializer)) {}
 
   const vector &getInitializerList() const { return mInitializer; }
-};
-
-/**
- * initializer:
- *  assignment-expression
- *  { initializer-list }
- *  { initializer-list , }
- */
-class Initializer final : public Node {
-  using variant = std::variant<AssignExpr, InitializerList>;
-  variant mVariant;
-
-public:
-  Initializer(variant &&variant) : mVariant(std::move(variant)) {}
-
-  [[nodiscard]] const variant &getVariant() const { return mVariant; }
 };
 
 /**

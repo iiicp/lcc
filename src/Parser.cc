@@ -602,7 +602,7 @@ Parser::ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& 
     switch (mTokCursor->getTokenKind()) {
     case tok::l_paren: {
       Consume(tok::l_paren);
-      if (IsFirstInParameterTypeList()) {
+      if (IsFirstInDeclarationSpecifier()) {
         auto start = mTokCursor;
         SetCheckTypedefType(false);
         auto parameterTypeList = ParseParameterTypeList();
@@ -694,7 +694,7 @@ Parser::ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& 
       }
       if (Peek(tok::kw_static)) {
         Consume(tok::kw_static);
-        auto start = mTokCursor;
+        start = mTokCursor;
         auto assignment = ParseAssignExpr();
         if (!assignment) {
           LOGE(*start, "expect assign expr");

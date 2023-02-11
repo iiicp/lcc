@@ -1,7 +1,8 @@
-typedef int INT32;
-typedef long LONG;
-void f(INT32 INT32, int LONG) {}
-int main(){}
-struct A{
-  int LONG;
-};
+int f(int a[]);
+int f(void);
+int f(const void);
+int f(int a[*]);
+int f(int a,float a);
+int f(register int a);
+int f(int a[static 6]);
+int f(int a[6][static 5]);

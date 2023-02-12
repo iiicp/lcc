@@ -16,6 +16,8 @@
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <memory>
+
 namespace lcc::Syntax {
 class PrimaryExprIdent;
 class PrimaryExprConstant;

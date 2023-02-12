@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <charconv> // std::from_chars
 #include <set>
+#include <limits>
 
 namespace lcc {
 

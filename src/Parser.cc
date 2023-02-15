@@ -162,6 +162,7 @@ next_specifier:
     if (!seeTy && mScope.isTypedefInScope(name)) {
       Consume(tok::identifier);
       declarationSpecifiers.addTypeSpecifier(Syntax::TypeSpecifier(name));
+      seeTy = true;
       break;
     }
     return declarationSpecifiers;
@@ -274,6 +275,7 @@ next_specifier:
     if (!seeTy && mScope.isTypedefInScope(name)) {
       Consume(tok::identifier);
       specifierQualifiers.addTypeSpecifier(Syntax::TypeSpecifier(name));
+      seeTy = true;
       break;
     }
     return specifierQualifiers;
@@ -325,9 +327,7 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
   {
     /// handle first declarator
     auto start = mTokCursor;
-    SetCheckTypedefType(true);
     auto declarator = ParseDeclarator();
-    SetCheckTypedefType(false);
     if (!declarator) {
       LOGE(*start, "expect declarator");
       return {};
@@ -357,9 +357,7 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
   while (Peek(tok::comma)) {
     Consume(tok::comma);
     auto start = mTokCursor;
-    SetCheckTypedefType(true);
     auto declarator = ParseDeclarator();
-    SetCheckTypedefType(false);
     if (!declarator) {
       LOGE(*start, "expect declarator");
       return {};
@@ -410,9 +408,7 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
     return Syntax::Declaration(std::move(declarationSpecifiers), {});
   }
   start = mTokCursor;
-  SetCheckTypedefType(true);
   auto declarator = ParseDeclarator();
-  SetCheckTypedefType(false);
   if (!declarator) {
     LOGE(*start, "expect declarator");
     return {};
@@ -515,9 +511,9 @@ Parser::ParseStructOrUnionSpecifier() {
           Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator>
           declarators;
       start = mTokCursor;
-      SetCheckTypedefType(true);
-      auto declarator = ParseDeclarator();
       SetCheckTypedefType(false);
+      auto declarator = ParseDeclarator();
+      SetCheckTypedefType(true);
       if (!declarator) {
         LOGE(*start,"expect declarator");
         return {};
@@ -537,9 +533,9 @@ Parser::ParseStructOrUnionSpecifier() {
       while (Peek(tok::comma)) {
         Consume(tok::comma);
         start = mTokCursor;
-        SetCheckTypedefType(true);
-        declarator = ParseDeclarator();
         SetCheckTypedefType(false);
+        declarator = ParseDeclarator();
+        SetCheckTypedefType(true);
         if (!declarator) {
           LOGE(*start, "expect declarator");
           return {};
@@ -608,7 +604,9 @@ Parser::ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& 
       Consume(tok::l_paren);
       if (IsFirstInParameterTypeList()) {
         auto start = mTokCursor;
+        SetCheckTypedefType(false);
         auto parameterTypeList = ParseParameterTypeList();
+        SetCheckTypedefType(true);
         if (!parameterTypeList) {
           LOGE(*start, "expect param type list");
           return {};

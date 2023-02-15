@@ -14,6 +14,7 @@
 #include "Token.h"
 #include <optional>
 #include <string_view>
+#include <string>
 #include <variant>
 #include <vector>
 #include <memory>
@@ -124,7 +125,7 @@ public:
 class PrimaryExprConstant final : public Node {
 public:
   using Variant = std::variant<std::int32_t, std::uint32_t, std::int64_t,
-                               std::uint64_t, float, double, std::string_view>;
+                               std::uint64_t, float, double, std::string>;
 
 private:
   Variant mValue;

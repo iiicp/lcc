@@ -14,14 +14,14 @@
 #include "llvm/Support/raw_ostream.h"
 namespace lcc::dump {
 
-static uint64_t LeftAlign = 0;
+static uint64_t LeftAlign = 1;
 
 void IncAlign() {
   LeftAlign++;
 }
 
 void DecAlign() {
-  assert(LeftAlign > 0);
+  assert(LeftAlign > 1);
   LeftAlign--;
 }
 
@@ -36,15 +36,23 @@ void DecAlign() {
 //}
 
 void Print(std::string_view content) {
-  std::string ws(LeftAlign, ' ');
+  std::string ws(LeftAlign, '-');
+  if (ws.length() >= 1) {
+    ws[0] = '|';
+  }
   llvm::outs() << ws << content << " ";
 }
 
 void Println(std::string_view content, bool color=true) {
-  std::string ws(LeftAlign, ' ');
+  std::string ws(LeftAlign, '-');
+  if (ws.length() >= 1) {
+    ws[0] = '|';
+  }
   if (color) {
     llvm::outs().changeColor(llvm::raw_ostream::GREEN) << ws << content;
     llvm::outs().resetColor() << "\n";
+  }else {
+    llvm::outs() << ws << content << "\n";
   }
 }
 
@@ -308,7 +316,7 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
            }
       },
       [](const std::string_view& stringView) {
-          llvm::outs() << stringView << "\n";
+          Println(stringView);
       }
   }, typeSpecifier.getVariant());
   DecAlign();
@@ -347,7 +355,7 @@ void visitor(const Syntax::Pointer &pointer) {
 void visitor(const Syntax::DirectDeclarator &directDeclarator) {
 //  Print("DirectDeclarator");
 //  llvm::outs() << &directDeclarator << "\n";
-  IncAlign();
+//  IncAlign();
   std::visit(overload{
       [](const Syntax::DirectDeclaratorIdent &ident) {
          Print("DirectDeclaratorIdent");
@@ -399,7 +407,7 @@ void visitor(const Syntax::DirectDeclarator &directDeclarator) {
        DecAlign();
      },
   }, directDeclarator);
-  DecAlign();
+ // DecAlign();
 }
 
 void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
@@ -493,11 +501,9 @@ void visitor(const Syntax::ParamList &paramList) {
 void visitor(const Syntax::BlockStmt &blockStmt) {
   Print("BlockStmt");
   llvm::outs() << &blockStmt << "\n";
-  IncAlign();
   for (const auto &blockItem : blockStmt.getBlockItems()) {
     visitor(blockItem);
   }
-  DecAlign();
 }
 
 void visitor(const Syntax::BlockItem &blockItem) {
@@ -659,7 +665,9 @@ void visitor(const Syntax::ReturnStmt &returnStmt){
   Print("ReturnStmt");
   llvm::outs() << &returnStmt << "\n";
   if (returnStmt.getExpression()) {
+    IncAlign();
     visitor(*returnStmt.getExpression());
+    DecAlign();
   }
 }
 
@@ -681,47 +689,47 @@ void visitor(const Syntax::AssignExpr &assignExpr) {
   for (const auto &pair : assignExpr.getOptionalConditionalExpr()) {
     switch (pair.first) {
     case Syntax::AssignExpr::Assign: {
-      Print("Assign");
+      Println("=");
       break;
     }
     case Syntax::AssignExpr::PlusAssign: {
-      Print("PlusAssign");
+      Println("+=");
       break;
     }
     case Syntax::AssignExpr::MinusAssign: {
-      Print("MinusAssign");
+      Println("-=");
       break;
     }
     case Syntax::AssignExpr::MultiplyAssign: {
-      Print("MultiplyAssign");
+      Println("*=");
       break;
     }
     case Syntax::AssignExpr::DivideAssign: {
-      Print("DivideAssign");
+      Println("/=");
       break;
     }
     case Syntax::AssignExpr::ModuloAssign: {
-      Print("ModuloAssign");
+      Println("%=");
       break;
     }
     case Syntax::AssignExpr::LeftShiftAssign: {
-      Print("LeftShiftAssign");
+      Println("<<=");
       break;
     }
     case Syntax::AssignExpr::RightShiftAssign: {
-      Print("RightShiftAssign");
+      Println(">>=");
       break;
     }
     case Syntax::AssignExpr::BitAndAssign: {
-      Print("BitAndAssign");
+      Println("&=");
       break;
     }
     case Syntax::AssignExpr::BitOrAssign: {
-      Print("BitOrAssign");
+      Println("|=");
       break;
     }
     case Syntax::AssignExpr::BitXorAssign: {
-      Print("BitXorAssign");
+      Println("^=");
       break;
     }
     default:
@@ -804,11 +812,11 @@ void visitor(const Syntax::EqualExpr &equalExpr){
   for (const auto &relationExpr: equalExpr.getOptionalRelationalExpr()) {
     switch (relationExpr.first) {
     case Syntax::EqualExpr::Equal: {
-      Print("Equal");
+      Println("==");
       break;
     }
     case Syntax::EqualExpr::NotEqual: {
-      Print("NotEqual");
+      Println("!=");
       break;
     }
     default:
@@ -826,19 +834,19 @@ void visitor(const Syntax::RelationalExpr &relationalExpr){
   for (const auto &shiftExpr: relationalExpr.getOptionalShiftExpressions()) {
     switch (shiftExpr.first) {
     case Syntax::RelationalExpr::LessThan: {
-      Print("LessThan");
+      Println("<");
       break;
     }
     case Syntax::RelationalExpr::LessThanOrEqual: {
-      Print("LessThanOrEqual");
+      Println("<=");
       break;
     }
     case Syntax::RelationalExpr::GreaterThan: {
-      Print("GreaterThan");
+      Println(">");
       break;
     }
     case Syntax::RelationalExpr::GreaterThanOrEqual: {
-      Print("GreaterThanOrEqual");
+      Println(">=");
       break;
     }
     default:
@@ -856,11 +864,11 @@ void visitor(const Syntax::ShiftExpr &shiftExpr){
   for (const auto &additiveExpr: shiftExpr.getOptAdditiveExps()) {
     switch (additiveExpr.first) {
     case Syntax::ShiftExpr::Left: {
-      Print("Shift Left");
+      Println("<<");
       break;
     }
     case Syntax::ShiftExpr::Right: {
-      Print("Shift Right");
+      Println(">>");
       break;
     }
     default:
@@ -878,11 +886,11 @@ void visitor(const Syntax::AdditiveExpr &additiveExpr){
   for (const auto &multiExpr: additiveExpr.getOptionalMultiExpr()) {
     switch (multiExpr.first) {
     case Syntax::AdditiveExpr::Minus: {
-      Print("Minus");
+      Println("-");
       break;
     }
     case Syntax::AdditiveExpr::Plus: {
-      Print("Plus");
+      Println("+");
       break;
     }
     default:
@@ -900,15 +908,15 @@ void visitor(const Syntax::MultiExpr &multiExpr){
   for (const auto &castExpr: multiExpr.getOptionalCastExpr()) {
     switch (castExpr.first) {
     case Syntax::MultiExpr::Multiply: {
-      Print("Multiply");
+      Println("*");
       break;
     }
     case Syntax::MultiExpr::Divide: {
-      Print("Divide");
+      Println("/");
       break;
     }
     case Syntax::MultiExpr::Modulo: {
-      Print("Modulo");
+      Println("%");
       break;
     }
     default:
@@ -932,14 +940,11 @@ void visitor(const Syntax::CastExpr &castExpr){
   DecAlign();
 }
 void visitor(const Syntax::UnaryExpr &unaryExpr){
-  IncAlign();
   std::visit(overload{
     [](const Syntax::UnaryExprPostFixExpr &unaryExprPostFixExpr) {
        Print("UnaryExprPostFixExpr");
        llvm::outs() << &unaryExprPostFixExpr << "\n";
-       IncAlign();
        visitor(unaryExprPostFixExpr.getPostExpr());
-       DecAlign();
     },
     [](const Syntax::UnaryExprUnaryOperator &unaryExprUnaryOperator) {
        Print("UnaryExprUnaryOperator");
@@ -947,35 +952,35 @@ void visitor(const Syntax::UnaryExpr &unaryExpr){
        IncAlign();
        switch (unaryExprUnaryOperator.getOperator()) {
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Increment: {
-         Println("Increment");
+         Println("++");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Decrement: {
-         Println("Decrement");
+         Println("--");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Ampersand: {
-         Println("Ampersand");
+         Println("&");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Asterisk:{
-         Println("Asterisk");
+         Println("*");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Plus:{
-         Println("Plus");
+         Println("+");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Minus:{
-         Println("Minus");
+         Println("-");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::BitNot:{
-         Println("BitNot");
+         Println("~");
          break;
        }
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::LogicalNot:{
-         Println("LogicalNot");
+         Println("!");
          break;
        }
        default:
@@ -996,7 +1001,6 @@ void visitor(const Syntax::UnaryExpr &unaryExpr){
        DecAlign();
     },
   }, unaryExpr);
-  DecAlign();
 }
 void visitor(const Syntax::TypeName &typeName){
   Print("TypeName");
@@ -1094,7 +1098,7 @@ void visitor(const Syntax::PrimaryExpr &primaryExpr){
        std::visit([](auto &&value) {
          IncAlign();
          using T = std::decay_t<decltype(value)>;
-         if constexpr (std::is_same_v<T, std::string_view>) {
+         if constexpr (std::is_same_v<T, std::string>) {
            Println(value);
          }else {
            Println(std::to_string(value));

@@ -25,7 +25,7 @@ private:
   using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
-  bool mIsCheckTypedefType{false};
+  bool mIsCheckTypedefType{true};
 public:
   class Scope {
   private:

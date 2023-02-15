@@ -45,6 +45,8 @@ void Println(std::string_view content, bool color=true) {
   if (color) {
     llvm::outs().changeColor(llvm::raw_ostream::GREEN) << ws << content;
     llvm::outs().resetColor() << "\n";
+  } else {
+    llvm::outs() << ws << content << "\n";
   }
 }
 

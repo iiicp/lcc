@@ -26,3 +26,5 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_BINARY_DIR}/src
         ${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_all})
+
+add_subdirectory(tests/ir)

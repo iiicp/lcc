@@ -58,3 +58,6 @@ target_link_libraries(c_fun_fib ${llvm_all})
 
 add_executable(c_while c_while.cpp)
 target_link_libraries(c_while ${llvm_all})
+
+add_executable(use_mgr use_sourcemgr.cc)
+target_link_libraries(use_mgr ${llvm_all})

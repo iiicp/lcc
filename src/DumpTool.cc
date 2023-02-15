@@ -40,9 +40,12 @@ void Print(std::string_view content) {
   llvm::outs() << ws << content << " ";
 }
 
-void Println(std::string_view content) {
+void Println(std::string_view content, bool color=true) {
   std::string ws(LeftAlign, ' ');
-  llvm::outs() << ws << content << "\n";
+  if (color) {
+    llvm::outs().changeColor(llvm::raw_ostream::GREEN) << ws << content;
+    llvm::outs().resetColor() << "\n";
+  }
 }
 
 void dumpTokens(const std::vector<lcc::Token> &tokens) {

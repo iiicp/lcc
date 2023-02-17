@@ -17,47 +17,22 @@
 
 namespace lcc {
 
-Lexer::Lexer(std::string &sourceCode, std::string_view sourcePath, LanguageOption option)
-: mLangOption(option) {
-  RegularSourceCode(sourceCode);
-  /// calculate start offset per line
-  uint32_t offset = 0;
-  auto &offsets = mSourceFile.lineStartOffsets;
-  offsets.push_back(offset);
-  for (auto &ch : sourceCode) {
-    offset++;
-    if (ch == '\n') {
-      offsets.push_back(offset);
-    }
-  }
-  offsets.push_back(offset + 1);
-  offsets.shrink_to_fit();
+using namespace llvm;
 
-  mSourceFile.sourceCode = sourceCode;
-  mSourceFile.sourcePath = sourcePath;
-}
+Lexer::Lexer(SourceMgr &mgr, std::unique_ptr<MemoryBuffer> &&oBuf, DiagnosticEngine &diag, LanguageOption option)
+    : Mgr(mgr), Diag(diag), mLangOption(option) {
 
-void Lexer::RegularSourceCode(std::string &sourceCode) {
-  /// check BOM header
-  std::string_view UTF8_BOM = "\xef\xbb\xbf";
-  if (sourceCode.size() >= 3 && sourceCode.substr(0, 3) == UTF8_BOM) {
-    sourceCode = sourceCode.substr(3);
-  }
-  /// compatible with windows
-  std::string::size_type pos = 0;
-  while ((pos = sourceCode.find("\r\n", pos)) != sourceCode.npos) {
-    sourceCode.erase(pos, 1);
+  if (HasUtf8BomHead(oBuf->getBuffer())) {
+    StringRef ref(oBuf->getBuffer().data()+3);
+    std::unique_ptr<MemoryBuffer> newBuf = MemoryBuffer::getMemBuffer(ref, oBuf->getBufferIdentifier());
+    Mgr.AddNewSourceBuffer(std::move(newBuf), SMLoc());
+  }else {
+    Mgr.AddNewSourceBuffer(std::move(oBuf), SMLoc());
   }
 
-  sourceCode.shrink_to_fit();
-}
-
-Token::ValueType Lexer::ParseStringLiteral(const Token &ppToken) {
-  auto chars = ProcessCharacters(ppToken.getContent());
-  if (!chars) {
-    LOGE(ppToken.getLine(), ppToken.getColumn(), "parse string literal error");
-  }
-  return std::string(chars.value().begin(), chars.value().end());
+  auto *m = Mgr.getMemoryBuffer(Mgr.getMainFileID());
+  P = m->getBufferStart();
+  Ep = m->getBufferEnd();
 }
 
 /**
@@ -76,14 +51,13 @@ int c = 0x123lu;
 float a1 = 0x.ffp-3;
  */
 Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
-  std::string content = ppToken.getContent();
-  std::string_view character = content;
+  StringRef character = ppToken.getRepresentation();
   const char *begin = character.begin(), *end = character.end();
   LCC_ASSERT(std::distance(begin, end) >= 1);
   /// If the number is just "0x", treat the x as a suffix instead of as a hex
   /// prefix
   bool isHex = character.size() > 2 &&
-               (character.starts_with("0x") || character.starts_with("0X")) &&
+               (character.startswith("0x") || character.startswith("0X")) &&
                 (IsHexDigit(character[2]) || character[2] == '.');
   std::vector<char> charSet{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   if (isHex) {
@@ -121,10 +95,10 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
     suffixBegin = std::find_if(suffixBegin, end, searchFunction);
     /// first character must be digit
     if (prev == suffixBegin) {
-      LOGE(ppToken.getLine(), ppToken.getColumn(), "expected digits after exponent");
+      DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset()+(suffixBegin-begin)),diag::err_lex_expected_digits_after_exponent);
     }
   } else if (isHex && isFloat) {
-    LOGE(ppToken.getLine(), ppToken.getColumn(), "binary floating point must contain exponent");
+      DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset()+(suffixBegin-begin)),diag::err_lex_binary_floating);
   }
 
   bool isHexOrOctal = isHex;
@@ -133,7 +107,7 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
     size_t len = std::distance(begin, suffixBegin);
     for (int i = 0; i < len; ++i) {
       if (character[i] >= '8') {
-        LOGE(ppToken.getLine(), ppToken.getColumn(), "invalid octal character");
+        DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset() + i),diag::err_lex_invalid_octal_character);
       }
     }
   }
@@ -151,7 +125,7 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
     valid = variants.find(suffix) != variants.end();
   }
   if (!valid) {
-    LOGE(ppToken.getLine(), ppToken.getColumn(), "invalid literal suffix");
+    DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset()+(suffixBegin-begin)),diag::err_lex_invalid_literal_suffix);
   }
 
   if (!isFloat) {
@@ -225,7 +199,7 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
   LCC_UNREACHABLE;
 }
 
-tok::TokenKind Lexer::ParsePunctuation(uint32_t & offset, char curChar, char nextChar,
+tok::TokenKind Lexer::ParsePunctuation(const char * & offset, char curChar, char nextChar,
                                 char nnChar) {
   tok::TokenKind type = tok::unknown;
   switch (curChar) {
@@ -461,76 +435,77 @@ tok::TokenKind Lexer::ParsePunctuation(uint32_t & offset, char curChar, char nex
   return type;
 }
 std::vector<Token> Lexer::tokenize() {
-  /// variables used each time
+
   std::vector<Token> results;
 
-  uint32_t offset = 0;
+  /// Sp meaning start p
+  const char *Sp = P;
+  std::string strBuilder;
+  char includeDelimiter{' '};
 
-  auto InsertToken = [&](uint32_t startOffset, uint32_t endOffset, tok::TokenKind tokenKind,
+  auto InsertToken = [&](const char * sp, const char *p, tok::TokenKind tokenKind,
                          std::string value = {}) {
-    auto &newToken = results.emplace_back(tokenKind, startOffset, endOffset - startOffset, mSourceFile,
-                                          std::move(value));
-    newToken.setLeadingWhitespace(leadingWhiteSpace);
-    leadingWhiteSpace = false;
-    characters.clear();
+    auto &newToken = results.emplace_back(tokenKind, sp, p - sp, Mgr, std::move(value));
+    strBuilder.clear();
   };
 
-  std::string_view sourceCode = mSourceFile.sourceCode;
-  while (offset < sourceCode.size()) {
-    char curChar = (offset < sourceCode.size() ? sourceCode[offset] : '\0');
-    char nextChar =
-        (offset < sourceCode.size() - 1) ? sourceCode[offset + 1] : '\0';
+  while (P < Ep) {
+    char curChar = (P < Ep ? P[0] : '\0');
+    char nextChar = (P < Ep - 1) ? P[1] : '\0';
 
     switch (state) {
     case State::Start: {
       if (IsLetter(curChar)) {
         state = State::Identifier;
-        tokenStartOffset = offset;
+        Sp = P;
         break;
       }
       if (IsDigit(curChar) ||
           (curChar == '.' && IsDigit(nextChar))) {
         state = State::Number;
-        tokenStartOffset = offset;
+        Sp = P;
         break;
       }
       if (curChar == '\'') {
         state = State::CharacterLiteral;
-        tokenStartOffset = offset++;
+        Sp = P++;
         break;
       }
       if (curChar == '"') {
         if (results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
-            results[results.size() - 1].getStrTokName() == "include") {
+            results[results.size() - 1].getRepresentation() == "include") {
           state = State::AfterInclude;
-          delimiter = '"';
-          tokenStartOffset = offset++;
+          includeDelimiter = '"';
+          Sp = P++;
         } else {
           state = State::StringLiteral;
-          tokenStartOffset = offset++;
+          Sp = P++;
         }
         break;
       }
       if (curChar == '\\') {
-        InsertToken(offset, offset + 1, tok::pp_backslash);
-        offset++;
+        InsertToken(Sp, ++P, tok::pp_backslash);
+        break;
+      }
+      /// \r\n meaning \n in windows
+      if (curChar == '\r' && nextChar == '\n') {
+        InsertToken(Sp+1, P+=2, tok::pp_newline);
         break;
       }
       if (curChar == '\n') {
-        InsertToken(offset, offset + 1, tok::pp_newline);
-        offset++;
+        InsertToken(Sp, ++P, tok::pp_newline);
         break;
       }
       if (curChar == '/' && nextChar == '/') {
         state = State::LineComment;
-        offset += 2;
+        P += 2;
         break;
       }
       if (curChar == '/' && nextChar == '*') {
         state = State::BlockComment;
-        offset += 2;
+        P += 2;
         break;
       }
       /// Line comments and block comments need to be processed first
@@ -538,90 +513,92 @@ std::vector<Token> Lexer::tokenize() {
         if (curChar == '<' && results.size() >= 2 &&
             results[results.size() - 2].getTokenKind() == tok::pp_hash &&
             results[results.size() - 1].getTokenKind() == tok::identifier &&
-            results[results.size() - 1].getContent() == "include") {
+            results[results.size() - 1].getRepresentation() == "include") {
           state = State::AfterInclude;
-          delimiter = '>';
-          tokenStartOffset = offset++;
+          includeDelimiter = '>';
+          Sp = P++;
         } else {
           state = State::Punctuator;
-          tokenStartOffset = offset;
+          Sp = P;
         }
         break;
       }
       /// last process
       if (IsWhiteSpace(curChar)) {
-        leadingWhiteSpace = true;
-        offset++;
+        P++;
         break;
       }
-      LOGE(GetLine(tokenStartOffset), GetColumn(tokenStartOffset), "illegal char");
+      DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_illegal_char);
+      P++; /// skip this char
       break;
     }
     case State::CharacterLiteral: {
-      if (curChar == '\'' &&
-          (characters.empty() || !characters.ends_with('\\'))) {
+      if (curChar == '\'' && strBuilder.empty()) {
         state = State::Start;
-        InsertToken(tokenStartOffset, offset, tok::char_constant, characters);
-      } else {
-        characters += curChar;
+        InsertToken(Sp, P, tok::char_constant, strBuilder);
+        DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_empty_char_literal);
+      }else if (curChar == '\'' && !strBuilder.ends_with('\\')) {
+        state = State::Start;
+        InsertToken(Sp, P, tok::char_constant, strBuilder);
+      }else {
+        strBuilder += curChar;
       }
-      offset++;
+      P++;
       break;
     }
     case State::StringLiteral: {
       if (curChar == '"' &&
-          (characters.empty() || !characters.ends_with('\\'))) {
+          (strBuilder.empty() || !strBuilder.ends_with('\\'))) {
         state = State::Start;
-        InsertToken(tokenStartOffset, offset, tok::string_literal, characters);
+        InsertToken(Sp, P, tok::string_literal, strBuilder);
       } else {
-        characters += curChar;
+        strBuilder += curChar;
       }
-      offset++;
+      P++;
       break;
     }
     case State::Identifier: {
       if (IsLetter(curChar) ||  IsDigit(curChar)) {
-        characters += curChar;
-        offset++;
+        strBuilder += curChar;
+        P++;
       } else {
         state = State::Start;
-        InsertToken(tokenStartOffset, offset, tok::identifier, characters);
+        InsertToken(Sp, P, tok::identifier, strBuilder);
       }
       break;
     }
     case State::Number: {
       constexpr std::uint8_t toLower = 32;
-      if (characters.empty()) {
-        characters += curChar;
-        offset++;
+      if (strBuilder.empty()) {
+        strBuilder += curChar;
+        P++;
       } else {
         char lower_char = (curChar | toLower);
-        if (!IsJudgeNumber(characters, lower_char) &&
+        if (!IsJudgeNumber(strBuilder, lower_char) &&
             (lower_char != 'e') &&
             (lower_char != 'p') &&
             (lower_char != 'f') &&
             (lower_char != 'u') &&
             (lower_char != 'l') &&
             (lower_char != '.') &&
-            (((characters.back() | toLower) != 'e' &&
-              (characters.back() | toLower) != 'p') ||
+            (((strBuilder.back() | toLower) != 'e' &&
+              (strBuilder.back() | toLower) != 'p') ||
              (lower_char != '+' && lower_char != '-'))) {
-          InsertToken(tokenStartOffset, offset, tok::pp_number, characters);
+          InsertToken(Sp, P, tok::pp_number, strBuilder);
           state = State::Start;
         } else {
-          characters += curChar;
-          offset++;
+          strBuilder += curChar;
+          P++;
         }
         break;
       }
       break;
     }
     case State::Punctuator: {
-      char nnChar =
-          (offset < sourceCode.size() - 2) ? sourceCode[offset + 2] : '\0';
-      tok::TokenKind tk = ParsePunctuation(offset, curChar, nextChar, nnChar);
+      char nnChar = (P < Ep - 2) ? P[2] : '\0';
+      tok::TokenKind tk = ParsePunctuation(P, curChar, nextChar, nnChar);
       LCC_ASSERT(tk != tok::unknown);
-      InsertToken(tokenStartOffset, offset, tk, tok::getPunctuatorSpelling(tk));
+      InsertToken(Sp, P, tk, tok::getPunctuatorSpelling(tk));
       state = State::Start;
       break;
     }
@@ -629,38 +606,47 @@ std::vector<Token> Lexer::tokenize() {
       if (curChar == '\n') {
         state = State::Start;
       } else {
-        offset++;
+        P++;
       }
       break;
     }
     case State::BlockComment: {
       if (curChar == '*' && nextChar == '/') {
         state = State::Start;
-        leadingWhiteSpace = true;
-        offset += 2;
+        P += 2;
       } else {
-        offset++;
+        P++;
       }
       break;
     }
     case State::AfterInclude: {
-      if (curChar != delimiter && curChar != '\n') {
-        characters += curChar;
-        offset++;
+      if (curChar != includeDelimiter && curChar != '\n') {
+        strBuilder += curChar;
+        P++;
         break;
       }
       /// curChar is delimiter
       if (curChar != '\n') {
-        InsertToken(tokenStartOffset, offset++, tok::string_literal,
-                    characters);
+        InsertToken(Sp, P++, tok::string_literal,
+                    strBuilder);
         state = State::Start;
         break;
       }
-      LOGE(GetLine(tokenStartOffset), GetColumn(tokenStartOffset), "illegal newline in after include");
+      DiagReport(Diag, SMLoc::getFromPointer(P), diag::err_lex_illegal_newline_in_after_include);
     }
     }
   }
   results.shrink_to_fit();
+
+  if (state == State::CharacterLiteral) {
+    DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_char);
+  }else if (state == State::StringLiteral) {
+    DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_string);
+  }else if (state == State::BlockComment) {
+    DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_block_comment);
+  }else if (state == State::AfterInclude) {
+    DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_after_include);
+  }
 
   if (mLangOption == LanguageOption::C) {
     return toCTokens(std::move(results));
@@ -676,12 +662,12 @@ std::vector<Token> Lexer::toCTokens(std::vector<Token>&& ppTokens) {
     case tok::pp_hash:
     case tok::pp_hashhash:
     case tok::pp_backslash:
-      LOGE(iter.getLine(), iter.getColumn(), "illegal token kind in c token");
+      DiagReport(Diag, SMLoc::getFromPointer(iter.getOffset()), diag::err_lex_illegal_token_in_c);
       break;
     case tok::pp_newline:
       break;
     case tok::identifier: {
-      iter.setTokenKind(tok::getKeywordTokenType(iter.getContent()));
+      iter.setTokenKind(tok::getKeywordTokenType(iter.getRepresentation()));
       results.push_back(iter);
       break;
     }
@@ -693,20 +679,17 @@ std::vector<Token> Lexer::toCTokens(std::vector<Token>&& ppTokens) {
       break;
     }
     case tok::string_literal: {
-      auto str = ParseStringLiteral(iter);
+      auto chars = ParseCharacters(iter, false);
+      std::string str(chars.begin(), chars.end());
       iter.setTokenKind(tok::string_literal);
       iter.setValue(str);
       results.push_back(iter);
       break;
     }
     case tok::char_constant: {
-      auto chars = ProcessCharacters(iter.getContent());
-      if (!chars || chars.value().empty() || chars.value().size() > 1) {
-        LOGE(iter.getLine(), iter.getLine(), "process char constant error");
-        break;
-      }
+      auto chars = ParseCharacters(iter, true);
       iter.setTokenKind(tok::char_constant);
-      iter.setValue((int32_t)chars.value()[0]);
+      iter.setValue((int32_t)chars[0]);
       results.push_back(iter);
       break;
     }
@@ -717,6 +700,11 @@ std::vector<Token> Lexer::toCTokens(std::vector<Token>&& ppTokens) {
   }
   results.shrink_to_fit();
   return results;
+}
+
+bool Lexer::HasUtf8BomHead(StringRef buf) {
+  return (buf.size() >= 3) && (buf[0] == '\xef') &&
+         (buf[1] == '\xbb') && (buf[2] == '\xbf');
 }
 
 bool Lexer::IsLetter(char ch) {
@@ -753,16 +741,6 @@ bool Lexer::IsPunctuation(char ch) {
          ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
 }
 
-uint32_t Lexer::GetLine(uint32_t offset) const {
-  auto result = std::lower_bound(mSourceFile.lineStartOffsets.begin(), mSourceFile.lineStartOffsets.end(), offset);
-  return std::distance(mSourceFile.lineStartOffsets.begin(), result) + ((*result == offset) ? 1 : 0);
-}
-
-uint32_t Lexer::GetColumn(uint32_t offset) const {
-  uint32_t line = GetLine(offset);
-  return offset - mSourceFile.lineStartOffsets[line - 1] + 1;
-}
-
 uint32_t Lexer::OctalToNum(std::string_view value)
 {
   std::uint32_t result;
@@ -771,7 +749,7 @@ uint32_t Lexer::OctalToNum(std::string_view value)
   return result;
 }
 
-std::optional<std::uint32_t> Lexer::EscapeCharToValue(char escape) {
+std::uint32_t Lexer::ParseEscapeChar(const char *p, char escape){
   switch (escape) {
   case '\\':
     return '\\';
@@ -796,29 +774,46 @@ std::optional<std::uint32_t> Lexer::EscapeCharToValue(char escape) {
   case '?':
     return '\?';
   default:
-    return {};
+    DiagReport(Diag, SMLoc::getFromPointer(p), diag::err_lex_invalid_escaped_char);
+    return escape;
   }
   return 0;
 }
 
-std::optional<std::vector<char>> Lexer::ProcessCharacters(std::string_view characters) {
+std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMode) {
+  const auto *sp = ppToken.getOffset();
+
+  llvm::StringRef characters = ppToken.getRepresentation();
   std::vector<char> result;
   result.reserve(characters.size());
   int offset = 0, resultStart = 0;
   while (offset < characters.size()) {
     char ch = characters[offset];
     if (ch == '\n') {
-      return {};
+      if (handleCharMode) {
+        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_implicit_newline_in_char);
+      }
+      else{
+        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_implicit_newline_in_string);
+      }
+      offset++;
+      continue;
     }
     if (ch != '\\') {
       result.push_back(ch);
       resultStart++;
       offset++;
+      if (handleCharMode) {
+        if (resultStart > 1) {
+          DiagReport(Diag, SMLoc::getFromPointer(sp + offset), diag::warn_lex_multi_character);
+        }
+      }
       continue;
     }
     if (offset + 1 == characters.size()) {
       break;
     }
+    /// meaning ch == '\'
     if (characters[offset+1] == 'x') {
       offset += 2;
       int lastHex = offset;
@@ -830,8 +825,10 @@ std::optional<std::vector<char>> Lexer::ProcessCharacters(std::string_view chara
         break;
       }
       if (offset == lastHex) {
-        /// error at least one hexadecimal digit required
-        return {};
+        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_at_least_one_hexadecimal_digit_required);
+        result.resize(1);
+        result[0] = 'x';
+        return result;
       }
       std::string_view sv(characters.data()+offset, lastHex-offset);
       auto value = std::strtol(sv.data(), nullptr, 16);
@@ -841,35 +838,34 @@ std::optional<std::vector<char>> Lexer::ProcessCharacters(std::string_view chara
       break;
     }
     /// '\0' is octal char
-    else if ( IsDigit(characters[offset+1])) {
+    else if (IsDigit(characters[offset+1])) {
       offset++;
       int start = offset;
-      /// first octal char must be oct char
-      if (! IsOctDigit(characters[offset])) {
-        return {};
-      }
       /// first octal char
-      if ( IsOctDigit(characters[offset])) {
+      if (IsOctDigit(characters[offset])) {
         offset++;
       }
       /// second octal char
-      if ( IsOctDigit(characters[offset])) {
+      if (IsOctDigit(characters[offset])) {
         offset++;
       }
       /// third octal char
-      if ( IsOctDigit(characters[offset])) {
+      if (IsOctDigit(characters[offset])) {
         offset++;
+      }
+      if (offset == start) {
+        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_at_least_one_oct_digit_required);
+        result.resize(1);
+        result[0] = '0';
+        return result;
       }
       auto value = OctalToNum(characters.substr(start, offset-start));
       result.push_back((char)value);
       resultStart++;
       break;
     }else {
-      auto character = EscapeCharToValue(characters[offset + 1]);
-      if (!character) {
-        return {};
-      }
-      result.push_back((char)character.value());
+      auto character = ParseEscapeChar(sp+offset,characters[offset + 1]);
+      result.push_back((char)character);
       resultStart++;
       offset += 2;
     }

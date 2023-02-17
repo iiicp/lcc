@@ -58,7 +58,9 @@ void Println(std::string_view content, bool color=true) {
 
 void dumpTokens(const std::vector<lcc::Token> &tokens) {
   for (auto &tok : tokens) {
-    llvm::outs() << tok.getLine() << ", " << tok.getColumn() << ", " << tok.getRepresentation() << "\n";
+//    llvm::outs() << tok.getLine() << ", " << tok.getColumn() << ", " << tok.getRepresentation() << "\n";
+    auto pair = tok.getLineAndColumn();
+    llvm::outs() << pair.first << ", " << pair.second << ", " << tok.getRepresentation() << "\n";
   }
 }
 

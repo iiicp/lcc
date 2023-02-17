@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include "Diagnostic.h"
 
 namespace lcc {
 
@@ -38,33 +39,30 @@ enum class LanguageOption {
 class Lexer {
 private:
   LanguageOption mLangOption{LanguageOption::C};
-  uint32_t tokenStartOffset{0};
-  bool leadingWhiteSpace = false;
-  char delimiter{' '};
-  std::string characters;
   State state = State::Start;
-  SourceFile mSourceFile;
+  llvm::SourceMgr &Mgr;
+  DiagnosticEngine &Diag;
+  const char *P{nullptr};
+  const char *Ep{nullptr};
 public:
-  explicit Lexer(std::string &sourceCode, std::string_view sourcePath = "<stdin>", LanguageOption option = LanguageOption::C);
+  explicit Lexer(llvm::SourceMgr &mgr, std::unique_ptr<llvm::MemoryBuffer> &&oBuf, DiagnosticEngine &diag, LanguageOption option = LanguageOption::C);
   std::vector<Token> tokenize();
-  static std::vector<Token> toCTokens(std::vector<Token>&& ppTokens);
+  std::vector<Token> toCTokens(std::vector<Token>&& ppTokens);
 
 private:
-  static void RegularSourceCode(std::string &sourceCode);
+  bool HasUtf8BomHead(llvm::StringRef buf);
   static bool IsLetter(char ch) ;
   static bool IsWhiteSpace(char ch) ;
   static bool IsDigit(char ch) ;
   static bool IsOctDigit(char ch) ;
   static bool IsHexDigit(char ch) ;
   static bool IsPunctuation(char ch) ;
-  [[nodiscard]] uint32_t GetLine(uint32_t offset) const;
-  [[nodiscard]] uint32_t GetColumn(uint32_t offset) const;
   static uint32_t OctalToNum(std::string_view value) ;
-  static Token::ValueType ParseNumber(const Token &ppToken);
-  static tok::TokenKind ParsePunctuation(uint32_t &offset, char curChar, char nextChar, char nnChar);
-  static Token::ValueType ParseStringLiteral(const Token &ppToken);
-  static std::optional<std::vector<char>> ProcessCharacters(std::string_view characters);
-  static std::optional<std::uint32_t> EscapeCharToValue(char escape);
+  static tok::TokenKind ParsePunctuation(const char* &offset, char curChar, char nextChar, char nnChar);
+
+  Token::ValueType ParseNumber(const Token &ppToken);
+  std::vector<char> ParseCharacters(const Token &ppToken, bool handleCharMode);
+  std::uint32_t ParseEscapeChar(const char *p, char escape);
   static bool IsJudgeNumber(const std::string &preCharacters, char curChar);
 };
 }

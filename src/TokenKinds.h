@@ -15,12 +15,6 @@
 #include <vector>
 namespace lcc {
 
-struct SourceFile {
-  std::string_view sourceCode;
-  std::string_view sourcePath;
-  std::vector<uint32_t> lineStartOffsets;
-};
-
 namespace tok {
 enum TokenKind : unsigned short {
 #define TOK(X) X,

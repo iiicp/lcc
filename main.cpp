@@ -6,10 +6,13 @@
 #include "DumpTool.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "Diagnostic.h"
 
 static const char *Head = "lcc - based llvm c compiler";
 
@@ -30,6 +33,11 @@ void printVersion(llvm::raw_ostream &OS) {
   exit(EXIT_SUCCESS);
 }
 
+bool hasUtf8BOM(llvm::StringRef buf) {
+  return (buf.size() >= 3) && (buf[0] == '\xef') &&
+      (buf[1] == '\xbb') && (buf[2] == '\xbf');
+}
+
 int main(int argc, char *argv[]) {
     llvm::InitLLVM X(argc, argv);
     llvm::cl::SetVersionPrinter(&printVersion);
@@ -44,12 +52,22 @@ int main(int argc, char *argv[]) {
             << "Error reading " << F << ": "
             << BufferError.message() << "\n";
       }
-      std::string source((*FileOrErr)->getBuffer());
-      lcc::Lexer lexer(source, F, lcc::LanguageOption::C);
-      auto tokens = lexer.tokenize();
+
+      llvm::SourceMgr mgr;
+      lcc::DiagnosticEngine diag(mgr);
+
+      lcc::Lexer lexer(mgr, std::move(*FileOrErr), diag, lcc::LanguageOption::PreProcess);
+      auto ppTokens = lexer.tokenize();
+      if (diag.numErrors())
+        break;
+      auto tokens = lexer.toCTokens(std::move(ppTokens));
+      if (diag.numErrors())
+        break;
       if (DumpTokens) {
         lcc::dump::dumpTokens(tokens);
       }
+      if (diag.numErrors())
+        break;
       lcc::Parser parser(std::move(tokens));
       auto translationUnit = parser.ParseTranslationUnit();
       if (DumpAST) {

@@ -16,12 +16,6 @@
 #include <string>
 
 namespace lcc {
-#if (_WIN32)
-#define PATH_SEPARATOR "\\"
-#else
-#define PATH_SEPARATOR "/"
-#endif
-
 namespace diag{
 enum {
 #define DIAG(ID, Level, Msg) ID,
@@ -53,7 +47,10 @@ public:
   }
 
   void report(llvm::StringRef fileName, int line) {
-    auto pos = fileName.find_last_of(PATH_SEPARATOR);
+    auto pos = fileName.find_last_of("/");
+    if (pos == std::string::npos) {
+      pos = fileName.find_last_of("\\");
+    }
     if (pos != std::string::npos) {
       auto shortFilename = fileName.substr(pos + 1);
       llvm::errs() << "[" << shortFilename << ":" << line << "]:";

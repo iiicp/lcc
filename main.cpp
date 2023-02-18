@@ -55,8 +55,9 @@ int main(int argc, char *argv[]) {
 
       llvm::SourceMgr mgr;
       lcc::DiagnosticEngine diag(mgr);
-
-      lcc::Lexer lexer(mgr, std::move(*FileOrErr), diag, lcc::LanguageOption::PreProcess);
+      std::string code((*FileOrErr)->getBuffer());
+      std::string_view path = (*FileOrErr)->getBufferIdentifier();
+      lcc::Lexer lexer(mgr, diag, std::move(code), path, lcc::LanguageOption::PreProcess);
       auto ppTokens = lexer.tokenize();
       if (diag.numErrors())
         break;

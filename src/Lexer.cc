@@ -19,17 +19,12 @@ namespace lcc {
 
 using namespace llvm;
 
-Lexer::Lexer(SourceMgr &mgr, std::unique_ptr<MemoryBuffer> &&oBuf, DiagnosticEngine &diag, LanguageOption option)
-    : Mgr(mgr), Diag(diag), mLangOption(option) {
+Lexer::Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag, std::string &&sourceCode, std::string_view sourcePath, LanguageOption option)
+    : Mgr(mgr), Diag(diag),mSourceCode(std::move(sourceCode)),mLangOption(option) {
 
-  if (HasUtf8BomHead(oBuf->getBuffer())) {
-    StringRef ref(oBuf->getBuffer().data()+3);
-    std::unique_ptr<MemoryBuffer> newBuf = MemoryBuffer::getMemBuffer(ref, oBuf->getBufferIdentifier());
-    Mgr.AddNewSourceBuffer(std::move(newBuf), SMLoc());
-  }else {
-    Mgr.AddNewSourceBuffer(std::move(oBuf), SMLoc());
-  }
-
+  RegularSourceCode();
+  auto memBuf = MemoryBuffer::getMemBuffer(mSourceCode, sourcePath);
+  Mgr.AddNewSourceBuffer(std::move(memBuf), SMLoc());
   auto *m = Mgr.getMemoryBuffer(Mgr.getMainFileID());
   P = m->getBufferStart();
   Ep = m->getBufferEnd();
@@ -702,9 +697,19 @@ std::vector<Token> Lexer::toCTokens(std::vector<Token>&& ppTokens) {
   return results;
 }
 
-bool Lexer::HasUtf8BomHead(StringRef buf) {
-  return (buf.size() >= 3) && (buf[0] == '\xef') &&
-         (buf[1] == '\xbb') && (buf[2] == '\xbf');
+void Lexer::RegularSourceCode() {
+  /// check BOM header
+  std::string_view UTF8_BOM = "\xef\xbb\xbf";
+  if (mSourceCode.size() >= 3 && mSourceCode.substr(0, 3) == UTF8_BOM) {
+    mSourceCode = mSourceCode.substr(3);
+  }
+  /// compatible with windows
+  std::string::size_type pos = 0;
+  while ((pos = mSourceCode.find("\r\n", pos)) != mSourceCode.npos) {
+    mSourceCode.erase(pos, 1);
+  }
+
+  mSourceCode.shrink_to_fit();
 }
 
 bool Lexer::IsLetter(char ch) {

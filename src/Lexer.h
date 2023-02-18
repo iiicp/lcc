@@ -38,15 +38,16 @@ private:
   State state = State::Start;
   llvm::SourceMgr &Mgr;
   DiagnosticEngine &Diag;
+  std::string mSourceCode;
   const char *P{nullptr};
   const char *Ep{nullptr};
 public:
-  explicit Lexer(llvm::SourceMgr &mgr, std::unique_ptr<llvm::MemoryBuffer> &&oBuf, DiagnosticEngine &diag, LanguageOption option = LanguageOption::C99);
+  explicit Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag, std::string &&sourceCode, std::string_view sourcePath = "<stdin>", LanguageOption option = LanguageOption::C99);
   std::vector<Token> tokenize();
   std::vector<Token> toCTokens(std::vector<Token>&& ppTokens);
 
 private:
-  bool HasUtf8BomHead(llvm::StringRef buf);
+  void RegularSourceCode();
   static bool IsLetter(char ch) ;
   static bool IsWhiteSpace(char ch) ;
   static bool IsDigit(char ch) ;

@@ -648,7 +648,7 @@ std::vector<Token> Lexer::tokenize() {
     DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_after_include);
   }
 
-  if (mLangOption == LanguageOption::C) {
+  if (mLangOption == LanguageOption::C99) {
     return toCTokens(std::move(results));
   }
 

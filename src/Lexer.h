@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include "LanguageOption.h"
 #include "Diagnostic.h"
 
 namespace lcc {
@@ -31,21 +32,16 @@ enum class State {
   AfterInclude
 };
 
-enum class LanguageOption {
-  PreProcess,
-  C
-};
-
 class Lexer {
 private:
-  LanguageOption mLangOption{LanguageOption::C};
+  LanguageOption mLangOption{LanguageOption::C99};
   State state = State::Start;
   llvm::SourceMgr &Mgr;
   DiagnosticEngine &Diag;
   const char *P{nullptr};
   const char *Ep{nullptr};
 public:
-  explicit Lexer(llvm::SourceMgr &mgr, std::unique_ptr<llvm::MemoryBuffer> &&oBuf, DiagnosticEngine &diag, LanguageOption option = LanguageOption::C);
+  explicit Lexer(llvm::SourceMgr &mgr, std::unique_ptr<llvm::MemoryBuffer> &&oBuf, DiagnosticEngine &diag, LanguageOption option = LanguageOption::C99);
   std::vector<Token> tokenize();
   std::vector<Token> toCTokens(std::vector<Token>&& ppTokens);
 

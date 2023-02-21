@@ -847,17 +847,24 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
       offset++;
       int start = offset;
       /// first octal char
-      if (IsOctDigit(characters[offset])) {
+      if (offset < characters.size() && IsOctDigit(characters[offset])) {
         offset++;
+      }else {
+        goto end;
       }
       /// second octal char
-      if (IsOctDigit(characters[offset])) {
+      if (offset < characters.size() && IsOctDigit(characters[offset])) {
         offset++;
+      }else {
+        goto end;
       }
       /// third octal char
-      if (IsOctDigit(characters[offset])) {
+      if (offset < characters.size() && IsOctDigit(characters[offset])) {
         offset++;
+      }else {
+        goto end;
       }
+      end:
       if (offset == start) {
         DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_at_least_one_oct_digit_required);
         result.resize(1);

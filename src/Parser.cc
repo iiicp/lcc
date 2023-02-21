@@ -317,6 +317,7 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
     }
   }
 
+  bool first = true;
   if (Peek(tok::semi))
     goto End;
 
@@ -324,7 +325,12 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
     Consume(tok::comma);
   }
 
-  {
+  do{
+    if (first) {
+      first = false;
+    }else {
+      Consume(tok::comma);
+    }
     /// handle first declarator
     auto start = mTokCursor;
     auto declarator = ParseDeclarator();
@@ -352,38 +358,7 @@ std::optional<Syntax::Declaration> Parser::FinishDeclaration(
           {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
            std::make_unique<Syntax::Initializer>(std::move(*initializer))});
     }
-  }
-
-  while (Peek(tok::comma)) {
-    Consume(tok::comma);
-    auto start = mTokCursor;
-    auto declarator = ParseDeclarator();
-    if (!declarator) {
-      LOGE(*start, "expect declarator");
-      return {};
-    }
-    if (!isTypedef) {
-      auto name = getDeclaratorName(*declarator);
-      mScope.addToScope(name);
-    }
-    if (!Peek(tok::equal)) {
-      initDeclarators.push_back(
-          {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-           nullptr});
-    } else {
-      Consume(tok::equal);
-      start = mTokCursor;
-      auto initializer = ParseInitializer();
-      if (!initializer) {
-        LOGE(*start, "expect initializer");
-        return {};
-      }
-      initDeclarators.push_back(
-          {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-           std::make_unique<Syntax::Initializer>(
-               std::move(*initializer))});
-    }
-  }
+  }while (Peek(tok::comma));
 
 End:
   Consume(tok::semi);
@@ -510,31 +485,17 @@ Parser::ParseStructOrUnionSpecifier() {
       std::vector<
           Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator>
           declarators;
-      start = mTokCursor;
-      SetCheckTypedefType(false);
-      auto declarator = ParseDeclarator();
-      SetCheckTypedefType(true);
-      if (!declarator) {
-        LOGE(*start,"expect declarator");
-        return {};
-      }
-      mScope.addToScope(getDeclaratorName(*declarator));
-      if (Peek(tok::colon)) {
-        Consume(tok::colon);
-        auto constant = ParseConditionalExpr();
-        declarators.push_back(
-            {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-             std::move(constant)});
-      } else {
-        declarators.push_back(
-            {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
-             std::nullopt});
-      }
-      while (Peek(tok::comma)) {
-        Consume(tok::comma);
+      bool first = true;
+      do {
+        if (first) {
+          /// jump
+          first = false;
+        } else {
+          Consume(tok::comma);
+        }
         start = mTokCursor;
         SetCheckTypedefType(false);
-        declarator = ParseDeclarator();
+        auto declarator = ParseDeclarator();
         SetCheckTypedefType(true);
         if (!declarator) {
           LOGE(*start, "expect declarator");
@@ -552,7 +513,7 @@ Parser::ParseStructOrUnionSpecifier() {
               {std::make_unique<Syntax::Declarator>(std::move(*declarator)),
                std::nullopt});
         }
-      }
+      } while (Peek(tok::comma));
       Match(tok::semi);
       structDeclarations.push_back(
           {std::move(specifierQualifiers), std::move(declarators)});
@@ -769,7 +730,7 @@ std::optional<Syntax::DirectDeclarator> Parser::ParseDirectDeclarator() {
       LOGE(*start, "expect declarator");
     }
     directDeclarator = std::make_unique<Syntax::DirectDeclarator>(
-        Syntax::DirectDeclaratorParent(std::make_unique<Syntax::Declarator>(std::move(*declarator))));
+        Syntax::DirectDeclaratorParentheses(std::make_unique<Syntax::Declarator>(std::move(*declarator))));
     Match(tok::r_paren);
   }else {
     LOGE(*mTokCursor, "expect identifier or (");
@@ -1327,66 +1288,42 @@ designator:
  */
 std::optional<Syntax::InitializerList> Parser::ParseInitializerList() {
   typename Syntax::InitializerList::vector vector;
-  Syntax::InitializerList::DesignatorList designation;
-  while (Peek(tok::l_square) || Peek(tok::period)) {
-    if (Peek(tok::l_square)) {
-      Consume(tok::l_square);
-      auto start = mTokCursor;
-      auto constant = ParseConditionalExpr();
-      if (!constant) {
-        LOGE(*start, "expect conditional expr");
-        return {};
-      }
-      designation.emplace_back(std::move(*constant));
-      Match(tok::r_square);
-    } else if (Peek(tok::period)) {
-      Consume(tok::period);
-      Expect(tok::identifier);
-      designation.emplace_back(mTokCursor->getRepresentation());
-      Consume(tok::identifier);
+  bool first = true;
+  do {
+    if (first) {
+      first = false;
+    } else {
+      Consume(tok::comma);
     }
-  }
-  if (!designation.empty()) {
-    if (Peek(tok::equal)) {
-      Consume(tok::equal);
-    }
-  }
-  auto initializer = ParseInitializer();
-  if (!initializer)
-    return {};
-  vector.push_back({std::move(*initializer), std::move(designation)});
-
-  while (Peek(tok::comma)) {
-    Consume(tok::comma);
-    Syntax::InitializerList::DesignatorList designation_t;
+    Syntax::InitializerList::DesignatorList designation;
     while (Peek(tok::l_square) || Peek(tok::period)) {
       if (Peek(tok::l_square)) {
         Consume(tok::l_square);
+        auto start = mTokCursor;
         auto constant = ParseConditionalExpr();
-        if (!constant)
+        if (!constant) {
+          LOGE(*start, "expect conditional expr");
           return {};
-        designation_t.emplace_back(std::move(*constant));
+        }
+        designation.emplace_back(std::move(*constant));
         Match(tok::r_square);
       } else if (Peek(tok::period)) {
         Consume(tok::period);
         Expect(tok::identifier);
-        designation_t.emplace_back(mTokCursor->getRepresentation());
+        designation.emplace_back(mTokCursor->getRepresentation());
         Consume(tok::identifier);
       }
     }
-    if (!designation_t.empty()) {
+    if (!designation.empty()) {
       if (Peek(tok::equal)) {
         Consume(tok::equal);
       }
     }
-    auto start = mTokCursor;
-    auto initializer_t = ParseInitializer();
-    if (!initializer_t) {
-      LOGE(*start, "expect initializer");
+    auto initializer = ParseInitializer();
+    if (!initializer)
       return {};
-    }
-    vector.push_back({std::move(*initializer_t), std::move(designation_t)});
-  }
+    vector.push_back({std::move(*initializer), std::move(designation)});
+  } while (Peek(tok::comma));
   return Syntax::InitializerList{std::move(vector)};
 }
 
@@ -2329,7 +2266,7 @@ std::optional<Syntax::PostFixExpr> Parser::ParsePostFixExpr() {
         LOGE(*start, "expect expr");
       }
       Match(tok::r_paren);
-      newPrimary = Syntax::PrimaryExpr(Syntax::PrimaryExprParent(std::move(*expr)));
+      newPrimary = Syntax::PrimaryExpr(Syntax::PrimaryExprParentheses(std::move(*expr)));
     }
   }else {
     LOGE(*start, "expect primary expr or ( type-name )");
@@ -2376,7 +2313,7 @@ std::optional<Syntax::PrimaryExpr> Parser::ParsePrimaryExpr() {
       return {};
     }
     Match(tok::r_paren);
-    return Syntax::PrimaryExpr(Syntax::PrimaryExprParent(std::move(*expr)));
+    return Syntax::PrimaryExpr(Syntax::PrimaryExprParentheses(std::move(*expr)));
   }
 }
 

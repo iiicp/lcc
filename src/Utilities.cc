@@ -20,7 +20,8 @@ void LOGE(uint32_t row, uint32_t col, const std::string &msg) {
 }
 
 void LOGE(const Token& tok, const std::string &msg) {
-//  llvm::errs() << tok.getSourceFile().sourcePath << ":" << tok.getLine() << ":" << tok.getColumn() << ", " << msg << "\n";
+  auto pair = tok.getLineAndColumn();
+  llvm::errs() << pair.first << ":" << pair.second << ", " << msg << "\n";
   LCC_ASSERT(0);
 }
 
@@ -30,7 +31,7 @@ std::string_view getDeclaratorName(const Syntax::Declarator& declarator) {
     [](auto&&, const Syntax::DirectDeclaratorIdent& name) -> std::string_view {
         return name.getIdent();
       },
-    [](auto&& self, const Syntax::DirectDeclaratorParent& declarator) -> std::string_view {
+    [](auto&& self, const Syntax::DirectDeclaratorParentheses & declarator) -> std::string_view {
         return std::visit([&self](auto &&value) -> std::string_view {
           return self(value);
         }, declarator.getDeclarator()->getDirectDeclarator());
@@ -58,7 +59,7 @@ const Syntax::DirectDeclaratorParamTypeList *getFuncDeclarator
       [](auto&&, const Syntax::DirectDeclaratorIdent& name) -> std::string_view {
         return name.getIdent();
       },
-      [](auto&& self, const Syntax::DirectDeclaratorParent& declarator) -> std::string_view {
+      [](auto&& self, const Syntax::DirectDeclaratorParentheses & declarator) -> std::string_view {
         return std::visit([&self](auto &&value) -> std::string_view {
           return self(value);
         }, declarator.getDeclarator()->getDirectDeclarator());

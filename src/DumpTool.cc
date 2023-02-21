@@ -366,8 +366,8 @@ void visitor(const Syntax::DirectDeclarator &directDeclarator) {
          Println(ident.getIdent());
          DecAlign();
       },
-      [](const Syntax::DirectDeclaratorParent &directDeclaratorParent) {
-         Print("DirectDeclaratorParent");
+      [](const Syntax::DirectDeclaratorParentheses &directDeclaratorParent) {
+         Print("DirectDeclaratorParentheses");
          llvm::outs() << &directDeclaratorParent << "\n";
          IncAlign();
          visitor(*directDeclaratorParent.getDeclarator());
@@ -417,8 +417,9 @@ void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
 //  llvm::outs() << &directAbstractDeclarator << "\n";
   IncAlign();
   std::visit(overload{
-                 [](const Syntax::DirectAbstractDeclaratorParent &directAbstractDeclaratorParent) {
-                   Print("DirectAbstractDeclaratorParent");
+                 [](const Syntax::DirectAbstractDeclaratorParentheses
+                        &directAbstractDeclaratorParent) {
+                   Print("DirectAbstractDeclaratorParentheses");
                    llvm::outs() << &directAbstractDeclaratorParent << "\n";
                    IncAlign();
                    visitor(*directAbstractDeclaratorParent.getAbstractDeclarator());
@@ -1109,9 +1110,9 @@ void visitor(const Syntax::PrimaryExpr &primaryExpr){
        }, constant.getValue());
        DecAlign();
      },
-     [](const Syntax::PrimaryExprParent& parent) {
+     [](const Syntax::PrimaryExprParentheses & parent) {
          IncAlign();
-         Print("PrimaryExprParent");
+         Print("PrimaryExprParentheses");
          llvm::outs() << &parent << "\n";
          visitor(parent.getExpr());
          DecAlign();

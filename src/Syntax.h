@@ -22,7 +22,7 @@
 namespace lcc::Syntax {
 class PrimaryExprIdent;
 class PrimaryExprConstant;
-class PrimaryExprParent;
+class PrimaryExprParentheses;
 class PostFixExprSubscript;
 class PostFixExprIncrement;
 class PostFixExprDecrement;
@@ -78,13 +78,13 @@ class EnumeratorList;
 class StructOrUnionSpecifier;
 class Declarator;
 class DirectDeclaratorIdent;
-class DirectDeclaratorParent;
+class DirectDeclaratorParentheses;
 class DirectDeclaratorAssignExpr;
 class DirectDeclaratorAsterisk;
 class DirectDeclaratorParamTypeList;
 class TypeName;
 class AbstractDeclarator;
-class DirectAbstractDeclaratorParent;
+class DirectAbstractDeclaratorParentheses;
 class DirectAbstractDeclaratorParamTypeList;
 class DirectAbstractDeclaratorAssignExpr;
 class DirectAbstractDeclaratorAsterisk;
@@ -139,12 +139,12 @@ public:
  * primary-expression:
  *    ( expression )
  */
-class PrimaryExprParent final : public Node {
+class PrimaryExprParentheses final : public Node {
 private:
   std::unique_ptr<Expr> mExpr;
 
 public:
-  PrimaryExprParent(Expr &&expr) : mExpr(std::make_unique<Expr>(std::move(expr))){};
+  PrimaryExprParentheses(Expr &&expr) : mExpr(std::make_unique<Expr>(std::move(expr))){};
   [[nodiscard]] const Expr &getExpr() const { return *mExpr; }
 };
 
@@ -156,7 +156,7 @@ public:
  *    ( expression )
  */
 using PrimaryExpr =
-    std::variant<PrimaryExprIdent, PrimaryExprConstant, PrimaryExprParent>;
+    std::variant<PrimaryExprIdent, PrimaryExprConstant, PrimaryExprParentheses>;
 
 /**
  * postfix-expression:
@@ -1290,7 +1290,8 @@ public:
  *      direct-abstract-declarator{opt} ( parameter-type-list{opt} )
  */
 using DirectAbstractDeclarator =
-    std::variant<DirectAbstractDeclaratorParent,
+    std::variant<
+    DirectAbstractDeclaratorParentheses,
                  DirectAbstractDeclaratorAssignExpr,
                  DirectAbstractDeclaratorAsterisk,
                  DirectAbstractDeclaratorParamTypeList>;
@@ -1299,11 +1300,11 @@ using DirectAbstractDeclarator =
  * direct-abstract-declarator:
  *      ( abstract-declarator )
  */
-class DirectAbstractDeclaratorParent final : public Node {
+class DirectAbstractDeclaratorParentheses final : public Node {
   std::unique_ptr<AbstractDeclarator> mAbstractDeclarator;
 
 public:
-  DirectAbstractDeclaratorParent(
+  DirectAbstractDeclaratorParentheses(
       std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
       : mAbstractDeclarator(std::move(abstractDeclarator)) {}
 
@@ -1507,7 +1508,7 @@ public:
  *   direct-declarator ( identifier-list{opt} )
  */
 using DirectDeclarator =
-    std::variant<DirectDeclaratorIdent, DirectDeclaratorParent,
+    std::variant<DirectDeclaratorIdent, DirectDeclaratorParentheses,
                  DirectDeclaratorAssignExpr,DirectDeclaratorAsterisk,
                  DirectDeclaratorParamTypeList>;
 
@@ -1529,11 +1530,11 @@ public:
  * direct-declarator:
  *  ( declarator )
  */
-class DirectDeclaratorParent final : public Node {
+class DirectDeclaratorParentheses final : public Node {
   std::unique_ptr<Declarator> mDeclarator;
 
 public:
-  DirectDeclaratorParent(std::unique_ptr<Declarator> &&declarator)
+  DirectDeclaratorParentheses(std::unique_ptr<Declarator> &&declarator)
       : mDeclarator(std::move(declarator)) {}
 
   [[nodiscard]] const Declarator *getDeclarator() const {

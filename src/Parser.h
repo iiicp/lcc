@@ -18,6 +18,7 @@
 #include <optional>
 #include <map>
 #include <unordered_map>
+#include <bitset>
 namespace lcc {
 class Parser {
 private:
@@ -48,9 +49,10 @@ public:
 private:
   Scope mScope;
 public:
+  using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
   explicit Parser(std::vector<Token> && tokens);
   Syntax::TranslationUnit ParseTranslationUnit();
-
+  
 private:
   std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
   std::optional<Syntax::Declaration> FinishDeclaration(
@@ -121,6 +123,12 @@ private:
   bool PeekN(int n, tok::TokenKind tokenType);
   bool IsUnaryOp(tok::TokenKind tokenType);
   bool IsPostFixExpr(tok::TokenKind tokenType);
+
+  template <class... Args>
+  constexpr static TokenBitSet FormTokenKinds(Args&&... tokenKinds) {
+    static_assert((std::is_same_v<std::decay_t<Args>, tok::TokenKind> && ...));
+    return (TokenBitSet() | ... | TokenBitSet().set(tokenKinds, true));
+  }
 
   bool IsFirstInExternalDeclaration() const;
   bool IsFirstInFunctionDefinition() const;

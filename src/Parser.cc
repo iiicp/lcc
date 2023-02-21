@@ -12,6 +12,7 @@
 #include <algorithm>
 #include "Utilities.h"
 #include <set>
+#include <iostream>
 
 namespace lcc {
 Parser::Parser(std::vector<Token> && tokens)
@@ -2430,6 +2431,12 @@ void Parser::Scope::pushScope() {
 void Parser::Scope::popScope() {
   mCurrentScope.pop_back();
 }
+
+//template <class... Args>
+//Parser::TokenBitSet Parser::FormTokenKinds(Args... tokenKinds) {
+//  static_assert((std::is_same_v<std::decay_t<Args>, tok::TokenKind> && ...));
+//  return (TokenBitSet() | ... | TokenBitSet().set(tokenKinds, true));
+//}
 
 bool Parser::IsFirstInExternalDeclaration() const {
   return IsFirstInDeclaration() || IsFirstInFunctionDefinition();

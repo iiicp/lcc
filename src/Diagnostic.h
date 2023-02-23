@@ -23,7 +23,7 @@ enum {
 };
 }
 
-#define DiagReport(obj, loc, id, ...) obj.report(__FILE__, __LINE__), obj.report(loc, id, ##__VA_ARGS__)
+#define DiagReport(obj, loc, id, ...) /*obj.report(__FILE__, __LINE__),*/ obj.report(loc, id, ##__VA_ARGS__)
 
 class DiagnosticEngine {
   static const char *getDiagnosticText(unsigned DiagID);
@@ -31,10 +31,11 @@ class DiagnosticEngine {
   static llvm::SourceMgr::DiagKind getDiagnosticKind(unsigned DiagID);
 
   llvm::SourceMgr &mSrcMgr;
+  llvm::raw_ostream &mOstream;
   unsigned NumErrors;
 public:
-  DiagnosticEngine(llvm::SourceMgr &SrcMgr)
-    :mSrcMgr(SrcMgr), NumErrors(0) {}
+  DiagnosticEngine(llvm::SourceMgr &SrcMgr, llvm::raw_ostream &ostream)
+    :mSrcMgr(SrcMgr), mOstream(ostream), NumErrors(0) {}
 
   unsigned numErrors() { return NumErrors; }
 
@@ -42,7 +43,7 @@ public:
   void report(llvm::SMLoc Loc, unsigned DiagID, Args &&... arguments) {
     std::string Msg = llvm::formatv(getDiagnosticText(DiagID), std::forward<Args>(arguments)...).str();
     llvm::SourceMgr::DiagKind Kind = getDiagnosticKind(DiagID);
-    mSrcMgr.PrintMessage(Loc, Kind, Msg);
+    mSrcMgr.PrintMessage(mOstream, mSrcMgr.GetMessage(Loc, Kind, Msg));
     NumErrors += (Kind == llvm::SourceMgr::DK_Error);
   }
 

@@ -10,15 +10,13 @@
  * Sign:     enjoy life
  ***********************************/
 
-#define CATCH_CONFIG_MAIN
-#include "catch2/catch_amalgamated.hpp"
+#include "catch2/catch_session.hpp"
+int main( int argc, char* argv[] ) {
+  // your setup ...
 
-//int main( int argc, char* argv[] ) {
-//  // your setup ...
-//
-//  int result = Catch::Session().run( argc, argv );
-//
-//  // your clean-up...
-//
-//  return result;
-//}
+  int result = Catch::Session().run( argc, argv );
+
+  // your clean-up...
+
+  return result;
+}

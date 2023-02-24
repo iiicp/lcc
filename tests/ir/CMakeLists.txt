@@ -61,3 +61,6 @@ target_link_libraries(c_while ${llvm_all})
 
 add_executable(use_mgr use_sourcemgr.cc)
 target_link_libraries(use_mgr ${llvm_all})
+
+add_executable(c_switch c_switch.cc)
+target_link_libraries(c_switch ${llvm_all})

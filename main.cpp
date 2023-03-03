@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
       }
       if (diag.numErrors())
         break;
-      lcc::Parser parser(std::move(tokens));
+      lcc::Parser parser(std::move(tokens), diag);
       auto translationUnit = parser.ParseTranslationUnit();
       if (DumpAST) {
         lcc::dump::dumpAst(translationUnit);

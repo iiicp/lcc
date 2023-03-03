@@ -70,6 +70,10 @@ public:
   [[nodiscard]] const char *getOffset() const {
     return mOffsetPtr;
   }
+
+  [[nodiscard]] llvm::SMLoc getSMLoc() const {
+    return llvm::SMLoc::getFromPointer(getOffset());
+  }
 };
 
 } // namespace lcc::lexer

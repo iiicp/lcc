@@ -331,18 +331,18 @@ void visitor(const Syntax::FunctionSpecifier &functionSpecifier ) {
   DecAlign();
 }
 
-void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers) {
-  Print("SpecifierQualifiers");
-  llvm::outs() << &specifierQualifiers << "\n";
-  IncAlign();
-  for (const auto &qualifier : specifierQualifiers.getTypeQualifiers()) {
-    visitor(qualifier);
-  }
-  for (const auto &specifier : specifierQualifiers.getTypeSpecifiers()) {
-    visitor(specifier);
-  }
-  DecAlign();
-}
+//void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers) {
+//  Print("SpecifierQualifiers");
+//  llvm::outs() << &specifierQualifiers << "\n";
+//  IncAlign();
+//  for (const auto &qualifier : specifierQualifiers.getTypeQualifiers()) {
+//    visitor(qualifier);
+//  }
+//  for (const auto &specifier : specifierQualifiers.getTypeSpecifiers()) {
+//    visitor(specifier);
+//  }
+//  DecAlign();
+//}
 
 void visitor(const Syntax::Pointer &pointer) {
   Print("Pointer");

@@ -34,6 +34,7 @@ class PostFixExprTypeInitializer;
 class UnaryExprPostFixExpr;
 class UnaryExprUnaryOperator;
 class UnaryExprSizeOf;
+class TypeName;
 class CastExpr;
 class MultiExpr;
 class AdditiveExpr;
@@ -82,7 +83,6 @@ class DirectDeclaratorParentheses;
 class DirectDeclaratorAssignExpr;
 class DirectDeclaratorAsterisk;
 class DirectDeclaratorParamTypeList;
-class TypeName;
 class AbstractDeclarator;
 class DirectAbstractDeclaratorParentheses;
 class DirectAbstractDeclaratorParamTypeList;
@@ -114,8 +114,8 @@ private:
   std::string_view mIdent;
 
 public:
-  PrimaryExprIdent(std::string_view identifier) : mIdent(identifier){};
-  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdent; }
+  PrimaryExprIdent(std::string_view identifier);
+  [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
 /*
@@ -131,8 +131,8 @@ private:
   Variant mValue;
 
 public:
-  PrimaryExprConstant(Variant variant) : mValue(std::move(variant)){};
-  [[nodiscard]] const Variant &getValue() const { return mValue; }
+  PrimaryExprConstant(Variant variant);
+  [[nodiscard]] const Variant &getValue() const;
 };
 
 /*
@@ -144,8 +144,8 @@ private:
   std::unique_ptr<Expr> mExpr;
 
 public:
-  PrimaryExprParentheses(Expr &&expr) : mExpr(std::make_unique<Expr>(std::move(expr))){};
-  [[nodiscard]] const Expr &getExpr() const { return *mExpr; }
+  PrimaryExprParentheses(Expr &&expr);
+  [[nodiscard]] const Expr &getExpr() const;
 };
 
 /*
@@ -185,12 +185,9 @@ private:
   PrimaryExpr mPrimaryExpr;
 
 public:
-  PostFixExprPrimaryExpr(PrimaryExpr &&primaryExpr)
-      : mPrimaryExpr(std::move(primaryExpr)){};
+  PostFixExprPrimaryExpr(PrimaryExpr &&primaryExpr);
 
-  [[nodiscard]] const PrimaryExpr &getPrimaryExpr() const {
-    return mPrimaryExpr;
-  }
+  [[nodiscard]] const PrimaryExpr &getPrimaryExpr() const;
 };
 
 /**
@@ -203,14 +200,9 @@ private:
   std::unique_ptr<Expr> mExpr;
 
 public:
-  PostFixExprSubscript(std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr)
-      : mPostFixExpr(std::move(postFixExpr)),
-        mExpr(std::make_unique<Expr>(std::move(expr))) {}
-
-  [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
-    return mPostFixExpr.get();
-  }
-  [[nodiscard]] const Expr &getExpr() const { return *mExpr; }
+  PostFixExprSubscript(std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr);
+  [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
+  [[nodiscard]] const Expr &getExpr() const;
 };
 
 /**
@@ -228,17 +220,11 @@ private:
 
 public:
   PostFixExprFuncCall(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                      std::vector<std::unique_ptr<AssignExpr>> &&optParams)
-      : mPostFixExpr(std::move(postFixExpr)), mOptParams(std::move(optParams)) {
-  }
+                      std::vector<std::unique_ptr<AssignExpr>> &&optParams);
 
-  [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
-    return mPostFixExpr.get();
-  }
+  [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
   [[nodiscard]] const std::vector<std::unique_ptr<AssignExpr>> &
-  getOptionalAssignExpressions() const {
-    return mOptParams;
-  }
+  getOptionalAssignExpressions() const;
 };
 
 /**
@@ -252,14 +238,10 @@ private:
 
 public:
   PostFixExprDot(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                 std::string_view identifier)
-      : mPostFixExpr(std::move(postFixExpr)),
-        mIdentifier(std::move(identifier)) {}
+                 std::string_view identifier);
 
-  [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
-    return mPostFixExpr.get();
-  }
-  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
+  [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
+  [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
 /**
@@ -273,13 +255,9 @@ private:
 
 public:
   PostFixExprArrow(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                   std::string_view identifier)
-      : mPostFixExpr(std::move(postFixExpr)),
-        mIdentifier(std::move(identifier)) {}
-  [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
-    return mPostFixExpr.get();
-  }
-  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
+                   std::string_view identifier);
+  [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
+  [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
 /**
@@ -291,11 +269,8 @@ private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
 
 public:
-  PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr)
-      : mPostFixExpr(std::move(postFixExpr)) {}
-  [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
-    return mPostFixExpr.get();
-  }
+  PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr);
+  [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
 };
 
 /**
@@ -307,11 +282,8 @@ private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
 
 public:
-  PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr)
-      : mPostFixExpr(std::move(postFixExpr)) {}
-  [[nodiscard]] const PostFixExpr *getPostFixExpr() const {
-    return mPostFixExpr.get();
-  }
+  PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr);
+  [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
 };
 
 /**
@@ -326,14 +298,10 @@ private:
 
 public:
   PostFixExprTypeInitializer(TypeName &&typeName,
-                             InitializerList &&initializerList)
-      : mTypeName(std::make_unique<TypeName>(std::move(typeName))),
-        mInitializerList(std::make_unique<InitializerList>(std::move(initializerList))) {}
+                             InitializerList &&initializerList);
 
-  [[nodiscard]] const InitializerList *getInitializerList() const {
-    return mInitializerList.get();
-  }
-  [[nodiscard]] const TypeName *getTypeName() const { return mTypeName.get(); }
+  [[nodiscard]] const InitializerList *getInitializerList() const;
+  [[nodiscard]] const TypeName *getTypeName() const;
 };
 
 /**
@@ -360,10 +328,9 @@ private:
   PostFixExpr mPostExpr;
 
 public:
-  UnaryExprPostFixExpr(PostFixExpr &&postExpr)
-      : mPostExpr(std::move(postExpr)) {}
+  UnaryExprPostFixExpr(PostFixExpr &&postExpr);
 
-  [[nodiscard]] const PostFixExpr &getPostExpr() const { return mPostExpr; }
+  [[nodiscard]] const PostFixExpr &getPostExpr() const;
 };
 
 /**
@@ -394,11 +361,10 @@ private:
 
 public:
   UnaryExprUnaryOperator(UnaryOperator anOperator,
-                         std::unique_ptr<CastExpr> &&castExpr)
-      : mOperator(anOperator), mCastExpr(std::move(castExpr)) {}
+                         std::unique_ptr<CastExpr> &&castExpr);
 
-  [[nodiscard]] UnaryOperator getOperator() const { return mOperator; }
-  [[nodiscard]] const CastExpr *getCastExpr() const { return mCastExpr.get(); }
+  [[nodiscard]] UnaryOperator getOperator() const;
+  [[nodiscard]] const CastExpr *getCastExpr() const;
 };
 
 /**
@@ -412,9 +378,9 @@ class UnaryExprSizeOf final : public Node {
   Variant mValue;
 
 public:
-  UnaryExprSizeOf(Variant &&variant) : mValue(std::move(variant)){};
+  UnaryExprSizeOf(Variant &&variant);
 
-  [[nodiscard]] const Variant &getVariant() const { return mValue; }
+  [[nodiscard]] const Variant &getVariant() const;
 };
 
 /**
@@ -448,9 +414,9 @@ private:
   variant mVariant;
 
 public:
-  TypeSpecifier(variant &&variant) : mVariant(std::move(variant)) {}
+  TypeSpecifier(variant &&variant);
 
-  [[nodiscard]] const variant &getVariant() const { return mVariant; }
+  [[nodiscard]] const variant &getVariant() const;
 };
 
 /**
@@ -467,8 +433,65 @@ private:
   Qualifier mQualifier;
 
 public:
-  TypeQualifier(Qualifier qualifier) : mQualifier(qualifier){};
-  [[nodiscard]] Qualifier getQualifier() const { return mQualifier; };
+  TypeQualifier(Qualifier qualifier);
+  [[nodiscard]] Qualifier getQualifier() const;
+};
+
+/**
+ * function-specifier:
+ *      inline
+ */
+class FunctionSpecifier final : public Node {
+public:
+  FunctionSpecifier();
+};
+
+/**
+ * storage-class-specifier:
+ *      typedef
+ *      extern
+ *      static
+ *      auto
+ *      register
+ */
+class StorageClassSpecifier final : public Node {
+public:
+  enum Specifiers { Typedef, Extern, Static, Auto, Register };
+
+private:
+  Specifiers mSpecifier;
+
+public:
+  StorageClassSpecifier(Specifiers specifier);
+  [[nodiscard]] Specifiers getSpecifier() const;
+};
+
+/**
+ * declaration-specifiers:
+        storage-class-specifier declaration-specifiers{opt}
+        type-specifier declaration-specifiers{opt}
+        type-qualifier declaration-specifiers{opt}
+        function-specifier declaration-specifiers{opt}
+ */
+class DeclarationSpecifiers final : public Node {
+private:
+  std::vector<StorageClassSpecifier> mStorageClassSpecifiers;
+  std::vector<TypeSpecifier> mTypeSpecifiers;
+  std::vector<TypeQualifier> mTypeQualifiers;
+  std::vector<FunctionSpecifier> mFunctionSpecifiers;
+
+public:
+  DeclarationSpecifiers();
+  void addStorageClassSpecifier(StorageClassSpecifier && specifier);
+  void addTypeSpecifier(TypeSpecifier && specifier);
+  void addTypeQualifier(TypeQualifier && qualifier);
+  void addFunctionSpecifier(FunctionSpecifier && specifier);
+
+  [[nodiscard]] const std::vector<StorageClassSpecifier> &getStorageClassSpecifiers() const;
+  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const;
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const;
+  [[nodiscard]] const std::vector<FunctionSpecifier> &getFunctionSpecifiers() const;
+  [[nodiscard]] bool isEmpty() const;
 };
 
 /**
@@ -477,29 +500,29 @@ public:
  *      type-qualifier
  */
 
-class SpecifierQualifiers final : public Node {
-private:
-  std::vector<TypeSpecifier> mTypeSpecifiers;
-  std::vector<TypeQualifier> mTypeQualifiers;
-
-public:
-  SpecifierQualifiers() {}
-  void addTypeSpecifier(TypeSpecifier && specifier) {
-    mTypeSpecifiers.push_back(std::move(specifier));
-  }
-  void addTypeQualifier(TypeQualifier && qualifier) {
-    mTypeQualifiers.push_back(std::move(qualifier));
-  }
-  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const {
-    return mTypeSpecifiers;
-  }
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
-    return mTypeQualifiers;
-  }
-  [[nodiscard]] bool isEmpty() const {
-    return mTypeSpecifiers.empty() && mTypeQualifiers.empty();
-  }
-};
+//class SpecifierQualifiers final : public Node {
+//private:
+//  std::vector<TypeSpecifier> mTypeSpecifiers;
+//  std::vector<TypeQualifier> mTypeQualifiers;
+//
+//public:
+//  SpecifierQualifiers() {}
+//  void addTypeSpecifier(TypeSpecifier && specifier) {
+//    mTypeSpecifiers.push_back(std::move(specifier));
+//  }
+//  void addTypeQualifier(TypeQualifier && qualifier) {
+//    mTypeQualifiers.push_back(std::move(qualifier));
+//  }
+//  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const {
+//    return mTypeSpecifiers;
+//  }
+//  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
+//    return mTypeQualifiers;
+//  }
+//  [[nodiscard]] bool isEmpty() const {
+//    return mTypeSpecifiers.empty() && mTypeQualifiers.empty();
+//  }
+//};
 
 /**
  * type-name:
@@ -507,21 +530,13 @@ public:
  */
 class TypeName final : public Node {
 private:
-  SpecifierQualifiers mSpecifierQualifiers;
+  DeclarationSpecifiers mSpecifierQualifiers;
   std::unique_ptr<AbstractDeclarator> mAbstractDeclarator;
-
 public:
-  TypeName(SpecifierQualifiers &&specifierQualifiers,
-           std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
-      : mSpecifierQualifiers(std::move(specifierQualifiers)),
-        mAbstractDeclarator(std::move(abstractDeclarator)) {}
-
-  [[nodiscard]] const SpecifierQualifiers &getSpecifierQualifiers() const {
-    return mSpecifierQualifiers;
-  }
-  [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const {
-    return mAbstractDeclarator.get();
-  }
+  TypeName(DeclarationSpecifiers &&specifierQualifiers,
+           std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
+  [[nodiscard]] const DeclarationSpecifiers &getSpecifierQualifiers() const;
+  [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const;
 };
 
 /**
@@ -537,9 +552,8 @@ public:
   Variant mVariant;
 
 public:
-  CastExpr(Variant &&unaryOrCast) : mVariant(std::move(unaryOrCast)) {}
-
-  [[nodiscard]] const Variant &getVariant() const { return mVariant; }
+  CastExpr(Variant &&unaryOrCast);
+  [[nodiscard]] const Variant &getVariant() const;
 };
 
 /**
@@ -560,13 +574,10 @@ private:
 public:
   explicit MultiExpr(
       CastExpr &&castExpr,
-      std::vector<std::pair<BinaryOperator, CastExpr>> &&optCastExps)
-      : mCastExpr(std::move(castExpr)), mOptCastExps(std::move(optCastExps)) {}
-  [[nodiscard]] const CastExpr &getCastExpr() const { return mCastExpr; }
+      std::vector<std::pair<BinaryOperator, CastExpr>> &&optCastExps);
+  [[nodiscard]] const CastExpr &getCastExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, CastExpr>> &
-  getOptionalCastExpr() const {
-    return mOptCastExps;
-  }
+  getOptionalCastExpr() const;
 };
 
 /**
@@ -586,14 +597,10 @@ private:
 public:
   AdditiveExpr(
       MultiExpr &&multiExpr,
-      std::vector<std::pair<BinaryOperator, MultiExpr>> &&optionalMultiExps)
-      : mMultiExpr(std::move(multiExpr)),
-        mOptionalMultiExpr(std::move(optionalMultiExps)) {}
-  [[nodiscard]] const MultiExpr &getMultiExpr() const { return mMultiExpr; }
+      std::vector<std::pair<BinaryOperator, MultiExpr>> &&optionalMultiExps);
+  [[nodiscard]] const MultiExpr &getMultiExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, MultiExpr>> &
-  getOptionalMultiExpr() const {
-    return mOptionalMultiExpr;
-  }
+  getOptionalMultiExpr() const;
 };
 
 /**
@@ -613,16 +620,10 @@ private:
 public:
   ShiftExpr(
       AdditiveExpr &&additiveExpr,
-      std::vector<std::pair<BinaryOperator, AdditiveExpr>> &&optAdditiveExps)
-      : mAdditiveExpr(std::move(additiveExpr)),
-        mOptAdditiveExps(std::move(optAdditiveExps)) {}
-  [[nodiscard]] const AdditiveExpr &getAdditiveExpr() const {
-    return mAdditiveExpr;
-  }
+      std::vector<std::pair<BinaryOperator, AdditiveExpr>> &&optAdditiveExps);
+  [[nodiscard]] const AdditiveExpr &getAdditiveExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, AdditiveExpr>> &
-  getOptAdditiveExps() const {
-    return mOptAdditiveExps;
-  }
+  getOptAdditiveExps() const;
 };
 
 /**
@@ -649,14 +650,10 @@ private:
 public:
   RelationalExpr(
       ShiftExpr &&shiftExpr,
-      std::vector<std::pair<BinaryOperator, ShiftExpr>> &&optShiftExps)
-      : mShiftExpr(std::move(shiftExpr)),
-        mOptShiftExps(std::move(optShiftExps)) {}
-  [[nodiscard]] const ShiftExpr &getShiftExpr() const { return mShiftExpr; }
+      std::vector<std::pair<BinaryOperator, ShiftExpr>> &&optShiftExps);
+  [[nodiscard]] const ShiftExpr &getShiftExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, ShiftExpr>> &
-  getOptionalShiftExpressions() const {
-    return mOptShiftExps;
-  }
+  getOptionalShiftExpressions() const;
 };
 
 /**
@@ -676,17 +673,11 @@ private:
 public:
   EqualExpr(RelationalExpr &&relationalExpr,
             std::vector<std::pair<BinaryOperator, RelationalExpr>>
-                &&optRelationalExps)
-      : mRelationalExpr(std::move(relationalExpr)),
-        mOptRelationExps(std::move(optRelationalExps)) {}
-  [[nodiscard]] const RelationalExpr &getRelationalExpr() const {
-    return mRelationalExpr;
-  }
+                &&optRelationalExps);
+  [[nodiscard]] const RelationalExpr &getRelationalExpr() const;
 
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, RelationalExpr>> &
-  getOptionalRelationalExpr() const {
-    return mOptRelationExps;
-  }
+  getOptionalRelationalExpr() const;
 };
 
 /**
@@ -700,14 +691,10 @@ private:
   std::vector<EqualExpr> mOptEqualExps;
 
 public:
-  BitAndExpr(EqualExpr &&equalExpr, std::vector<EqualExpr> &&optEqualExps)
-      : mEqualExpr(std::move(equalExpr)),
-        mOptEqualExps(std::move(optEqualExps)) {}
-  [[nodiscard]] const EqualExpr &getEqualExpr() const { return mEqualExpr; }
+  BitAndExpr(EqualExpr &&equalExpr, std::vector<EqualExpr> &&optEqualExps);
+  [[nodiscard]] const EqualExpr &getEqualExpr() const;
 
-  [[nodiscard]] const std::vector<EqualExpr> &getOptionalEqualExpr() const {
-    return mOptEqualExps;
-  }
+  [[nodiscard]] const std::vector<EqualExpr> &getOptionalEqualExpr() const;
 };
 
 /**
@@ -721,14 +708,10 @@ private:
   std::vector<BitAndExpr> mOptBitAndExps;
 
 public:
-  BitXorExpr(BitAndExpr &&bitAndExpr, std::vector<BitAndExpr> &&optBitAndExps)
-      : mBitAndExpr(std::move(bitAndExpr)),
-        mOptBitAndExps(std::move(optBitAndExps)) {}
-  [[nodiscard]] const BitAndExpr &getBitAndExpr() const { return mBitAndExpr; }
+  BitXorExpr(BitAndExpr &&bitAndExpr, std::vector<BitAndExpr> &&optBitAndExps);
+  [[nodiscard]] const BitAndExpr &getBitAndExpr() const;
   [[nodiscard]] const std::vector<BitAndExpr> &
-  getOptionalBitAndExpressions() const {
-    return mOptBitAndExps;
-  }
+  getOptionalBitAndExpressions() const;
 };
 
 /**
@@ -742,17 +725,11 @@ private:
   std::vector<BitXorExpr> mOptBitXorExps;
 
 public:
-  BitOrExpr(BitXorExpr &&bitXorExpr, std::vector<BitXorExpr> &&optBitXorExps)
-      : mBitXorExpr(std::move(bitXorExpr)),
-        mOptBitXorExps(std::move(optBitXorExps)) {}
-  [[nodiscard]] const BitXorExpr &getBitXorExpression() const {
-    return mBitXorExpr;
-  }
+  BitOrExpr(BitXorExpr &&bitXorExpr, std::vector<BitXorExpr> &&optBitXorExps);
+  [[nodiscard]] const BitXorExpr &getBitXorExpression() const;
 
   [[nodiscard]] const std::vector<BitXorExpr> &
-  getOptionalBitXorExpressions() const {
-    return mOptBitXorExps;
-  }
+  getOptionalBitXorExpressions() const;
 };
 
 /**
@@ -766,16 +743,10 @@ private:
   std::vector<BitOrExpr> mOptBitOrExps;
 
 public:
-  LogAndExpr(BitOrExpr &&bitOrExpr, std::vector<BitOrExpr> &&optBitOrExps)
-      : mBitOrExpr(std::move(bitOrExpr)),
-        mOptBitOrExps(std::move(optBitOrExps)) {}
-  [[nodiscard]] const BitOrExpr &getBitOrExpression() const {
-    return mBitOrExpr;
-  }
+  LogAndExpr(BitOrExpr &&bitOrExpr, std::vector<BitOrExpr> &&optBitOrExps);
+  [[nodiscard]] const BitOrExpr &getBitOrExpression() const;
   [[nodiscard]] const std::vector<BitOrExpr> &
-  getOptionalBitOrExpressions() const {
-    return mOptBitOrExps;
-  }
+  getOptionalBitOrExpressions() const;
 };
 
 /**
@@ -789,16 +760,10 @@ private:
   std::vector<LogAndExpr> mOptLogAndExps;
 
 public:
-  LogOrExpr(LogAndExpr &&logAndExpr, std::vector<LogAndExpr> &&optLogAndExps)
-      : mLogAndExpr(std::move(logAndExpr)),
-        mOptLogAndExps(std::move(optLogAndExps)) {}
-  [[nodiscard]] const LogAndExpr &getAndExpression() const {
-    return mLogAndExpr;
-  }
+  LogOrExpr(LogAndExpr &&logAndExpr, std::vector<LogAndExpr> &&optLogAndExps);
+  [[nodiscard]] const LogAndExpr &getAndExpression() const;
   [[nodiscard]] const std::vector<LogAndExpr> &
-  getOptionalAndExpressions() const {
-    return mOptLogAndExps;
-  }
+  getOptionalAndExpressions() const;
 };
 
 /**
@@ -815,19 +780,11 @@ private:
 public:
   explicit ConditionalExpr(
       LogOrExpr &&logOrExpr, std::unique_ptr<Expr> &&optExpr = nullptr,
-      std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr)
-      : Node(), mLogOrExpr(std::move(logOrExpr)), mOptExpr(std::move(optExpr)),
-        mOptCondExpr(std::move(optCondExpr)) {}
-  [[nodiscard]] const LogOrExpr &getLogicalOrExpression() const {
-    return mLogOrExpr;
-  }
-  [[nodiscard]] const Expr *getOptionalExpression() const {
-    return mOptExpr.get();
-  }
+      std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr);
+  [[nodiscard]] const LogOrExpr &getLogicalOrExpression() const;
+  [[nodiscard]] const Expr *getOptionalExpression() const;
   [[nodiscard]] const ConditionalExpr *
-  getOptionalConditionalExpression() const {
-    return mOptCondExpr.get();
-  }
+  getOptionalConditionalExpression() const;
 };
 
 /**
@@ -868,20 +825,13 @@ private:
 public:
   AssignExpr(ConditionalExpr &&conditionalExpression,
              std::vector<std::pair<AssignmentOperator, ConditionalExpr>>
-                 &&optConditionExpr)
-      : mCondExpr(std::move(conditionalExpression)),
-        mOptConditionExpr(std::move(optConditionExpr)) {}
+                 &&optConditionExpr);
 
-  [[nodiscard]] const ConditionalExpr &getConditionalExpr() const {
-    return mCondExpr;
-  }
+  [[nodiscard]] const ConditionalExpr &getConditionalExpr() const;
   [[nodiscard]] const std::vector<
       std::pair<AssignmentOperator, ConditionalExpr>> &
-  getOptionalConditionalExpr() const {
-    return mOptConditionExpr;
-  }
+  getOptionalConditionalExpr() const;
 };
-
 
 /**
  expression:
@@ -893,13 +843,11 @@ private:
   std::vector<AssignExpr> mAssignExpressions;
 
 public:
-  Expr(std::vector<AssignExpr> assignExpressions)
-      : mAssignExpressions(std::move(assignExpressions)) {}
+  Expr(std::vector<AssignExpr> assignExpressions);
 
-  const std::vector<AssignExpr> &getAssignExpressions() const {
-    return mAssignExpressions;
-  }
+  const std::vector<AssignExpr> &getAssignExpressions() const;
 };
+
 
 using Stmt =
     std::variant<ReturnStmt, ExprStmt, IfStmt, BlockStmt, ForStmt, WhileStmt,
@@ -915,12 +863,9 @@ private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  ExprStmt(std::unique_ptr<Expr> &&optExpr = nullptr)
-      : mOptExpr(std::move(optExpr)) {}
-  [[nodiscard]] const Expr *getOptionalExpression() const {
-    return mOptExpr.get();
-  }
-  std::unique_ptr<Expr> moveOptionalExpr() { return std::move(mOptExpr); }
+  ExprStmt(std::unique_ptr<Expr> &&optExpr = nullptr);
+  [[nodiscard]] const Expr *getOptionalExpression() const;
+  std::unique_ptr<Expr> moveOptionalExpr();
 };
 
 /**
@@ -936,15 +881,13 @@ private:
 
 public:
   IfStmt(Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
-         std::unique_ptr<Stmt> &&optElseStmt = nullptr)
-      : mExpr(std::move(expr)), mThenStmt(std::move(thenStmt)),
-        mOptElseStmt(std::move(optElseStmt)) {}
+         std::unique_ptr<Stmt> &&optElseStmt = nullptr);
 
-  [[nodiscard]] const Expr &getExpression() const { return mExpr; }
+  [[nodiscard]] const Expr &getExpression() const;
 
-  [[nodiscard]] const Stmt *getThenStmt() const { return mThenStmt.get(); }
+  [[nodiscard]] const Stmt *getThenStmt() const;
 
-  [[nodiscard]] const Stmt *getElseStmt() const { return mOptElseStmt.get(); }
+  [[nodiscard]] const Stmt *getElseStmt() const;
 };
 
 /**
@@ -957,12 +900,11 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  SwitchStmt(Expr &&expression, std::unique_ptr<Stmt> &&statement)
-      : mExpr(std::move(expression)), mStmt(std::move(statement)) {}
+  SwitchStmt(Expr &&expression, std::unique_ptr<Stmt> &&statement);
 
-  [[nodiscard]] const Expr &getExpression() const { return mExpr; }
+  [[nodiscard]] const Expr &getExpression() const;
 
-  [[nodiscard]] const Stmt *getStatement() const { return mStmt.get(); }
+  [[nodiscard]] const Stmt *getStatement() const;
 };
 
 /**
@@ -974,9 +916,8 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  DefaultStmt(std::unique_ptr<Stmt> &&statement)
-      : mStmt(std::move(statement)) {}
-  [[nodiscard]] const Stmt *getStatement() const { return mStmt.get(); }
+  DefaultStmt(std::unique_ptr<Stmt> &&statement);
+  [[nodiscard]] const Stmt *getStatement() const;
 };
 
 /**
@@ -989,14 +930,10 @@ private:
   std::unique_ptr<Stmt> mStatement;
 
 public:
-  CaseStmt(ConstantExpr &&constantExpr, std::unique_ptr<Stmt> &&statement)
-      : mConstantExpr(std::move(constantExpr)),
-        mStatement(std::move(statement)) {}
+  CaseStmt(ConstantExpr &&constantExpr, std::unique_ptr<Stmt> &&statement);
 
-  [[nodiscard]] const ConstantExpr &getConstantExpr() const {
-    return mConstantExpr;
-  }
-  [[nodiscard]] const Stmt *getStatement() const { return mStatement.get(); }
+  [[nodiscard]] const ConstantExpr &getConstantExpr() const;
+  [[nodiscard]] const Stmt *getStatement() const;
 };
 
 /**
@@ -1008,8 +945,8 @@ private:
   std::string_view mIdentifier;
 
 public:
-  LabelStmt(std::string_view identifier) : mIdentifier(identifier) {}
-  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
+  LabelStmt(std::string_view identifier);
+  [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
 /**
@@ -1021,8 +958,8 @@ private:
   std::string_view mIdentifier;
 
 public:
-  GotoStmt(std::string_view identifier) : mIdentifier(identifier) {}
-  [[nodiscard]] const std::string_view &getIdentifier() const { return mIdentifier; }
+  GotoStmt(std::string_view identifier);
+  [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
 /**
@@ -1035,10 +972,9 @@ private:
   Expr mExpr;
 
 public:
-  DoWhileStmt(std::unique_ptr<Stmt> &&stmt, Expr &&expr)
-      : mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
-  [[nodiscard]] const Stmt *getStatement() const { return mStmt.get(); }
-  [[nodiscard]] const Expr &getExpression() const { return mExpr; }
+  DoWhileStmt(std::unique_ptr<Stmt> &&stmt, Expr &&expr);
+  [[nodiscard]] const Stmt *getStatement() const;
+  [[nodiscard]] const Expr &getExpression() const;
 };
 
 /**
@@ -1051,10 +987,9 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  WhileStmt(Expr &&expr, std::unique_ptr<Stmt> &&stmt)
-      : mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
-  [[nodiscard]] const Expr &getExpression() const { return mExpr; }
-  [[nodiscard]] const Stmt *getStatement() const { return mStmt.get(); }
+  WhileStmt(Expr &&expr, std::unique_ptr<Stmt> &&stmt);
+  [[nodiscard]] const Expr &getExpression() const;
+  [[nodiscard]] const Stmt *getStatement() const;
 };
 
 /**
@@ -1074,116 +1009,44 @@ public:
           std::variant<std::unique_ptr<Declaration>, std::unique_ptr<Expr>>
               &&initial,
           std::unique_ptr<Expr> &&controlExpr = nullptr,
-          std::unique_ptr<Expr> &&postExpr = nullptr)
-      : mStmt(std::move(stmt)), mInitial(std::move(initial)),
-        mControlExpr(std::move(controlExpr)), mPostExpr(std::move(postExpr)) {}
-  [[nodiscard]] const Stmt *getStatement() const { return mStmt.get(); }
+          std::unique_ptr<Expr> &&postExpr = nullptr);
+  [[nodiscard]] const Stmt *getStatement() const;
 
   [[nodiscard]] const std::variant<std::unique_ptr<Declaration>,
-                                   std::unique_ptr<Expr>> &
-  getInitial() const {
-    return mInitial;
-  }
-  [[nodiscard]] const Expr *getControlling() const {
-    return mControlExpr.get();
-  }
-  [[nodiscard]] const Expr *getPost() const { return mPostExpr.get(); }
+                                   std::unique_ptr<Expr>> &getInitial() const;
+  [[nodiscard]] const Expr *getControlling() const;
+  [[nodiscard]] const Expr *getPost() const;
 };
 
 /**
- * storage-class-specifier:
- *      typedef
- *      extern
- *      static
- *      auto
- *      register
+ * break-statement:
+ *      break ;
  */
-class StorageClassSpecifier final : public Node {
+class BreakStmt final : public Node {
 public:
-  enum Specifiers { Typedef, Extern, Static, Auto, Register };
+  BreakStmt();
+};
 
+/**
+ * continue-statement:
+ *      continue ;
+ */
+class ContinueStmt final : public Node {
+public:
+  ContinueStmt();
+};
+
+/**
+ * return-statement:
+ *      return expr{opt} ;
+ */
+class ReturnStmt final : public Node {
 private:
-  Specifiers mSpecifier;
+  std::unique_ptr<Expr> mOptExpr;
 
 public:
-  StorageClassSpecifier(Specifiers specifier) : mSpecifier(specifier) {}
-  [[nodiscard]] Specifiers getSpecifier() const { return mSpecifier; }
-};
-
-inline bool operator==(const StorageClassSpecifier &storageClassSpecifier,
-                       StorageClassSpecifier::Specifiers specifier) {
-  return specifier == storageClassSpecifier.getSpecifier();
-}
-
-inline bool operator!=(const StorageClassSpecifier &storageClassSpecifier,
-                       StorageClassSpecifier::Specifiers specifier) {
-  return specifier != storageClassSpecifier.getSpecifier();
-}
-
-inline bool operator==(StorageClassSpecifier::Specifiers specifier,
-                       const StorageClassSpecifier &storageClassSpecifier) {
-  return specifier == storageClassSpecifier.getSpecifier();
-}
-
-inline bool operator!=(StorageClassSpecifier::Specifiers specifier,
-                       const StorageClassSpecifier &storageClassSpecifier) {
-  return specifier != storageClassSpecifier.getSpecifier();
-}
-
-/**
- * function-specifier:
- *      inline
- */
-class FunctionSpecifier final : public Node {
-public:
-  FunctionSpecifier() {}
-};
-
-/**
- * declaration-specifiers:
-        storage-class-specifier declaration-specifiers{opt}
-        type-specifier declaration-specifiers{opt}
-        type-qualifier declaration-specifiers{opt}
-        function-specifier declaration-specifiers{opt}
- */
-class DeclarationSpecifiers final : public Node {
-private:
-  std::vector<StorageClassSpecifier> mStorageClassSpecifiers;
-  std::vector<TypeSpecifier> mTypeSpecifiers;
-  std::vector<TypeQualifier> mTypeQualifiers;
-  std::vector<FunctionSpecifier> mFunctionSpecifiers;
-
-public:
-  DeclarationSpecifiers() {}
-  void addStorageClassSpecifier(StorageClassSpecifier && specifier) {
-    mStorageClassSpecifiers.push_back(std::move(specifier));
-  }
-  void addTypeSpecifier(TypeSpecifier && specifier) {
-    mTypeSpecifiers.push_back(std::move(specifier));
-  }
-  void addTypeQualifier(TypeQualifier && qualifier) {
-    mTypeQualifiers.push_back(std::move(qualifier));
-  }
-  void addFunctionSpecifier(FunctionSpecifier && specifier) {
-    mFunctionSpecifiers.push_back(std::move(specifier));
-  }
-
-  [[nodiscard]] const std::vector<StorageClassSpecifier> &getStorageClassSpecifiers() const {
-    return mStorageClassSpecifiers;
-  }
-  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const {
-    return mTypeSpecifiers;
-  }
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
-    return mTypeQualifiers;
-  }
-  [[nodiscard]] const std::vector<FunctionSpecifier> &getFunctionSpecifiers() const {
-    return mFunctionSpecifiers;
-  }
-  [[nodiscard]] bool isEmpty() const {
-    return mStorageClassSpecifiers.empty() && mTypeSpecifiers.empty()
-           && mTypeQualifiers.empty() && mFunctionSpecifiers.empty();
-  }
+  ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr);
+  [[nodiscard]] const Expr *getExpression() const;
 };
 
 /**
@@ -1211,48 +1074,10 @@ private:
 
 public:
   Declaration(DeclarationSpecifiers &&declarationSpecifiers,
-              std::vector<InitDeclarator> &&initDeclarators)
-      : mDeclarationSpecifiers(std::move(declarationSpecifiers)),
-        mInitDeclarators(std::move(initDeclarators)) {}
+              std::vector<InitDeclarator> &&initDeclarators);
   [[nodiscard]] const DeclarationSpecifiers &
-  getDeclarationSpecifiers() const {
-    return mDeclarationSpecifiers;
-  }
-  [[nodiscard]] const std::vector<InitDeclarator> &getInitDeclarators() const {
-    return mInitDeclarators;
-  }
-};
-
-/**
- * break-statement:
- *      break ;
- */
-class BreakStmt final : public Node {
-public:
-  BreakStmt() {}
-};
-
-/**
- * continue-statement:
- *      continue ;
- */
-class ContinueStmt final : public Node {
-public:
-  ContinueStmt() {}
-};
-
-/**
- * return-statement:
- *      return expr{opt} ;
- */
-class ReturnStmt final : public Node {
-private:
-  std::unique_ptr<Expr> mOptExpr;
-
-public:
-  ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr)
-      : mOptExpr(std::move(optExpr)) {}
-  [[nodiscard]] const Expr *getExpression() const { return mOptExpr.get(); }
+  getDeclarationSpecifiers() const;
+  [[nodiscard]] const std::vector<InitDeclarator> &getInitDeclarators() const;
 };
 
 using BlockItem = std::variant<Stmt, Declaration>;
@@ -1272,11 +1097,8 @@ private:
   std::vector<BlockItem> mBlockItems;
 
 public:
-  BlockStmt(std::vector<BlockItem> &&blockItems)
-      : mBlockItems(std::move(blockItems)) {}
-  [[nodiscard]] const std::vector<BlockItem> &getBlockItems() const {
-    return mBlockItems;
-  }
+  BlockStmt(std::vector<BlockItem> &&blockItems);
+  [[nodiscard]] const std::vector<BlockItem> &getBlockItems() const;
 };
 
 /**
@@ -1305,12 +1127,9 @@ class DirectAbstractDeclaratorParentheses final : public Node {
 
 public:
   DirectAbstractDeclaratorParentheses(
-      std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
-      : mAbstractDeclarator(std::move(abstractDeclarator)) {}
+      std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
 
-  [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const {
-    return mAbstractDeclarator.get();
-  }
+  [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const;
 };
 
 /**
@@ -1332,28 +1151,16 @@ public:
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
       std::vector<TypeQualifier> &&typeQualifiers,
       std::unique_ptr<AssignExpr> &&assignmentExpression,
-      bool hasStatic)
-      : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
-        mTypeQualifiers(std::move(typeQualifiers)),
-        mAssignmentExpression(std::move(assignmentExpression)),
-        mHasStatic(hasStatic){}
+      bool hasStatic);
 
   [[nodiscard]] const DirectAbstractDeclarator *
-  getDirectAbstractDeclarator() const {
-    return mDirectAbstractDeclarator.get();
-  }
+  getDirectAbstractDeclarator() const;
 
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
-    return mTypeQualifiers;
-  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const;
 
-  [[nodiscard]] const AssignExpr *getAssignmentExpression() const {
-    return mAssignmentExpression.get();
-  }
+  [[nodiscard]] const AssignExpr *getAssignmentExpression() const;
 
-  [[nodiscard]] bool hasStatic() const {
-    return mHasStatic;
-  }
+  [[nodiscard]] bool hasStatic() const;
 };
 
 /// direct-abstract-declarator{opt} [*]
@@ -1361,13 +1168,10 @@ class DirectAbstractDeclaratorAsterisk final : public Node {
   std::unique_ptr<DirectAbstractDeclarator> mDirectAbstractDeclarator;
 public:
   DirectAbstractDeclaratorAsterisk(
-      std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator)
-      : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)){}
+      std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator);
 
   [[nodiscard]] const DirectAbstractDeclarator *
-  getDirectAbstractDeclarator() const {
-    return mDirectAbstractDeclarator.get();
-  }
+  getDirectAbstractDeclarator() const;
 };
 
 /**
@@ -1381,18 +1185,12 @@ class DirectAbstractDeclaratorParamTypeList final : public Node {
 public:
   DirectAbstractDeclaratorParamTypeList(
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
-      std::unique_ptr<ParamTypeList> &&parameterTypeList)
-      : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
-        mParameterTypeList(std::move(parameterTypeList)) {}
+      std::unique_ptr<ParamTypeList> &&parameterTypeList);
 
   [[nodiscard]] const DirectAbstractDeclarator *
-  getDirectAbstractDeclarator() const {
-    return mDirectAbstractDeclarator.get();
-  }
+  getDirectAbstractDeclarator() const;
 
-  [[nodiscard]] const ParamTypeList *getParameterTypeList() const {
-    return mParameterTypeList.get();
-  }
+  [[nodiscard]] const ParamTypeList *getParameterTypeList() const;
 };
 
 /**
@@ -1404,12 +1202,9 @@ class Pointer final : public Node {
   std::vector<TypeQualifier> mTypeQualifiers;
 
 public:
-  Pointer(std::vector<TypeQualifier> &&typeQualifiers)
-      : mTypeQualifiers(std::move(typeQualifiers)) {}
+  Pointer(std::vector<TypeQualifier> &&typeQualifiers);
 
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
-    return mTypeQualifiers;
-  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const;
 };
 
 /**
@@ -1424,18 +1219,12 @@ class AbstractDeclarator final : public Node {
 public:
   AbstractDeclarator(
       std::vector<Pointer> &&pointers,
-      std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator = {})
-      : mPointers(std::move(pointers)),
-        mDirectAbstractDeclarator(std::move(directAbstractDeclarator)) {}
+      std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator = {});
 
-  [[nodiscard]] const std::vector<Pointer> &getPointers() const {
-    return mPointers;
-  }
+  [[nodiscard]] const std::vector<Pointer> &getPointers() const;
 
   [[nodiscard]] const DirectAbstractDeclarator *
-  getDirectAbstractDeclarator() const {
-    return mDirectAbstractDeclarator ? &*mDirectAbstractDeclarator : nullptr;
-  }
+  getDirectAbstractDeclarator() const;
 };
 
 /**
@@ -1452,9 +1241,7 @@ public:
   ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers,
                        std::variant<std::unique_ptr<Declarator>,
                        std::optional<std::unique_ptr<AbstractDeclarator>>>
-                           variant = {std::nullopt})
-      : declarationSpecifiers(std::move(declarationSpecifiers)),
-        declarator(std::move(variant)) {}
+                           variant = {std::nullopt});
 };
 
 /**
@@ -1467,13 +1254,10 @@ private:
   std::vector<ParameterDeclaration> mParameterList;
 
 public:
-  ParamList(std::vector<ParameterDeclaration> &&parameterList)
-      : mParameterList(std::move(parameterList)) {}
+  ParamList(std::vector<ParameterDeclaration> &&parameterList);
 
   [[nodiscard]] const std::vector<ParameterDeclaration> &
-  getParameterDeclarations() const {
-    return mParameterList;
-  }
+  getParameterDeclarations() const;
 };
 
 /**
@@ -1486,14 +1270,11 @@ class ParamTypeList final : public Node {
   bool mHasEllipse;
 
 public:
-  ParamTypeList(ParamList &&parameterList, bool hasEllipse)
-      : mParameterList(std::move(parameterList)), mHasEllipse(hasEllipse) {}
+  ParamTypeList(ParamList &&parameterList, bool hasEllipse);
 
-  [[nodiscard]] const ParamList &getParameterList() const {
-    return mParameterList;
-  }
+  [[nodiscard]] const ParamList &getParameterList() const;
 
-  [[nodiscard]] bool hasEllipse() const { return mHasEllipse; }
+  [[nodiscard]] bool hasEllipse() const;
 };
 
 /**
@@ -1520,10 +1301,9 @@ class DirectDeclaratorIdent final : public Node {
   std::string_view mIdent;
 
 public:
-  DirectDeclaratorIdent(std::string_view ident)
-      : mIdent(ident) {}
+  DirectDeclaratorIdent(std::string_view ident);
 
-  [[nodiscard]] const std::string_view& getIdent() const { return mIdent; }
+  [[nodiscard]] const std::string_view& getIdent() const;
 };
 
 /**
@@ -1534,12 +1314,9 @@ class DirectDeclaratorParentheses final : public Node {
   std::unique_ptr<Declarator> mDeclarator;
 
 public:
-  DirectDeclaratorParentheses(std::unique_ptr<Declarator> &&declarator)
-      : mDeclarator(std::move(declarator)) {}
+  DirectDeclaratorParentheses(std::unique_ptr<Declarator> &&declarator);
 
-  [[nodiscard]] const Declarator *getDeclarator() const {
-    return mDeclarator.get();
-  }
+  [[nodiscard]] const Declarator *getDeclarator() const;
 };
 
 /**
@@ -1552,17 +1329,11 @@ class DirectDeclaratorParamTypeList final : public Node {
 
 public:
   DirectDeclaratorParamTypeList(std::unique_ptr<DirectDeclarator> &&directDeclarator,
-                              ParamTypeList &&parameterTypeList)
-      : mDirectDeclarator(std::move(directDeclarator)),
-        mParameterTypeList(std::move(parameterTypeList)) {}
+                              ParamTypeList &&parameterTypeList);
 
-  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const {
-    return mDirectDeclarator.get();
-  }
+  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const;
 
-  [[nodiscard]] const ParamTypeList &getParameterTypeList() const {
-    return mParameterTypeList;
-  }
+  [[nodiscard]] const ParamTypeList &getParameterTypeList() const;
 };
 
 /**
@@ -1581,28 +1352,16 @@ public:
       std::unique_ptr<DirectDeclarator> &&directDeclarator,
       std::vector<TypeQualifier> &&typeQualifierList,
       std::unique_ptr<AssignExpr> &&assignmentExpression,
-      bool hasStatic)
-      : mDirectDeclarator(std::move(directDeclarator)),
-        mTypeQualifierList(std::move(typeQualifierList)),
-        mAssignmentExpression(std::move(assignmentExpression)),
-        mHasStatic(hasStatic){}
+      bool hasStatic);
 
-  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const {
-    return mDirectDeclarator.get();
-  }
+  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const;
 
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const {
-    return mTypeQualifierList;
-  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const;
 
   [[nodiscard]] const AssignExpr *
-  getAssignmentExpression() const {
-    return mAssignmentExpression == nullptr ? nullptr : mAssignmentExpression.get();
-  }
+  getAssignmentExpression() const;
 
-  [[nodiscard]] bool hasStatic() const {
-    return mHasStatic;
-  }
+  [[nodiscard]] bool hasStatic() const;
 };
 
 /**
@@ -1615,17 +1374,11 @@ class DirectDeclaratorAsterisk final : public Node {
 public:
   DirectDeclaratorAsterisk(
       std::unique_ptr<DirectDeclarator> &&directDeclarator,
-      std::vector<TypeQualifier> &&typeQualifierList)
-      : mDirectDeclarator(std::move(directDeclarator)),
-        mTypeQualifierList(std::move(typeQualifierList)){}
+      std::vector<TypeQualifier> &&typeQualifierList);
 
-  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const {
-    return mDirectDeclarator.get();
-  }
+  [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const;
 
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const {
-    return mTypeQualifierList;
-  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const;
 };
 
 /**
@@ -1638,17 +1391,11 @@ class Declarator final : public Node {
 
 public:
   Declarator(std::vector<Pointer> &&pointers,
-             DirectDeclarator &&directDeclarator)
-      : mPointers(std::move(pointers)),
-        mDirectDeclarator(std::move(directDeclarator)) {}
+             DirectDeclarator &&directDeclarator);
 
-  [[nodiscard]] const std::vector<Pointer> &getPointers() const {
-    return mPointers;
-  }
+  [[nodiscard]] const std::vector<Pointer> &getPointers() const;
 
-  [[nodiscard]] const DirectDeclarator &getDirectDeclarator() const {
-    return mDirectDeclarator;
-  }
+  [[nodiscard]] const DirectDeclarator &getDirectDeclarator() const;
 };
 
 /**
@@ -1674,7 +1421,7 @@ public:
 class StructOrUnionSpecifier final : public Node {
 public:
   struct StructDeclaration {
-    SpecifierQualifiers specifierQualifiers;
+    DeclarationSpecifiers specifierQualifiers;
     struct StructDeclarator {
       std::unique_ptr<Declarator> optionalDeclarator;
       std::optional<ConstantExpr> optionalBitfield;
@@ -1688,18 +1435,14 @@ private:
 
 public:
   StructOrUnionSpecifier(bool isUnion, std::string_view identifier,
-                         std::vector<StructDeclaration> &&structDeclarations)
-      : mIsUnion(isUnion), mId(identifier),
-        mStructDeclarations(std::move(structDeclarations)) {}
+                         std::vector<StructDeclaration> &&structDeclarations);
 
-  [[nodiscard]] bool isUnion() const { return mIsUnion; }
+  [[nodiscard]] bool isUnion() const;
 
-  [[nodiscard]] std::string_view getTag() const { return mId; }
+  [[nodiscard]] std::string_view getTag() const;
 
   [[nodiscard]] const std::vector<StructDeclaration> &
-  getStructDeclarations() const {
-    return mStructDeclarations;
-  }
+  getStructDeclarations() const;
 };
 
 /**
@@ -1736,15 +1479,10 @@ private:
   std::string_view mId;
   std::vector<Enumerator> mEnumerators;
 public:
-  EnumSpecifier(std::string_view id, std::vector<Enumerator> &&enumerators)
-      : mId(id), mEnumerators(std::move(enumerators)) {}
+  EnumSpecifier(std::string_view id, std::vector<Enumerator> &&enumerators);
 
-  [[nodiscard]] const std::string_view &getName() const {
-    return mId;
-  }
-  [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const {
-    return mEnumerators;
-  }
+  [[nodiscard]] const std::string_view &getName() const;
+  [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const;
 };
 
 /**
@@ -1758,9 +1496,9 @@ class Initializer final : public Node {
   variant mVariant;
 
 public:
-  Initializer(variant &&variant) : mVariant(std::move(variant)) {}
+  Initializer(variant &&variant);
 
-  [[nodiscard]] const variant &getVariant() const { return mVariant; }
+  [[nodiscard]] const variant &getVariant() const;
 };
 
 /**
@@ -1795,10 +1533,9 @@ private:
   vector mInitializer;
 
 public:
-  InitializerList(vector &&initializer)
-      : mInitializer(std::move(initializer)) {}
+  InitializerList(vector &&initializer);
 
-  const vector &getInitializerList() const { return mInitializer; }
+  const vector &getInitializerList() const;
 };
 
 /**
@@ -1812,20 +1549,13 @@ class FunctionDefinition final : public Node {
 
 public:
   FunctionDefinition(DeclarationSpecifiers &&declarationSpecifiers,
-                     Declarator &&declarator, BlockStmt &&compoundStatement)
-      : mDeclarationSpecifiers(std::move(declarationSpecifiers)),
-        mDeclarator(std::move(declarator)),
-        mCompoundStatement(std::move(compoundStatement)) {}
+                     Declarator &&declarator, BlockStmt &&compoundStatement);
 
-  [[nodiscard]] const DeclarationSpecifiers & getDeclarationSpecifiers() const {
-    return mDeclarationSpecifiers;
-  }
+  [[nodiscard]] const DeclarationSpecifiers & getDeclarationSpecifiers() const;
 
-  [[nodiscard]] const Declarator &getDeclarator() const { return mDeclarator; }
+  [[nodiscard]] const Declarator &getDeclarator() const;
 
-  [[nodiscard]] const BlockStmt &getCompoundStatement() const {
-    return mCompoundStatement;
-  }
+  [[nodiscard]] const BlockStmt &getCompoundStatement() const;
 };
 
 /**

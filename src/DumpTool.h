@@ -29,7 +29,7 @@ void visitor(const Syntax::StorageClassSpecifier &storageClassSpecifier);
 void visitor(const Syntax::TypeQualifier &typeQualifier);
 void visitor(const Syntax::TypeSpecifier &typeSpecifier);
 void visitor(const Syntax::FunctionSpecifier &functionSpecifier);
-void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers);
+//void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers);
 void visitor(const Syntax::Pointer &pointer);
 void visitor(const Syntax::DirectDeclarator &directDeclarator);
 void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator);

@@ -21,4 +21,10 @@ DIAG(err_lex_unclosed_block_comment, Error, "unclosed block comment")
 DIAG(err_lex_unclosed_after_include, Error, "unclosed after include")
 DIAG(err_lex_implicit_newline_in_char, Error, "implicit newline in char literal")
 DIAG(err_lex_implicit_newline_in_string, Error, "implicit newline in string literal")
+
+DIAG(err_parse_skip_to_first_external_declaration, Error, "the beginning of external declaration")
+DIAG(err_parse_skip_to_first_struct_declaration, Error, "the start of struct declaration or }")
+DIAG(err_parse_expect_n, Error, "expect {0}")
+DIAG(err_parse_struct_declaration_appear_storage_class, Error, "struct/union member should not have storage class")
+DIAG(err_parse_expect_type_specifier_or_qualifier, Error, "expect type specifier or qualifier")
 #undef DIAG

@@ -19,6 +19,7 @@
 #include <map>
 #include <unordered_map>
 #include <bitset>
+#include "Diagnostic.h"
 namespace lcc {
 class Parser {
 public:
@@ -29,6 +30,7 @@ private:
   TokIter mTokCursor;
   TokIter mTokEnd;
   bool mIsCheckTypedefType{true};
+  DiagnosticEngine &Diag;
 private:
   class Scope {
   private:
@@ -50,8 +52,9 @@ private:
   };
   Scope mScope;
   TokenBitSet FirstDeclaration, FirstExpression, FirstStatement;
+  TokenBitSet FirstStructDeclaration, FirstExternalDeclaration;
 public:
-  explicit Parser(std::vector<Token> && tokens);
+  explicit Parser(std::vector<Token> && tokens, DiagnosticEngine &diag);
   Syntax::TranslationUnit ParseTranslationUnit();
   
 private:
@@ -61,7 +64,7 @@ private:
       std::optional<Syntax::Declarator> alreadyParsedDeclarator = {});
   std::optional<Syntax::Declaration> ParseDeclaration();
   Syntax::DeclarationSpecifiers ParseDeclarationSpecifiers();
-  Syntax::SpecifierQualifiers ParseSpecifierQualifierList();
+//  Syntax::SpecifierQualifiers ParseSpecifierQualifierList();
   std::optional<Syntax::Declarator> ParseDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator);
@@ -74,6 +77,8 @@ private:
   std::optional<Syntax::ParameterDeclaration> ParseParameterDeclarationSuffix(Syntax::DeclarationSpecifiers &declarationSpecifiers);
   Syntax::Pointer ParsePointer();
   std::optional<Syntax::StructOrUnionSpecifier> ParseStructOrUnionSpecifier();
+  std::optional<Syntax::StructOrUnionSpecifier::StructDeclaration> ParseStructDeclaration();
+  std::optional<Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator> ParseStructDeclarator();
   std::optional<Syntax::EnumSpecifier> ParseEnumSpecifier();
   std::optional<Syntax::EnumSpecifier::Enumerator> ParseEnumerator();
   std::optional<Syntax::Initializer> ParseInitializer();
@@ -116,7 +121,6 @@ private:
 
   std::optional<Syntax::TypeName> ParseTypeName();
   bool IsAssignment(tok::TokenKind type);
-  bool Match(tok::TokenKind tokenType);
   bool Expect(tok::TokenKind tokenType);
   bool Consume(tok::TokenKind tokenType);
   bool ConsumeAny();
@@ -124,6 +128,7 @@ private:
   bool PeekN(int n, tok::TokenKind tokenType);
   bool IsUnaryOp(tok::TokenKind tokenType);
   bool IsPostFixExpr(tok::TokenKind tokenType);
+  bool IsCurrentIn(TokenBitSet tokenSet);
 
   bool IsFirstInExternalDeclaration() const;
   bool IsFirstInFunctionDefinition() const;
@@ -173,6 +178,8 @@ private:
     static_assert((std::is_same_v<std::decay_t<Args>, tok::TokenKind> && ...));
     return (TokenBitSet() | ... | TokenBitSet().set(tokenKinds, true));
   }
+
+  void SkipTo(TokenBitSet recoveryToken, unsigned DiagID);
 };
 }
 #endif // LCC_PARSER_H

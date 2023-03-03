@@ -32,8 +32,8 @@
   } while (0)
 
 namespace lcc {
-void LOGE(uint32_t row, uint32_t col, const std::string &msg);
-void LOGE(const Token& tok, const std::string &msg);
+//void LOGE(uint32_t row, uint32_t col, const std::string &msg);
+//void LOGE(const Token& tok, const std::string &msg);
 
 template <class... Ts>
 struct overload : Ts...

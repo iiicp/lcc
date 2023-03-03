@@ -5,7 +5,7 @@ float dec_f = 0.122e-2f;
 float hex_f = 0x.ffp-3;
 double hex_d = 0xffp-2;
 
-char c0 = '';
+char c0 = 'b';
 char c1 = 'a';
 char c2 = '\a';
 char c3 = 'ab';

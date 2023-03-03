@@ -23,7 +23,7 @@ enum {
 };
 }
 
-#define DiagReport(obj, loc, id, ...) /*obj.report(__FILE__, __LINE__),*/ obj.report(loc, id, ##__VA_ARGS__)
+#define DiagReport(obj, loc, id, ...) obj.report(__FILE__, __LINE__), obj.report(loc, id, ##__VA_ARGS__)
 
 class DiagnosticEngine {
   static const char *getDiagnosticText(unsigned DiagID);

@@ -117,12 +117,10 @@ private:
   std::optional<Syntax::UnaryExpr> ParseUnaryExpr();
   std::optional<Syntax::PostFixExpr> ParsePostFixExpr();
   void ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& current);
-  std::optional<Syntax::PrimaryExpr> ParsePrimaryExpr();
 
   std::optional<Syntax::TypeName> ParseTypeName();
   bool IsAssignment(tok::TokenKind type);
   bool Expect(tok::TokenKind tokenType);
-  bool Consume(tok::TokenKind tokenType);
   bool ConsumeAny();
   bool Peek(tok::TokenKind tokenType);
   bool PeekN(int n, tok::TokenKind tokenType);

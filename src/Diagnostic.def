@@ -25,6 +25,10 @@ DIAG(err_lex_implicit_newline_in_string, Error, "implicit newline in string lite
 DIAG(err_parse_skip_to_first_external_declaration, Error, "the beginning of external declaration")
 DIAG(err_parse_skip_to_first_struct_declaration, Error, "the start of struct declaration or }")
 DIAG(err_parse_expect_n, Error, "expect {0}")
+DIAG(err_parse_expect_n_after, Error, "expect {0} after this")
 DIAG(err_parse_struct_declaration_appear_storage_class, Error, "struct/union member should not have storage class")
 DIAG(err_parse_expect_type_specifier_or_qualifier, Error, "expect type specifier or qualifier")
+DIAG(err_parse_expect_storage_class_or_type_specifier_or_qualifier, Error, "expect storage class or type specifier or qualifier")
+DIAG(err_parse_type_name_appear_storage_class, Error, "type name should not have storage class")
+DIAG(err_parse_skip_to_first_statement_or_first_declaration, Error, "the beginning of a statement or a declaration")
 #undef DIAG

@@ -18,6 +18,23 @@ namespace lcc {
 Parser::Parser(std::vector<Token> && tokens)
     : mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()),
       mTokEnd(mTokens.cend()) {
+
+  FirstDeclaration = FormTokenKinds(tok::kw_auto, tok::kw_extern, tok::kw_static,
+     tok::kw_register, tok::kw_typedef, tok::kw_const, tok::kw_restrict,
+     tok::kw_volatile, tok::kw_signed, tok::kw_unsigned, tok::kw_short,
+     tok::kw_long, tok::kw_char, tok::kw_int, tok::kw__Bool, tok::kw_float,
+     tok::kw_double, tok::kw_enum, tok::kw_struct, tok::kw_union, tok::kw_void,
+     tok::kw_inline, tok::identifier);
+
+  FirstExpression = FormTokenKinds(tok::identifier, tok::char_constant,
+     tok::string_literal, tok::numeric_constant, tok::l_paren, tok::plus_plus,
+     tok::minus_minus, tok::kw_sizeof, tok::amp, tok::star, tok::plus,
+     tok::minus, tok::tilde, tok::exclaim);
+
+  FirstStatement = FormTokenKinds(tok::l_brace, tok::kw_if, tok::kw_while,
+     tok::kw_do, tok::kw_for, tok::kw_break, tok::kw_continue, tok::kw_goto,
+     tok::identifier, tok::kw_switch, tok::kw_return, tok::kw_case,
+     tok::kw_default, tok::semi) | FirstExpression;
 }
 
 Syntax::TranslationUnit Parser::ParseTranslationUnit() {
@@ -287,7 +304,7 @@ next_specifier:
   goto next_specifier;
 }
 
-std::optional<Syntax::Declaration> Parser::FinishDeclaration(
+std::optional<Syntax::Declaration> Parser::ParseDeclarationSuffix(
     Syntax::DeclarationSpecifiers &&declarationSpecifiers,
     std::optional<Syntax::Declarator> alreadyParsedDeclarator) {
   bool isTypedef = std::any_of(declarationSpecifiers.getStorageClassSpecifiers().begin(), declarationSpecifiers.getStorageClassSpecifiers().end(),
@@ -433,8 +450,8 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
                                       std::move(*declarator),std::move(*compoundStmt));
   }
   /// is global declaration
-  return FinishDeclaration(std::move(declarationSpecifiers),
-                           std::move(declarator));
+  return ParseDeclarationSuffix(std::move(declarationSpecifiers),
+                                std::move(declarator));
 }
 
 /// declaration: declaration-specifiers init-declarator-list{opt} ;
@@ -448,7 +465,7 @@ std::optional<Syntax::Declaration> Parser::ParseDeclaration() {
     ConsumeAny();
     return Syntax::Declaration(std::move(declarationSpecifiers), {});
   }
-  return FinishDeclaration(std::move(declarationSpecifiers));
+  return ParseDeclarationSuffix(std::move(declarationSpecifiers));
 }
 
 std::optional<Syntax::StructOrUnionSpecifier>

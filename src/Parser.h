@@ -21,13 +21,15 @@
 #include <bitset>
 namespace lcc {
 class Parser {
+public:
+  using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
 private:
   std::vector<Token> mTokens;
   using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
   bool mIsCheckTypedefType{true};
-public:
+private:
   class Scope {
   private:
     struct Symbol {
@@ -46,16 +48,15 @@ public:
     void pushScope();
     void popScope();
   };
-private:
   Scope mScope;
+  TokenBitSet FirstDeclaration, FirstExpression, FirstStatement;
 public:
-  using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
   explicit Parser(std::vector<Token> && tokens);
   Syntax::TranslationUnit ParseTranslationUnit();
   
 private:
   std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
-  std::optional<Syntax::Declaration> FinishDeclaration(
+  std::optional<Syntax::Declaration> ParseDeclarationSuffix(
       Syntax::DeclarationSpecifiers &&declarationSpecifiers,
       std::optional<Syntax::Declarator> alreadyParsedDeclarator = {});
   std::optional<Syntax::Declaration> ParseDeclaration();
@@ -124,12 +125,6 @@ private:
   bool IsUnaryOp(tok::TokenKind tokenType);
   bool IsPostFixExpr(tok::TokenKind tokenType);
 
-  template <class... Args>
-  constexpr static TokenBitSet FormTokenKinds(Args&&... tokenKinds) {
-    static_assert((std::is_same_v<std::decay_t<Args>, tok::TokenKind> && ...));
-    return (TokenBitSet() | ... | TokenBitSet().set(tokenKinds, true));
-  }
-
   bool IsFirstInExternalDeclaration() const;
   bool IsFirstInFunctionDefinition() const;
   bool IsFirstInDeclaration() const;
@@ -171,6 +166,12 @@ private:
 
   [[nodiscard]] bool IsCheckTypedefType() const {
     return mIsCheckTypedefType;
+  }
+
+  template <class... Args>
+  constexpr static TokenBitSet FormTokenKinds(Args&&... tokenKinds) {
+    static_assert((std::is_same_v<std::decay_t<Args>, tok::TokenKind> && ...));
+    return (TokenBitSet() | ... | TokenBitSet().set(tokenKinds, true));
   }
 };
 }

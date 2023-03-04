@@ -31,4 +31,6 @@ DIAG(err_parse_expect_type_specifier_or_qualifier, Error, "expect type specifier
 DIAG(err_parse_expect_storage_class_or_type_specifier_or_qualifier, Error, "expect storage class or type specifier or qualifier")
 DIAG(err_parse_type_name_appear_storage_class, Error, "type name should not have storage class")
 DIAG(err_parse_skip_to_first_statement_or_first_declaration, Error, "the beginning of a statement or a declaration")
+DIAG(err_parse_accidently_add_semi, Error, "maybe you accidently add the ;")
+DIAG(err_parse_func_param_declaration_miss_name, Error, "miss param name")
 #undef DIAG

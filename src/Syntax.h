@@ -12,12 +12,12 @@
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
 #include "Token.h"
+#include <memory>
 #include <optional>
-#include <string_view>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
-#include <memory>
 
 namespace lcc::Syntax {
 class PrimaryExprIdent;
@@ -96,13 +96,16 @@ class Initializer;
 class InitializerList;
 
 class Node {
+private:
+   TokIter mBeginTok;
 public:
-  Node(){};
+  Node(TokIter begin);
   virtual ~Node() = default;
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
   Node(Node &&) = default;
-  Node &operator=(Node &&) = default;
+  Node &operator=(Node &&) noexcept = default;
+  TokIter getBegin() const;
 };
 
 /*
@@ -114,7 +117,7 @@ private:
   std::string_view mIdent;
 
 public:
-  PrimaryExprIdent(std::string_view identifier);
+  PrimaryExprIdent(TokIter begin, std::string_view identifier);
   [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
@@ -131,7 +134,7 @@ private:
   Variant mValue;
 
 public:
-  PrimaryExprConstant(Variant variant);
+  PrimaryExprConstant(TokIter begin, Variant variant);
   [[nodiscard]] const Variant &getValue() const;
 };
 
@@ -144,7 +147,7 @@ private:
   std::unique_ptr<Expr> mExpr;
 
 public:
-  PrimaryExprParentheses(Expr &&expr);
+  PrimaryExprParentheses(TokIter begin, Expr &&expr);
   [[nodiscard]] const Expr &getExpr() const;
 };
 
@@ -185,7 +188,7 @@ private:
   PrimaryExpr mPrimaryExpr;
 
 public:
-  PostFixExprPrimaryExpr(PrimaryExpr &&primaryExpr);
+  PostFixExprPrimaryExpr(TokIter begin, PrimaryExpr &&primaryExpr);
 
   [[nodiscard]] const PrimaryExpr &getPrimaryExpr() const;
 };
@@ -200,7 +203,8 @@ private:
   std::unique_ptr<Expr> mExpr;
 
 public:
-  PostFixExprSubscript(std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr);
+  PostFixExprSubscript(TokIter begin,
+                       std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr);
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
   [[nodiscard]] const Expr &getExpr() const;
 };
@@ -219,7 +223,8 @@ private:
   std::vector<std::unique_ptr<AssignExpr>> mOptParams;
 
 public:
-  PostFixExprFuncCall(std::unique_ptr<PostFixExpr> &&postFixExpr,
+  PostFixExprFuncCall(TokIter begin,
+                      std::unique_ptr<PostFixExpr> &&postFixExpr,
                       std::vector<std::unique_ptr<AssignExpr>> &&optParams);
 
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
@@ -237,7 +242,7 @@ private:
   std::string_view mIdentifier;
 
 public:
-  PostFixExprDot(std::unique_ptr<PostFixExpr> &&postFixExpr,
+  PostFixExprDot(TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr,
                  std::string_view identifier);
 
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
@@ -254,7 +259,7 @@ private:
   std::string_view mIdentifier;
 
 public:
-  PostFixExprArrow(std::unique_ptr<PostFixExpr> &&postFixExpr,
+  PostFixExprArrow(TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr,
                    std::string_view identifier);
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
   [[nodiscard]] const std::string_view &getIdentifier() const;
@@ -269,7 +274,8 @@ private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
 
 public:
-  PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr);
+  PostFixExprIncrement(TokIter begin,
+                       std::unique_ptr<PostFixExpr> &&postFixExpr);
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
 };
 
@@ -282,7 +288,8 @@ private:
   std::unique_ptr<PostFixExpr> mPostFixExpr;
 
 public:
-  PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr);
+  PostFixExprDecrement(TokIter begin,
+                       std::unique_ptr<PostFixExpr> &&postFixExpr);
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
 };
 
@@ -297,7 +304,7 @@ private:
   std::unique_ptr<InitializerList> mInitializerList;
 
 public:
-  PostFixExprTypeInitializer(TypeName &&typeName,
+  PostFixExprTypeInitializer(TokIter begin, TypeName &&typeName,
                              InitializerList &&initializerList);
 
   [[nodiscard]] const InitializerList *getInitializerList() const;
@@ -328,7 +335,7 @@ private:
   PostFixExpr mPostExpr;
 
 public:
-  UnaryExprPostFixExpr(PostFixExpr &&postExpr);
+  UnaryExprPostFixExpr(TokIter begin, PostFixExpr &&postExpr);
 
   [[nodiscard]] const PostFixExpr &getPostExpr() const;
 };
@@ -360,7 +367,7 @@ private:
   std::unique_ptr<CastExpr> mCastExpr;
 
 public:
-  UnaryExprUnaryOperator(UnaryOperator anOperator,
+  UnaryExprUnaryOperator(TokIter begin, UnaryOperator anOperator,
                          std::unique_ptr<CastExpr> &&castExpr);
 
   [[nodiscard]] UnaryOperator getOperator() const;
@@ -378,7 +385,7 @@ class UnaryExprSizeOf final : public Node {
   Variant mValue;
 
 public:
-  UnaryExprSizeOf(Variant &&variant);
+  UnaryExprSizeOf(TokIter begin, Variant &&variant);
 
   [[nodiscard]] const Variant &getVariant() const;
 };
@@ -414,7 +421,7 @@ private:
   variant mVariant;
 
 public:
-  TypeSpecifier(variant &&variant);
+  TypeSpecifier(TokIter begin, variant &&variant);
 
   [[nodiscard]] const variant &getVariant() const;
 };
@@ -433,7 +440,7 @@ private:
   Qualifier mQualifier;
 
 public:
-  TypeQualifier(Qualifier qualifier);
+  TypeQualifier(TokIter begin, Qualifier qualifier);
   [[nodiscard]] Qualifier getQualifier() const;
 };
 
@@ -443,7 +450,7 @@ public:
  */
 class FunctionSpecifier final : public Node {
 public:
-  FunctionSpecifier();
+  FunctionSpecifier(TokIter begin);
 };
 
 /**
@@ -462,7 +469,7 @@ private:
   Specifiers mSpecifier;
 
 public:
-  StorageClassSpecifier(Specifiers specifier);
+  StorageClassSpecifier(TokIter begin, Specifiers specifier);
   [[nodiscard]] Specifiers getSpecifier() const;
 };
 
@@ -481,16 +488,18 @@ private:
   std::vector<FunctionSpecifier> mFunctionSpecifiers;
 
 public:
-  DeclarationSpecifiers();
-  void addStorageClassSpecifier(StorageClassSpecifier && specifier);
-  void addTypeSpecifier(TypeSpecifier && specifier);
-  void addTypeQualifier(TypeQualifier && qualifier);
-  void addFunctionSpecifier(FunctionSpecifier && specifier);
+  DeclarationSpecifiers(TokIter begin);
+  void addStorageClassSpecifier(StorageClassSpecifier &&specifier);
+  void addTypeSpecifier(TypeSpecifier &&specifier);
+  void addTypeQualifier(TypeQualifier &&qualifier);
+  void addFunctionSpecifier(FunctionSpecifier &&specifier);
 
-  [[nodiscard]] const std::vector<StorageClassSpecifier> &getStorageClassSpecifiers() const;
+  [[nodiscard]] const std::vector<StorageClassSpecifier> &
+  getStorageClassSpecifiers() const;
   [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const;
   [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const;
-  [[nodiscard]] const std::vector<FunctionSpecifier> &getFunctionSpecifiers() const;
+  [[nodiscard]] const std::vector<FunctionSpecifier> &
+  getFunctionSpecifiers() const;
   [[nodiscard]] bool isEmpty() const;
 };
 
@@ -500,30 +509,6 @@ public:
  *      type-qualifier
  */
 
-//class SpecifierQualifiers final : public Node {
-//private:
-//  std::vector<TypeSpecifier> mTypeSpecifiers;
-//  std::vector<TypeQualifier> mTypeQualifiers;
-//
-//public:
-//  SpecifierQualifiers() {}
-//  void addTypeSpecifier(TypeSpecifier && specifier) {
-//    mTypeSpecifiers.push_back(std::move(specifier));
-//  }
-//  void addTypeQualifier(TypeQualifier && qualifier) {
-//    mTypeQualifiers.push_back(std::move(qualifier));
-//  }
-//  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const {
-//    return mTypeSpecifiers;
-//  }
-//  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
-//    return mTypeQualifiers;
-//  }
-//  [[nodiscard]] bool isEmpty() const {
-//    return mTypeSpecifiers.empty() && mTypeQualifiers.empty();
-//  }
-//};
-
 /**
  * type-name:
  *  specifier-qualifier-list abstract-declarator{opt}
@@ -532,8 +517,9 @@ class TypeName final : public Node {
 private:
   DeclarationSpecifiers mSpecifierQualifiers;
   std::unique_ptr<AbstractDeclarator> mAbstractDeclarator;
+
 public:
-  TypeName(DeclarationSpecifiers &&specifierQualifiers,
+  TypeName(TokIter begin, DeclarationSpecifiers &&specifierQualifiers,
            std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
   [[nodiscard]] const DeclarationSpecifiers &getSpecifierQualifiers() const;
   [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const;
@@ -552,7 +538,7 @@ public:
   Variant mVariant;
 
 public:
-  CastExpr(Variant &&unaryOrCast);
+  CastExpr(TokIter begin, Variant &&unaryOrCast);
   [[nodiscard]] const Variant &getVariant() const;
 };
 
@@ -573,7 +559,7 @@ private:
 
 public:
   explicit MultiExpr(
-      CastExpr &&castExpr,
+      TokIter begin, CastExpr &&castExpr,
       std::vector<std::pair<BinaryOperator, CastExpr>> &&optCastExps);
   [[nodiscard]] const CastExpr &getCastExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, CastExpr>> &
@@ -596,7 +582,7 @@ private:
 
 public:
   AdditiveExpr(
-      MultiExpr &&multiExpr,
+      TokIter begin, MultiExpr &&multiExpr,
       std::vector<std::pair<BinaryOperator, MultiExpr>> &&optionalMultiExps);
   [[nodiscard]] const MultiExpr &getMultiExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, MultiExpr>> &
@@ -619,7 +605,7 @@ private:
 
 public:
   ShiftExpr(
-      AdditiveExpr &&additiveExpr,
+      TokIter begin, AdditiveExpr &&additiveExpr,
       std::vector<std::pair<BinaryOperator, AdditiveExpr>> &&optAdditiveExps);
   [[nodiscard]] const AdditiveExpr &getAdditiveExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, AdditiveExpr>> &
@@ -649,7 +635,7 @@ private:
 
 public:
   RelationalExpr(
-      ShiftExpr &&shiftExpr,
+      TokIter begin, ShiftExpr &&shiftExpr,
       std::vector<std::pair<BinaryOperator, ShiftExpr>> &&optShiftExps);
   [[nodiscard]] const ShiftExpr &getShiftExpr() const;
   [[nodiscard]] const std::vector<std::pair<BinaryOperator, ShiftExpr>> &
@@ -671,7 +657,7 @@ private:
   std::vector<std::pair<BinaryOperator, RelationalExpr>> mOptRelationExps;
 
 public:
-  EqualExpr(RelationalExpr &&relationalExpr,
+  EqualExpr(TokIter begin, RelationalExpr &&relationalExpr,
             std::vector<std::pair<BinaryOperator, RelationalExpr>>
                 &&optRelationalExps);
   [[nodiscard]] const RelationalExpr &getRelationalExpr() const;
@@ -691,7 +677,8 @@ private:
   std::vector<EqualExpr> mOptEqualExps;
 
 public:
-  BitAndExpr(EqualExpr &&equalExpr, std::vector<EqualExpr> &&optEqualExps);
+  BitAndExpr(TokIter begin, EqualExpr &&equalExpr,
+             std::vector<EqualExpr> &&optEqualExps);
   [[nodiscard]] const EqualExpr &getEqualExpr() const;
 
   [[nodiscard]] const std::vector<EqualExpr> &getOptionalEqualExpr() const;
@@ -708,7 +695,8 @@ private:
   std::vector<BitAndExpr> mOptBitAndExps;
 
 public:
-  BitXorExpr(BitAndExpr &&bitAndExpr, std::vector<BitAndExpr> &&optBitAndExps);
+  BitXorExpr(TokIter begin, BitAndExpr &&bitAndExpr,
+             std::vector<BitAndExpr> &&optBitAndExps);
   [[nodiscard]] const BitAndExpr &getBitAndExpr() const;
   [[nodiscard]] const std::vector<BitAndExpr> &
   getOptionalBitAndExpressions() const;
@@ -725,7 +713,8 @@ private:
   std::vector<BitXorExpr> mOptBitXorExps;
 
 public:
-  BitOrExpr(BitXorExpr &&bitXorExpr, std::vector<BitXorExpr> &&optBitXorExps);
+  BitOrExpr(TokIter begin, BitXorExpr &&bitXorExpr,
+            std::vector<BitXorExpr> &&optBitXorExps);
   [[nodiscard]] const BitXorExpr &getBitXorExpression() const;
 
   [[nodiscard]] const std::vector<BitXorExpr> &
@@ -743,7 +732,8 @@ private:
   std::vector<BitOrExpr> mOptBitOrExps;
 
 public:
-  LogAndExpr(BitOrExpr &&bitOrExpr, std::vector<BitOrExpr> &&optBitOrExps);
+  LogAndExpr(TokIter begin, BitOrExpr &&bitOrExpr,
+             std::vector<BitOrExpr> &&optBitOrExps);
   [[nodiscard]] const BitOrExpr &getBitOrExpression() const;
   [[nodiscard]] const std::vector<BitOrExpr> &
   getOptionalBitOrExpressions() const;
@@ -760,7 +750,8 @@ private:
   std::vector<LogAndExpr> mOptLogAndExps;
 
 public:
-  LogOrExpr(LogAndExpr &&logAndExpr, std::vector<LogAndExpr> &&optLogAndExps);
+  LogOrExpr(TokIter begin, LogAndExpr &&logAndExpr,
+            std::vector<LogAndExpr> &&optLogAndExps);
   [[nodiscard]] const LogAndExpr &getAndExpression() const;
   [[nodiscard]] const std::vector<LogAndExpr> &
   getOptionalAndExpressions() const;
@@ -779,12 +770,12 @@ private:
 
 public:
   explicit ConditionalExpr(
-      LogOrExpr &&logOrExpr, std::unique_ptr<Expr> &&optExpr = nullptr,
+      TokIter begin, LogOrExpr &&logOrExpr,
+      std::unique_ptr<Expr> &&optExpr = nullptr,
       std::unique_ptr<ConditionalExpr> &&optCondExpr = nullptr);
   [[nodiscard]] const LogOrExpr &getLogicalOrExpression() const;
   [[nodiscard]] const Expr *getOptionalExpression() const;
-  [[nodiscard]] const ConditionalExpr *
-  getOptionalConditionalExpression() const;
+  [[nodiscard]] const ConditionalExpr *getOptionalConditionalExpression() const;
 };
 
 /**
@@ -823,7 +814,7 @@ private:
   std::vector<std::pair<AssignmentOperator, ConditionalExpr>> mOptConditionExpr;
 
 public:
-  AssignExpr(ConditionalExpr &&conditionalExpression,
+  AssignExpr(TokIter begin, ConditionalExpr &&conditionalExpression,
              std::vector<std::pair<AssignmentOperator, ConditionalExpr>>
                  &&optConditionExpr);
 
@@ -843,11 +834,10 @@ private:
   std::vector<AssignExpr> mAssignExpressions;
 
 public:
-  Expr(std::vector<AssignExpr> assignExpressions);
+  Expr(TokIter begin, std::vector<AssignExpr> assignExpressions);
 
   const std::vector<AssignExpr> &getAssignExpressions() const;
 };
-
 
 using Stmt =
     std::variant<ReturnStmt, ExprStmt, IfStmt, BlockStmt, ForStmt, WhileStmt,
@@ -863,7 +853,7 @@ private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  ExprStmt(std::unique_ptr<Expr> &&optExpr = nullptr);
+  ExprStmt(TokIter begin, std::unique_ptr<Expr> &&optExpr = nullptr);
   [[nodiscard]] const Expr *getOptionalExpression() const;
   std::unique_ptr<Expr> moveOptionalExpr();
 };
@@ -880,7 +870,7 @@ private:
   std::unique_ptr<Stmt> mOptElseStmt;
 
 public:
-  IfStmt(Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
+  IfStmt(TokIter begin, Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
          std::unique_ptr<Stmt> &&optElseStmt = nullptr);
 
   [[nodiscard]] const Expr &getExpression() const;
@@ -900,7 +890,8 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  SwitchStmt(Expr &&expression, std::unique_ptr<Stmt> &&statement);
+  SwitchStmt(TokIter begin, Expr &&expression,
+             std::unique_ptr<Stmt> &&statement);
 
   [[nodiscard]] const Expr &getExpression() const;
 
@@ -916,7 +907,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  DefaultStmt(std::unique_ptr<Stmt> &&statement);
+  DefaultStmt(TokIter begin, std::unique_ptr<Stmt> &&statement);
   [[nodiscard]] const Stmt *getStatement() const;
 };
 
@@ -930,7 +921,8 @@ private:
   std::unique_ptr<Stmt> mStatement;
 
 public:
-  CaseStmt(ConstantExpr &&constantExpr, std::unique_ptr<Stmt> &&statement);
+  CaseStmt(TokIter begin, ConstantExpr &&constantExpr,
+           std::unique_ptr<Stmt> &&statement);
 
   [[nodiscard]] const ConstantExpr &getConstantExpr() const;
   [[nodiscard]] const Stmt *getStatement() const;
@@ -945,7 +937,7 @@ private:
   std::string_view mIdentifier;
 
 public:
-  LabelStmt(std::string_view identifier);
+  LabelStmt(TokIter begin, std::string_view identifier);
   [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
@@ -958,7 +950,7 @@ private:
   std::string_view mIdentifier;
 
 public:
-  GotoStmt(std::string_view identifier);
+  GotoStmt(TokIter begin, std::string_view identifier);
   [[nodiscard]] const std::string_view &getIdentifier() const;
 };
 
@@ -972,7 +964,7 @@ private:
   Expr mExpr;
 
 public:
-  DoWhileStmt(std::unique_ptr<Stmt> &&stmt, Expr &&expr);
+  DoWhileStmt(TokIter begin, std::unique_ptr<Stmt> &&stmt, Expr &&expr);
   [[nodiscard]] const Stmt *getStatement() const;
   [[nodiscard]] const Expr &getExpression() const;
 };
@@ -987,7 +979,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  WhileStmt(Expr &&expr, std::unique_ptr<Stmt> &&stmt);
+  WhileStmt(TokIter begin, Expr &&expr, std::unique_ptr<Stmt> &&stmt);
   [[nodiscard]] const Expr &getExpression() const;
   [[nodiscard]] const Stmt *getStatement() const;
 };
@@ -1005,7 +997,7 @@ private:
   std::unique_ptr<Stmt> mStmt;
 
 public:
-  ForStmt(std::unique_ptr<Stmt> &&stmt,
+  ForStmt(TokIter begin, std::unique_ptr<Stmt> &&stmt,
           std::variant<std::unique_ptr<Declaration>, std::unique_ptr<Expr>>
               &&initial,
           std::unique_ptr<Expr> &&controlExpr = nullptr,
@@ -1013,7 +1005,8 @@ public:
   [[nodiscard]] const Stmt *getStatement() const;
 
   [[nodiscard]] const std::variant<std::unique_ptr<Declaration>,
-                                   std::unique_ptr<Expr>> &getInitial() const;
+                                   std::unique_ptr<Expr>> &
+  getInitial() const;
   [[nodiscard]] const Expr *getControlling() const;
   [[nodiscard]] const Expr *getPost() const;
 };
@@ -1024,7 +1017,7 @@ public:
  */
 class BreakStmt final : public Node {
 public:
-  BreakStmt();
+  BreakStmt(TokIter begin);
 };
 
 /**
@@ -1033,7 +1026,7 @@ public:
  */
 class ContinueStmt final : public Node {
 public:
-  ContinueStmt();
+  ContinueStmt(TokIter begin);
 };
 
 /**
@@ -1045,7 +1038,7 @@ private:
   std::unique_ptr<Expr> mOptExpr;
 
 public:
-  ReturnStmt(std::unique_ptr<Expr> &&optExpr = nullptr);
+  ReturnStmt(TokIter begin, std::unique_ptr<Expr> &&optExpr = nullptr);
   [[nodiscard]] const Expr *getExpression() const;
 };
 
@@ -1064,6 +1057,7 @@ public:
 class Declaration final : public Node {
 public:
   struct InitDeclarator {
+    TokIter begin;
     std::unique_ptr<Declarator> mDeclarator;
     std::unique_ptr<Initializer> mOptInitializer;
   };
@@ -1073,10 +1067,9 @@ private:
   std::vector<InitDeclarator> mInitDeclarators;
 
 public:
-  Declaration(DeclarationSpecifiers &&declarationSpecifiers,
+  Declaration(TokIter begin, DeclarationSpecifiers &&declarationSpecifiers,
               std::vector<InitDeclarator> &&initDeclarators);
-  [[nodiscard]] const DeclarationSpecifiers &
-  getDeclarationSpecifiers() const;
+  [[nodiscard]] const DeclarationSpecifiers &getDeclarationSpecifiers() const;
   [[nodiscard]] const std::vector<InitDeclarator> &getInitDeclarators() const;
 };
 
@@ -1097,7 +1090,7 @@ private:
   std::vector<BlockItem> mBlockItems;
 
 public:
-  BlockStmt(std::vector<BlockItem> &&blockItems);
+  BlockStmt(TokIter begin, std::vector<BlockItem> &&blockItems);
   [[nodiscard]] const std::vector<BlockItem> &getBlockItems() const;
 };
 
@@ -1111,12 +1104,9 @@ public:
  * assignment-expression ] direct-abstract-declarator{opt} [*]
  *      direct-abstract-declarator{opt} ( parameter-type-list{opt} )
  */
-using DirectAbstractDeclarator =
-    std::variant<
-    DirectAbstractDeclaratorParentheses,
-                 DirectAbstractDeclaratorAssignExpr,
-                 DirectAbstractDeclaratorAsterisk,
-                 DirectAbstractDeclaratorParamTypeList>;
+using DirectAbstractDeclarator = std::variant<
+    DirectAbstractDeclaratorParentheses, DirectAbstractDeclaratorAssignExpr,
+    DirectAbstractDeclaratorAsterisk, DirectAbstractDeclaratorParamTypeList>;
 
 /**
  * direct-abstract-declarator:
@@ -1127,6 +1117,7 @@ class DirectAbstractDeclaratorParentheses final : public Node {
 
 public:
   DirectAbstractDeclaratorParentheses(
+      TokIter begin,
       std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
 
   [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const;
@@ -1148,10 +1139,10 @@ class DirectAbstractDeclaratorAssignExpr final : public Node {
 
 public:
   DirectAbstractDeclaratorAssignExpr(
+      TokIter begin,
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
       std::vector<TypeQualifier> &&typeQualifiers,
-      std::unique_ptr<AssignExpr> &&assignmentExpression,
-      bool hasStatic);
+      std::unique_ptr<AssignExpr> &&assignmentExpression, bool hasStatic);
 
   [[nodiscard]] const DirectAbstractDeclarator *
   getDirectAbstractDeclarator() const;
@@ -1166,8 +1157,10 @@ public:
 /// direct-abstract-declarator{opt} [*]
 class DirectAbstractDeclaratorAsterisk final : public Node {
   std::unique_ptr<DirectAbstractDeclarator> mDirectAbstractDeclarator;
+
 public:
   DirectAbstractDeclaratorAsterisk(
+      TokIter begin,
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator);
 
   [[nodiscard]] const DirectAbstractDeclarator *
@@ -1184,6 +1177,7 @@ class DirectAbstractDeclaratorParamTypeList final : public Node {
 
 public:
   DirectAbstractDeclaratorParamTypeList(
+      TokIter begin,
       std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
       std::unique_ptr<ParamTypeList> &&parameterTypeList);
 
@@ -1202,7 +1196,7 @@ class Pointer final : public Node {
   std::vector<TypeQualifier> mTypeQualifiers;
 
 public:
-  Pointer(std::vector<TypeQualifier> &&typeQualifiers);
+  Pointer(TokIter begin, std::vector<TypeQualifier> &&typeQualifiers);
 
   [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const;
 };
@@ -1218,7 +1212,7 @@ class AbstractDeclarator final : public Node {
 
 public:
   AbstractDeclarator(
-      std::vector<Pointer> &&pointers,
+      TokIter begin, std::vector<Pointer> &&pointers,
       std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator = {});
 
   [[nodiscard]] const std::vector<Pointer> &getPointers() const;
@@ -1235,13 +1229,16 @@ public:
 struct ParameterDeclaration final : public Node {
 public:
   DeclarationSpecifiers declarationSpecifiers;
-  std::variant<std::unique_ptr<Declarator>, std::optional<std::unique_ptr<AbstractDeclarator>>>
+  std::variant<std::unique_ptr<Declarator>,
+               std::optional<std::unique_ptr<AbstractDeclarator>>>
       declarator;
+
 public:
-  ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers,
-                       std::variant<std::unique_ptr<Declarator>,
-                       std::optional<std::unique_ptr<AbstractDeclarator>>>
-                           variant = {std::nullopt});
+  ParameterDeclaration(
+      TokIter begin, DeclarationSpecifiers declarationSpecifiers,
+      std::variant<std::unique_ptr<Declarator>,
+                   std::optional<std::unique_ptr<AbstractDeclarator>>>
+          variant = {std::nullopt});
 };
 
 /**
@@ -1254,7 +1251,8 @@ private:
   std::vector<ParameterDeclaration> mParameterList;
 
 public:
-  ParamList(std::vector<ParameterDeclaration> &&parameterList);
+  ParamList(TokIter begin,
+            std::vector<ParameterDeclaration> &&parameterList);
 
   [[nodiscard]] const std::vector<ParameterDeclaration> &
   getParameterDeclarations() const;
@@ -1270,7 +1268,7 @@ class ParamTypeList final : public Node {
   bool mHasEllipse;
 
 public:
-  ParamTypeList(ParamList &&parameterList, bool hasEllipse);
+  ParamTypeList(TokIter begin, ParamList &&parameterList, bool hasEllipse);
 
   [[nodiscard]] const ParamList &getParameterList() const;
 
@@ -1290,7 +1288,7 @@ public:
  */
 using DirectDeclarator =
     std::variant<DirectDeclaratorIdent, DirectDeclaratorParentheses,
-                 DirectDeclaratorAssignExpr,DirectDeclaratorAsterisk,
+                 DirectDeclaratorAssignExpr, DirectDeclaratorAsterisk,
                  DirectDeclaratorParamTypeList>;
 
 /**
@@ -1301,9 +1299,9 @@ class DirectDeclaratorIdent final : public Node {
   std::string_view mIdent;
 
 public:
-  DirectDeclaratorIdent(std::string_view ident);
+  DirectDeclaratorIdent(TokIter begin, std::string_view ident);
 
-  [[nodiscard]] const std::string_view& getIdent() const;
+  [[nodiscard]] const std::string_view &getIdent() const;
 };
 
 /**
@@ -1314,7 +1312,8 @@ class DirectDeclaratorParentheses final : public Node {
   std::unique_ptr<Declarator> mDeclarator;
 
 public:
-  DirectDeclaratorParentheses(std::unique_ptr<Declarator> &&declarator);
+  DirectDeclaratorParentheses(TokIter begin,
+                              std::unique_ptr<Declarator> &&declarator);
 
   [[nodiscard]] const Declarator *getDeclarator() const;
 };
@@ -1328,8 +1327,9 @@ class DirectDeclaratorParamTypeList final : public Node {
   ParamTypeList mParameterTypeList;
 
 public:
-  DirectDeclaratorParamTypeList(std::unique_ptr<DirectDeclarator> &&directDeclarator,
-                              ParamTypeList &&parameterTypeList);
+  DirectDeclaratorParamTypeList(
+      TokIter begin, std::unique_ptr<DirectDeclarator> &&directDeclarator,
+      ParamTypeList &&parameterTypeList);
 
   [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const;
 
@@ -1347,19 +1347,18 @@ class DirectDeclaratorAssignExpr final : public Node {
   std::unique_ptr<AssignExpr> mAssignmentExpression;
   std::vector<TypeQualifier> mTypeQualifierList;
   bool mHasStatic{false};
+
 public:
   DirectDeclaratorAssignExpr(
-      std::unique_ptr<DirectDeclarator> &&directDeclarator,
+      TokIter begin, std::unique_ptr<DirectDeclarator> &&directDeclarator,
       std::vector<TypeQualifier> &&typeQualifierList,
-      std::unique_ptr<AssignExpr> &&assignmentExpression,
-      bool hasStatic);
+      std::unique_ptr<AssignExpr> &&assignmentExpression, bool hasStatic);
 
   [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const;
 
   [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifierList() const;
 
-  [[nodiscard]] const AssignExpr *
-  getAssignmentExpression() const;
+  [[nodiscard]] const AssignExpr *getAssignmentExpression() const;
 
   [[nodiscard]] bool hasStatic() const;
 };
@@ -1371,10 +1370,11 @@ public:
 class DirectDeclaratorAsterisk final : public Node {
   std::unique_ptr<DirectDeclarator> mDirectDeclarator;
   std::vector<TypeQualifier> mTypeQualifierList;
+
 public:
-  DirectDeclaratorAsterisk(
-      std::unique_ptr<DirectDeclarator> &&directDeclarator,
-      std::vector<TypeQualifier> &&typeQualifierList);
+  DirectDeclaratorAsterisk(TokIter begin,
+                           std::unique_ptr<DirectDeclarator> &&directDeclarator,
+                           std::vector<TypeQualifier> &&typeQualifierList);
 
   [[nodiscard]] const DirectDeclarator *getDirectDeclarator() const;
 
@@ -1390,7 +1390,7 @@ class Declarator final : public Node {
   DirectDeclarator mDirectDeclarator;
 
 public:
-  Declarator(std::vector<Pointer> &&pointers,
+  Declarator(TokIter begin, std::vector<Pointer> &&pointers,
              DirectDeclarator &&directDeclarator);
 
   [[nodiscard]] const std::vector<Pointer> &getPointers() const;
@@ -1421,20 +1421,24 @@ public:
 class StructOrUnionSpecifier final : public Node {
 public:
   struct StructDeclaration {
+    TokIter begin;
     DeclarationSpecifiers specifierQualifiers;
     struct StructDeclarator {
+      TokIter begin;
       std::unique_ptr<Declarator> optionalDeclarator;
       std::optional<ConstantExpr> optionalBitfield;
     };
     std::vector<StructDeclarator> structDeclarators;
   };
+
 private:
   std::string_view mId;
   bool mIsUnion;
   std::vector<StructDeclaration> mStructDeclarations;
 
 public:
-  StructOrUnionSpecifier(bool isUnion, std::string_view identifier,
+  StructOrUnionSpecifier(TokIter begin, bool isUnion,
+                         std::string_view identifier,
                          std::vector<StructDeclaration> &&structDeclarations);
 
   [[nodiscard]] bool isUnion() const;
@@ -1468,18 +1472,22 @@ public:
     std::string_view mName;
     std::optional<ConstantExpr> mValue;
     Enumerator() = default;
-    Enumerator(std::string_view name, std::optional<ConstantExpr>&& value = {})
-        : mName(name), mValue(std::move(value)) {};
+    Enumerator(TokIter begin, std::string_view name,
+               std::optional<ConstantExpr> &&value = {})
+        : mName(name), mValue(std::move(value)){};
     Enumerator(const Enumerator &) = delete;
     Enumerator &operator=(const Enumerator &) = delete;
     Enumerator(Enumerator &&) = default;
     Enumerator &operator=(Enumerator &&) = default;
   };
+
 private:
   std::string_view mId;
   std::vector<Enumerator> mEnumerators;
+
 public:
-  EnumSpecifier(std::string_view id, std::vector<Enumerator> &&enumerators);
+  EnumSpecifier(TokIter begin, std::string_view id,
+                std::vector<Enumerator> &&enumerators);
 
   [[nodiscard]] const std::string_view &getName() const;
   [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const;
@@ -1496,7 +1504,7 @@ class Initializer final : public Node {
   variant mVariant;
 
 public:
-  Initializer(variant &&variant);
+  Initializer(TokIter begin, variant &&variant);
 
   [[nodiscard]] const variant &getVariant() const;
 };
@@ -1533,7 +1541,7 @@ private:
   vector mInitializer;
 
 public:
-  InitializerList(vector &&initializer);
+  InitializerList(TokIter begin, vector &&initializer);
 
   const vector &getInitializerList() const;
 };
@@ -1548,10 +1556,11 @@ class FunctionDefinition final : public Node {
   BlockStmt mCompoundStatement;
 
 public:
-  FunctionDefinition(DeclarationSpecifiers &&declarationSpecifiers,
+  FunctionDefinition(TokIter begin,
+                     DeclarationSpecifiers &&declarationSpecifiers,
                      Declarator &&declarator, BlockStmt &&compoundStatement);
 
-  [[nodiscard]] const DeclarationSpecifiers & getDeclarationSpecifiers() const;
+  [[nodiscard]] const DeclarationSpecifiers &getDeclarationSpecifiers() const;
 
   [[nodiscard]] const Declarator &getDeclarator() const;
 
@@ -1574,7 +1583,8 @@ class TranslationUnit final {
   std::vector<ExternalDeclaration> mGlobals;
 
 public:
-  explicit TranslationUnit(std::vector<ExternalDeclaration> &&globals) noexcept
+  explicit TranslationUnit(TokIter begin,
+                           std::vector<ExternalDeclaration> &&globals) noexcept
       : mGlobals(std::move(globals)) {}
 
   [[nodiscard]] const std::vector<ExternalDeclaration> &getGlobals() const {

@@ -1,44 +1,56 @@
 #include "Syntax.h"
-namespace lcc::Syntax{
-PrimaryExprIdent::PrimaryExprIdent(std::string_view identifier)
-    : mIdent(identifier) {}
+namespace lcc::Syntax {
+Node::Node(TokIter begin):mBeginTok(begin) {
+}
+TokIter Node::getBegin() const { return mBeginTok; }
+
+PrimaryExprIdent::PrimaryExprIdent(TokIter begin,
+                                   std::string_view identifier)
+    : Node(begin), mIdent(identifier) {}
 [[nodiscard]] const std::string_view &PrimaryExprIdent::getIdentifier() const {
   return mIdent;
 }
 
-PrimaryExprConstant::PrimaryExprConstant(Variant variant)
-    : mValue(std::move(variant)){};
-[[nodiscard]] const PrimaryExprConstant::Variant &PrimaryExprConstant::getValue() const {
+PrimaryExprConstant::PrimaryExprConstant(TokIter begin, Variant variant)
+    : Node(begin), mValue(std::move(variant)){};
+[[nodiscard]] const PrimaryExprConstant::Variant &
+PrimaryExprConstant::getValue() const {
   return mValue;
 }
 
-PrimaryExprParentheses::PrimaryExprParentheses(Expr &&expr)
-    : mExpr(std::make_unique<Expr>(std::move(expr))){}
+PrimaryExprParentheses::PrimaryExprParentheses(TokIter begin, Expr &&expr)
+    : Node(begin), mExpr(std::make_unique<Expr>(std::move(expr))) {}
 
 [[nodiscard]] const Expr &PrimaryExprParentheses::getExpr() const {
   return *mExpr;
 }
 
-PostFixExprPrimaryExpr::PostFixExprPrimaryExpr(PrimaryExpr &&primaryExpr)
-    : mPrimaryExpr(std::move(primaryExpr)){};
+PostFixExprPrimaryExpr::PostFixExprPrimaryExpr(TokIter begin,
+                                               PrimaryExpr &&primaryExpr)
+    : Node(begin), mPrimaryExpr(std::move(primaryExpr)){};
 
-[[nodiscard]] const PrimaryExpr &PostFixExprPrimaryExpr::getPrimaryExpr() const {
+[[nodiscard]] const PrimaryExpr &
+PostFixExprPrimaryExpr::getPrimaryExpr() const {
   return mPrimaryExpr;
 }
 
-PostFixExprSubscript::PostFixExprSubscript(std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr)
-    : mPostFixExpr(std::move(postFixExpr)),
+PostFixExprSubscript::PostFixExprSubscript(
+    TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr, Expr &&expr)
+    : Node(begin), mPostFixExpr(std::move(postFixExpr)),
       mExpr(std::make_unique<Expr>(std::move(expr))) {}
 
 [[nodiscard]] const PostFixExpr *PostFixExprSubscript::getPostFixExpr() const {
   return mPostFixExpr.get();
 }
-[[nodiscard]] const Expr &PostFixExprSubscript::getExpr() const { return *mExpr; }
-
-PostFixExprFuncCall::PostFixExprFuncCall(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                    std::vector<std::unique_ptr<AssignExpr>> &&optParams)
-    : mPostFixExpr(std::move(postFixExpr)), mOptParams(std::move(optParams)) {
+[[nodiscard]] const Expr &PostFixExprSubscript::getExpr() const {
+  return *mExpr;
 }
+
+PostFixExprFuncCall::PostFixExprFuncCall(
+    TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr,
+    std::vector<std::unique_ptr<AssignExpr>> &&optParams)
+    : Node(begin), mPostFixExpr(std::move(postFixExpr)),
+      mOptParams(std::move(optParams)) {}
 
 [[nodiscard]] const PostFixExpr *PostFixExprFuncCall::getPostFixExpr() const {
   return mPostFixExpr.get();
@@ -48,156 +60,207 @@ PostFixExprFuncCall::getOptionalAssignExpressions() const {
   return mOptParams;
 }
 
-PostFixExprDot::PostFixExprDot(std::unique_ptr<PostFixExpr> &&postFixExpr,
-               std::string_view identifier)
-    : mPostFixExpr(std::move(postFixExpr)),
+PostFixExprDot::PostFixExprDot(TokIter begin,
+                               std::unique_ptr<PostFixExpr> &&postFixExpr,
+                               std::string_view identifier)
+    : Node(begin), mPostFixExpr(std::move(postFixExpr)),
       mIdentifier(std::move(identifier)) {}
 
 [[nodiscard]] const PostFixExpr *PostFixExprDot::getPostFixExpr() const {
   return mPostFixExpr.get();
 }
-[[nodiscard]] const std::string_view &PostFixExprDot::getIdentifier() const { return mIdentifier; }
+[[nodiscard]] const std::string_view &PostFixExprDot::getIdentifier() const {
+  return mIdentifier;
+}
 
-
-PostFixExprArrow::PostFixExprArrow(std::unique_ptr<PostFixExpr> &&postFixExpr,
-                 std::string_view identifier)
-    : mPostFixExpr(std::move(postFixExpr)),
+PostFixExprArrow::PostFixExprArrow(TokIter begin,
+                                   std::unique_ptr<PostFixExpr> &&postFixExpr,
+                                   std::string_view identifier)
+    : Node(begin), mPostFixExpr(std::move(postFixExpr)),
       mIdentifier(std::move(identifier)) {}
 [[nodiscard]] const PostFixExpr *PostFixExprArrow::getPostFixExpr() const {
   return mPostFixExpr.get();
 }
-[[nodiscard]] const std::string_view &PostFixExprArrow::getIdentifier() const { return mIdentifier; }
+[[nodiscard]] const std::string_view &PostFixExprArrow::getIdentifier() const {
+  return mIdentifier;
+}
 
-PostFixExprIncrement::PostFixExprIncrement(std::unique_ptr<PostFixExpr> &&postFixExpr)
-    : mPostFixExpr(std::move(postFixExpr)) {}
+PostFixExprIncrement::PostFixExprIncrement(
+    TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr)
+    : Node(begin), mPostFixExpr(std::move(postFixExpr)) {}
 [[nodiscard]] const PostFixExpr *PostFixExprIncrement::getPostFixExpr() const {
   return mPostFixExpr.get();
 }
 
-PostFixExprDecrement::PostFixExprDecrement(std::unique_ptr<PostFixExpr> &&postFixExpr)
-    : mPostFixExpr(std::move(postFixExpr)) {}
+PostFixExprDecrement::PostFixExprDecrement(
+    TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr)
+    : Node(begin), mPostFixExpr(std::move(postFixExpr)) {}
 [[nodiscard]] const PostFixExpr *PostFixExprDecrement::getPostFixExpr() const {
   return mPostFixExpr.get();
 }
 
-PostFixExprTypeInitializer::PostFixExprTypeInitializer(TypeName &&typeName,
-                           InitializerList &&initializerList)
-    : mTypeName(std::make_unique<TypeName>(std::move(typeName))),
-      mInitializerList(std::make_unique<InitializerList>(std::move(initializerList))) {}
+PostFixExprTypeInitializer::PostFixExprTypeInitializer(
+    TokIter begin, TypeName &&typeName, InitializerList &&initializerList)
+    : Node(begin), mTypeName(std::make_unique<TypeName>(std::move(typeName))),
+      mInitializerList(
+          std::make_unique<InitializerList>(std::move(initializerList))) {}
 
-[[nodiscard]] const InitializerList *PostFixExprTypeInitializer::getInitializerList() const {
+[[nodiscard]] const InitializerList *
+PostFixExprTypeInitializer::getInitializerList() const {
   return mInitializerList.get();
 }
-[[nodiscard]] const TypeName *PostFixExprTypeInitializer::getTypeName() const { return mTypeName.get(); }
+[[nodiscard]] const TypeName *PostFixExprTypeInitializer::getTypeName() const {
+  return mTypeName.get();
+}
 
+UnaryExprPostFixExpr::UnaryExprPostFixExpr(TokIter begin,
+                                           PostFixExpr &&postExpr)
+    : Node(begin), mPostExpr(std::move(postExpr)) {}
 
-UnaryExprPostFixExpr::UnaryExprPostFixExpr(PostFixExpr &&postExpr)
-    : mPostExpr(std::move(postExpr)) {}
+[[nodiscard]] const PostFixExpr &UnaryExprPostFixExpr::getPostExpr() const {
+  return mPostExpr;
+}
 
-[[nodiscard]] const PostFixExpr &UnaryExprPostFixExpr::getPostExpr() const { return mPostExpr; }
+UnaryExprUnaryOperator::UnaryExprUnaryOperator(
+    TokIter begin, UnaryOperator anOperator,
+    std::unique_ptr<CastExpr> &&castExpr)
+    : Node(begin), mOperator(anOperator), mCastExpr(std::move(castExpr)) {}
 
-UnaryExprUnaryOperator::UnaryExprUnaryOperator(UnaryOperator anOperator,
-                       std::unique_ptr<CastExpr> &&castExpr)
-    : mOperator(anOperator), mCastExpr(std::move(castExpr)) {}
+[[nodiscard]] UnaryExprUnaryOperator::UnaryOperator
+UnaryExprUnaryOperator::getOperator() const {
+  return mOperator;
+}
+[[nodiscard]] const CastExpr *UnaryExprUnaryOperator::getCastExpr() const {
+  return mCastExpr.get();
+}
 
-[[nodiscard]] UnaryExprUnaryOperator::UnaryOperator UnaryExprUnaryOperator::getOperator() const { return mOperator; }
-[[nodiscard]] const CastExpr *UnaryExprUnaryOperator::getCastExpr() const { return mCastExpr.get(); }
+UnaryExprSizeOf::UnaryExprSizeOf(TokIter begin, Variant &&variant)
+    : Node(begin), mValue(std::move(variant)){};
 
-UnaryExprSizeOf::UnaryExprSizeOf(Variant &&variant) : mValue(std::move(variant)){};
+[[nodiscard]] const UnaryExprSizeOf::Variant &
+UnaryExprSizeOf::getVariant() const {
+  return mValue;
+}
 
-[[nodiscard]] const UnaryExprSizeOf::Variant &UnaryExprSizeOf::getVariant() const { return mValue; }
+TypeSpecifier::TypeSpecifier(TokIter begin, variant &&variant)
+    : Node(begin), mVariant(std::move(variant)) {}
 
+[[nodiscard]] const TypeSpecifier::variant &TypeSpecifier::getVariant() const {
+  return mVariant;
+}
 
-TypeSpecifier::TypeSpecifier(variant &&variant) : mVariant(std::move(variant)) {}
+TypeQualifier::TypeQualifier(TokIter begin, Qualifier qualifier)
+    : Node(begin), mQualifier(qualifier){};
+[[nodiscard]] TypeQualifier::Qualifier TypeQualifier::getQualifier() const {
+  return mQualifier;
+};
 
-[[nodiscard]] const TypeSpecifier::variant &TypeSpecifier::getVariant() const { return mVariant; }
+CastExpr::CastExpr(TokIter begin, Variant &&unaryOrCast)
+    : Node(begin), mVariant(std::move(unaryOrCast)) {}
 
-TypeQualifier::TypeQualifier(Qualifier qualifier) : mQualifier(qualifier){};
-[[nodiscard]] TypeQualifier::Qualifier TypeQualifier::getQualifier() const { return mQualifier; };
-
-CastExpr::CastExpr(Variant &&unaryOrCast) : mVariant(std::move(unaryOrCast)) {}
-
-[[nodiscard]] const CastExpr::Variant &CastExpr::getVariant() const { return mVariant; }
+[[nodiscard]] const CastExpr::Variant &CastExpr::getVariant() const {
+  return mVariant;
+}
 
 MultiExpr::MultiExpr(
-    CastExpr &&castExpr,
+    TokIter begin, CastExpr &&castExpr,
     std::vector<std::pair<BinaryOperator, CastExpr>> &&optCastExps)
-    : mCastExpr(std::move(castExpr)), mOptCastExps(std::move(optCastExps)) {}
-[[nodiscard]] const CastExpr &MultiExpr::getCastExpr() const { return mCastExpr; }
-[[nodiscard]] const std::vector<std::pair<MultiExpr::BinaryOperator, CastExpr>> &
-MultiExpr::getOptionalCastExpr() const {
+    : Node(begin), mCastExpr(std::move(castExpr)),
+      mOptCastExps(std::move(optCastExps)) {}
+[[nodiscard]] const CastExpr &MultiExpr::getCastExpr() const {
+  return mCastExpr;
+}
+[[nodiscard]] const std::vector<std::pair<MultiExpr::BinaryOperator, CastExpr>>
+    &MultiExpr::getOptionalCastExpr() const {
   return mOptCastExps;
 }
 
 AdditiveExpr::AdditiveExpr(
-    MultiExpr &&multiExpr,
+    TokIter begin, MultiExpr &&multiExpr,
     std::vector<std::pair<BinaryOperator, MultiExpr>> &&optionalMultiExps)
-    : mMultiExpr(std::move(multiExpr)),
+    : Node(begin), mMultiExpr(std::move(multiExpr)),
       mOptionalMultiExpr(std::move(optionalMultiExps)) {}
-[[nodiscard]] const MultiExpr &AdditiveExpr::getMultiExpr() const { return mMultiExpr; }
-[[nodiscard]] const std::vector<std::pair<AdditiveExpr::BinaryOperator, MultiExpr>> &
+[[nodiscard]] const MultiExpr &AdditiveExpr::getMultiExpr() const {
+  return mMultiExpr;
+}
+[[nodiscard]] const std::vector<
+    std::pair<AdditiveExpr::BinaryOperator, MultiExpr>> &
 AdditiveExpr::getOptionalMultiExpr() const {
   return mOptionalMultiExpr;
 }
 
 ShiftExpr::ShiftExpr(
-    AdditiveExpr &&additiveExpr,
+    TokIter begin, AdditiveExpr &&additiveExpr,
     std::vector<std::pair<BinaryOperator, AdditiveExpr>> &&optAdditiveExps)
-    : mAdditiveExpr(std::move(additiveExpr)),
+    : Node(begin), mAdditiveExpr(std::move(additiveExpr)),
       mOptAdditiveExps(std::move(optAdditiveExps)) {}
 [[nodiscard]] const AdditiveExpr &ShiftExpr::getAdditiveExpr() const {
   return mAdditiveExpr;
 }
-[[nodiscard]] const std::vector<std::pair<ShiftExpr::BinaryOperator, AdditiveExpr>> &
+[[nodiscard]] const std::vector<
+    std::pair<ShiftExpr::BinaryOperator, AdditiveExpr>> &
 ShiftExpr::getOptAdditiveExps() const {
   return mOptAdditiveExps;
 }
 
 RelationalExpr::RelationalExpr(
-    ShiftExpr &&shiftExpr,
-    std::vector<std::pair<RelationalExpr::BinaryOperator, ShiftExpr>> &&optShiftExps)
-    : mShiftExpr(std::move(shiftExpr)),
+    TokIter begin, ShiftExpr &&shiftExpr,
+    std::vector<std::pair<RelationalExpr::BinaryOperator, ShiftExpr>>
+        &&optShiftExps)
+    : Node(begin), mShiftExpr(std::move(shiftExpr)),
       mOptShiftExps(std::move(optShiftExps)) {}
-[[nodiscard]] const ShiftExpr &RelationalExpr::getShiftExpr() const { return mShiftExpr; }
-[[nodiscard]] const std::vector<std::pair<RelationalExpr::BinaryOperator, ShiftExpr>> &
+[[nodiscard]] const ShiftExpr &RelationalExpr::getShiftExpr() const {
+  return mShiftExpr;
+}
+[[nodiscard]] const std::vector<
+    std::pair<RelationalExpr::BinaryOperator, ShiftExpr>> &
 RelationalExpr::getOptionalShiftExpressions() const {
   return mOptShiftExps;
 }
 
-EqualExpr::EqualExpr(RelationalExpr &&relationalExpr,
-          std::vector<std::pair<BinaryOperator, RelationalExpr>>
-              &&optRelationalExps)
-    : mRelationalExpr(std::move(relationalExpr)),
+EqualExpr::EqualExpr(
+    TokIter begin, RelationalExpr &&relationalExpr,
+    std::vector<std::pair<BinaryOperator, RelationalExpr>> &&optRelationalExps)
+    : Node(begin), mRelationalExpr(std::move(relationalExpr)),
       mOptRelationExps(std::move(optRelationalExps)) {}
 [[nodiscard]] const RelationalExpr &EqualExpr::getRelationalExpr() const {
   return mRelationalExpr;
 }
 
-[[nodiscard]] const std::vector<std::pair<EqualExpr::BinaryOperator, RelationalExpr>> &
+[[nodiscard]] const std::vector<
+    std::pair<EqualExpr::BinaryOperator, RelationalExpr>> &
 EqualExpr::getOptionalRelationalExpr() const {
   return mOptRelationExps;
 }
 
-BitAndExpr::BitAndExpr(EqualExpr &&equalExpr, std::vector<EqualExpr> &&optEqualExps)
-    : mEqualExpr(std::move(equalExpr)),
+BitAndExpr::BitAndExpr(TokIter begin, EqualExpr &&equalExpr,
+                       std::vector<EqualExpr> &&optEqualExps)
+    : Node(begin), mEqualExpr(std::move(equalExpr)),
       mOptEqualExps(std::move(optEqualExps)) {}
-[[nodiscard]] const EqualExpr &BitAndExpr::getEqualExpr() const { return mEqualExpr; }
+[[nodiscard]] const EqualExpr &BitAndExpr::getEqualExpr() const {
+  return mEqualExpr;
+}
 
-[[nodiscard]] const std::vector<EqualExpr> &BitAndExpr::getOptionalEqualExpr() const {
+[[nodiscard]] const std::vector<EqualExpr> &
+BitAndExpr::getOptionalEqualExpr() const {
   return mOptEqualExps;
 }
 
-BitXorExpr::BitXorExpr(BitAndExpr &&bitAndExpr, std::vector<BitAndExpr> &&optBitAndExps)
-    : mBitAndExpr(std::move(bitAndExpr)),
+BitXorExpr::BitXorExpr(TokIter begin, BitAndExpr &&bitAndExpr,
+                       std::vector<BitAndExpr> &&optBitAndExps)
+    : Node(begin), mBitAndExpr(std::move(bitAndExpr)),
       mOptBitAndExps(std::move(optBitAndExps)) {}
-[[nodiscard]] const BitAndExpr &BitXorExpr::getBitAndExpr() const { return mBitAndExpr; }
+[[nodiscard]] const BitAndExpr &BitXorExpr::getBitAndExpr() const {
+  return mBitAndExpr;
+}
 [[nodiscard]] const std::vector<BitAndExpr> &
 BitXorExpr::getOptionalBitAndExpressions() const {
   return mOptBitAndExps;
 }
 
-BitOrExpr::BitOrExpr(BitXorExpr &&bitXorExpr, std::vector<BitXorExpr> &&optBitXorExps)
-    : mBitXorExpr(std::move(bitXorExpr)),
+BitOrExpr::BitOrExpr(TokIter begin, BitXorExpr &&bitXorExpr,
+                     std::vector<BitXorExpr> &&optBitXorExps)
+    : Node(begin), mBitXorExpr(std::move(bitXorExpr)),
       mOptBitXorExps(std::move(optBitXorExps)) {}
 [[nodiscard]] const BitXorExpr &BitOrExpr::getBitXorExpression() const {
   return mBitXorExpr;
@@ -208,8 +271,9 @@ BitOrExpr::getOptionalBitXorExpressions() const {
   return mOptBitXorExps;
 }
 
-LogAndExpr::LogAndExpr(BitOrExpr &&bitOrExpr, std::vector<BitOrExpr> &&optBitOrExps)
-    : mBitOrExpr(std::move(bitOrExpr)),
+LogAndExpr::LogAndExpr(TokIter begin, BitOrExpr &&bitOrExpr,
+                       std::vector<BitOrExpr> &&optBitOrExps)
+    : Node(begin), mBitOrExpr(std::move(bitOrExpr)),
       mOptBitOrExps(std::move(optBitOrExps)) {}
 [[nodiscard]] const BitOrExpr &LogAndExpr::getBitOrExpression() const {
   return mBitOrExpr;
@@ -219,8 +283,9 @@ LogAndExpr::getOptionalBitOrExpressions() const {
   return mOptBitOrExps;
 }
 
-LogOrExpr::LogOrExpr(LogAndExpr &&logAndExpr, std::vector<LogAndExpr> &&optLogAndExps)
-    : mLogAndExpr(std::move(logAndExpr)),
+LogOrExpr::LogOrExpr(TokIter begin, LogAndExpr &&logAndExpr,
+                     std::vector<LogAndExpr> &&optLogAndExps)
+    : Node(begin), mLogAndExpr(std::move(logAndExpr)),
       mOptLogAndExps(std::move(optLogAndExps)) {}
 [[nodiscard]] const LogAndExpr &LogOrExpr::getAndExpression() const {
   return mLogAndExpr;
@@ -230,10 +295,10 @@ LogOrExpr::getOptionalAndExpressions() const {
   return mOptLogAndExps;
 }
 
-ConditionalExpr::ConditionalExpr(
-    LogOrExpr &&logOrExpr, std::unique_ptr<Expr> &&optExpr,
-    std::unique_ptr<ConditionalExpr> &&optCondExpr)
-    : Node(), mLogOrExpr(std::move(logOrExpr)), mOptExpr(std::move(optExpr)),
+ConditionalExpr::ConditionalExpr(TokIter begin, LogOrExpr &&logOrExpr,
+                                 std::unique_ptr<Expr> &&optExpr,
+                                 std::unique_ptr<ConditionalExpr> &&optCondExpr)
+    : Node(begin), mLogOrExpr(std::move(logOrExpr)), mOptExpr(std::move(optExpr)),
       mOptCondExpr(std::move(optCondExpr)) {}
 [[nodiscard]] const LogOrExpr &ConditionalExpr::getLogicalOrExpression() const {
   return mLogOrExpr;
@@ -246,10 +311,11 @@ ConditionalExpr::getOptionalConditionalExpression() const {
   return mOptCondExpr.get();
 }
 
-AssignExpr::AssignExpr(ConditionalExpr &&conditionalExpression,
-           std::vector<std::pair<AssignmentOperator, ConditionalExpr>>
-               &&optConditionExpr)
-    : mCondExpr(std::move(conditionalExpression)),
+AssignExpr::AssignExpr(
+    TokIter begin, ConditionalExpr &&conditionalExpression,
+    std::vector<std::pair<AssignmentOperator, ConditionalExpr>>
+        &&optConditionExpr)
+    : Node(begin), mCondExpr(std::move(conditionalExpression)),
       mOptConditionExpr(std::move(optConditionExpr)) {}
 
 [[nodiscard]] const ConditionalExpr &AssignExpr::getConditionalExpr() const {
@@ -261,74 +327,98 @@ AssignExpr::getOptionalConditionalExpr() const {
   return mOptConditionExpr;
 }
 
-Expr::Expr(std::vector<AssignExpr> assignExpressions)
-    : mAssignExpressions(std::move(assignExpressions)) {}
+Expr::Expr(TokIter begin, std::vector<AssignExpr> assignExpressions)
+    : Node(begin), mAssignExpressions(std::move(assignExpressions)) {}
 
 const std::vector<AssignExpr> &Expr::getAssignExpressions() const {
   return mAssignExpressions;
 }
 
-ExprStmt::ExprStmt(std::unique_ptr<Expr> &&optExpr)
-    : mOptExpr(std::move(optExpr)) {}
+ExprStmt::ExprStmt(TokIter begin, std::unique_ptr<Expr> &&optExpr)
+    : Node(begin), mOptExpr(std::move(optExpr)) {}
 [[nodiscard]] const Expr *ExprStmt::getOptionalExpression() const {
   return mOptExpr.get();
 }
-std::unique_ptr<Expr> ExprStmt::moveOptionalExpr() { return std::move(mOptExpr); }
+std::unique_ptr<Expr> ExprStmt::moveOptionalExpr() {
+  return std::move(mOptExpr);
+}
 
-IfStmt::IfStmt(Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
-       std::unique_ptr<Stmt> &&optElseStmt)
-    : mExpr(std::move(expr)), mThenStmt(std::move(thenStmt)),
+IfStmt::IfStmt(TokIter begin, Expr &&expr, std::unique_ptr<Stmt> &&thenStmt,
+               std::unique_ptr<Stmt> &&optElseStmt)
+    : Node(begin), mExpr(std::move(expr)), mThenStmt(std::move(thenStmt)),
       mOptElseStmt(std::move(optElseStmt)) {}
 
 [[nodiscard]] const Expr &IfStmt::getExpression() const { return mExpr; }
 
-[[nodiscard]] const Stmt *IfStmt::getThenStmt() const { return mThenStmt.get(); }
+[[nodiscard]] const Stmt *IfStmt::getThenStmt() const {
+  return mThenStmt.get();
+}
 
-[[nodiscard]] const Stmt *IfStmt::getElseStmt() const { return mOptElseStmt.get(); }
+[[nodiscard]] const Stmt *IfStmt::getElseStmt() const {
+  return mOptElseStmt.get();
+}
 
-
-SwitchStmt::SwitchStmt(Expr &&expression, std::unique_ptr<Stmt> &&statement)
-    : mExpr(std::move(expression)), mStmt(std::move(statement)) {}
+SwitchStmt::SwitchStmt(TokIter begin, Expr &&expression,
+                       std::unique_ptr<Stmt> &&statement)
+    : Node(begin), mExpr(std::move(expression)), mStmt(std::move(statement)) {}
 
 [[nodiscard]] const Expr &SwitchStmt::getExpression() const { return mExpr; }
 
-[[nodiscard]] const Stmt *SwitchStmt::getStatement() const { return mStmt.get(); }
+[[nodiscard]] const Stmt *SwitchStmt::getStatement() const {
+  return mStmt.get();
+}
 
-DefaultStmt::DefaultStmt(std::unique_ptr<Stmt> &&statement)
-    : mStmt(std::move(statement)) {}
-[[nodiscard]] const Stmt *DefaultStmt::getStatement() const { return mStmt.get(); }
+DefaultStmt::DefaultStmt(TokIter begin, std::unique_ptr<Stmt> &&statement)
+    : Node(begin), mStmt(std::move(statement)) {}
+[[nodiscard]] const Stmt *DefaultStmt::getStatement() const {
+  return mStmt.get();
+}
 
-CaseStmt::CaseStmt(ConstantExpr &&constantExpr, std::unique_ptr<Stmt> &&statement)
-    : mConstantExpr(std::move(constantExpr)),
+CaseStmt::CaseStmt(TokIter begin, ConstantExpr &&constantExpr,
+                   std::unique_ptr<Stmt> &&statement)
+    : Node(begin), mConstantExpr(std::move(constantExpr)),
       mStatement(std::move(statement)) {}
 
 [[nodiscard]] const ConstantExpr &CaseStmt::getConstantExpr() const {
   return mConstantExpr;
 }
-[[nodiscard]] const Stmt *CaseStmt::getStatement() const { return mStatement.get(); }
+[[nodiscard]] const Stmt *CaseStmt::getStatement() const {
+  return mStatement.get();
+}
 
-LabelStmt::LabelStmt(std::string_view identifier) : mIdentifier(identifier) {}
-[[nodiscard]] const std::string_view &LabelStmt::getIdentifier() const { return mIdentifier; }
+LabelStmt::LabelStmt(TokIter begin, std::string_view identifier)
+    : Node(begin), mIdentifier(identifier) {}
+[[nodiscard]] const std::string_view &LabelStmt::getIdentifier() const {
+  return mIdentifier;
+}
 
-GotoStmt::GotoStmt(std::string_view identifier) : mIdentifier(identifier) {}
-[[nodiscard]] const std::string_view &GotoStmt::getIdentifier() const { return mIdentifier; }
+GotoStmt::GotoStmt(TokIter begin, std::string_view identifier)
+    : Node(begin), mIdentifier(identifier) {}
+[[nodiscard]] const std::string_view &GotoStmt::getIdentifier() const {
+  return mIdentifier;
+}
 
-DoWhileStmt::DoWhileStmt(std::unique_ptr<Stmt> &&stmt, Expr &&expr)
-    : mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
-[[nodiscard]] const Stmt *DoWhileStmt::getStatement() const { return mStmt.get(); }
+DoWhileStmt::DoWhileStmt(TokIter begin, std::unique_ptr<Stmt> &&stmt,
+                         Expr &&expr)
+    : Node(begin), mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
+[[nodiscard]] const Stmt *DoWhileStmt::getStatement() const {
+  return mStmt.get();
+}
 [[nodiscard]] const Expr &DoWhileStmt::getExpression() const { return mExpr; }
 
-WhileStmt::WhileStmt(Expr &&expr, std::unique_ptr<Stmt> &&stmt)
-    : mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
+WhileStmt::WhileStmt(TokIter begin, Expr &&expr,
+                     std::unique_ptr<Stmt> &&stmt)
+    : Node(begin), mStmt(std::move(stmt)), mExpr(std::move(expr)) {}
 [[nodiscard]] const Expr &WhileStmt::getExpression() const { return mExpr; }
-[[nodiscard]] const Stmt *WhileStmt::getStatement() const { return mStmt.get(); }
+[[nodiscard]] const Stmt *WhileStmt::getStatement() const {
+  return mStmt.get();
+}
 
-ForStmt::ForStmt(std::unique_ptr<Stmt> &&stmt,
-        std::variant<std::unique_ptr<Declaration>, std::unique_ptr<Expr>>
-            &&initial,
-        std::unique_ptr<Expr> &&controlExpr,
-        std::unique_ptr<Expr> &&postExpr)
-    : mStmt(std::move(stmt)), mInitial(std::move(initial)),
+ForStmt::ForStmt(
+    TokIter begin, std::unique_ptr<Stmt> &&stmt,
+    std::variant<std::unique_ptr<Declaration>, std::unique_ptr<Expr>> &&initial,
+    std::unique_ptr<Expr> &&controlExpr, std::unique_ptr<Expr> &&postExpr)
+    : Node(begin), mStmt(std::move(stmt)), mInitial(std::move(initial)),
       mControlExpr(std::move(controlExpr)), mPostExpr(std::move(postExpr)) {}
 [[nodiscard]] const Stmt *ForStmt::getStatement() const { return mStmt.get(); }
 
@@ -342,108 +432,129 @@ ForStmt::getInitial() const {
 }
 [[nodiscard]] const Expr *ForStmt::getPost() const { return mPostExpr.get(); }
 
-StorageClassSpecifier::StorageClassSpecifier(StorageClassSpecifier::Specifiers specifier) : mSpecifier(specifier) {}
-[[nodiscard]] StorageClassSpecifier::Specifiers StorageClassSpecifier::getSpecifier() const { return mSpecifier; }
+StorageClassSpecifier::StorageClassSpecifier(
+    TokIter begin, StorageClassSpecifier::Specifiers specifier)
+    : Node(begin), mSpecifier(specifier) {}
+[[nodiscard]] StorageClassSpecifier::Specifiers
+StorageClassSpecifier::getSpecifier() const {
+  return mSpecifier;
+}
 
-FunctionSpecifier::FunctionSpecifier() {}
+FunctionSpecifier::FunctionSpecifier(TokIter begin) : Node(begin) {}
 
-DeclarationSpecifiers::DeclarationSpecifiers() {}
-void DeclarationSpecifiers::addStorageClassSpecifier(StorageClassSpecifier && specifier) {
+DeclarationSpecifiers::DeclarationSpecifiers(TokIter begin) : Node(begin) {}
+void DeclarationSpecifiers::addStorageClassSpecifier(
+    StorageClassSpecifier &&specifier) {
   mStorageClassSpecifiers.push_back(std::move(specifier));
 }
-void DeclarationSpecifiers::addTypeSpecifier(TypeSpecifier && specifier) {
+void DeclarationSpecifiers::addTypeSpecifier(TypeSpecifier &&specifier) {
   mTypeSpecifiers.push_back(std::move(specifier));
 }
-void DeclarationSpecifiers::addTypeQualifier(TypeQualifier && qualifier) {
+void DeclarationSpecifiers::addTypeQualifier(TypeQualifier &&qualifier) {
   mTypeQualifiers.push_back(std::move(qualifier));
 }
-void DeclarationSpecifiers::addFunctionSpecifier(FunctionSpecifier && specifier) {
+void DeclarationSpecifiers::addFunctionSpecifier(
+    FunctionSpecifier &&specifier) {
   mFunctionSpecifiers.push_back(std::move(specifier));
 }
 
-[[nodiscard]] const std::vector<StorageClassSpecifier> &DeclarationSpecifiers::getStorageClassSpecifiers() const {
+[[nodiscard]] const std::vector<StorageClassSpecifier> &
+DeclarationSpecifiers::getStorageClassSpecifiers() const {
   return mStorageClassSpecifiers;
 }
-[[nodiscard]] const std::vector<TypeSpecifier> &DeclarationSpecifiers::getTypeSpecifiers() const {
+[[nodiscard]] const std::vector<TypeSpecifier> &
+DeclarationSpecifiers::getTypeSpecifiers() const {
   return mTypeSpecifiers;
 }
-[[nodiscard]] const std::vector<TypeQualifier> &DeclarationSpecifiers::getTypeQualifiers() const {
+[[nodiscard]] const std::vector<TypeQualifier> &
+DeclarationSpecifiers::getTypeQualifiers() const {
   return mTypeQualifiers;
 }
-[[nodiscard]] const std::vector<FunctionSpecifier> &DeclarationSpecifiers::getFunctionSpecifiers() const {
+[[nodiscard]] const std::vector<FunctionSpecifier> &
+DeclarationSpecifiers::getFunctionSpecifiers() const {
   return mFunctionSpecifiers;
 }
 [[nodiscard]] bool DeclarationSpecifiers::isEmpty() const {
-  return mStorageClassSpecifiers.empty() && mTypeSpecifiers.empty()
-         && mTypeQualifiers.empty() && mFunctionSpecifiers.empty();
+  return mStorageClassSpecifiers.empty() && mTypeSpecifiers.empty() &&
+         mTypeQualifiers.empty() && mFunctionSpecifiers.empty();
 }
 
-TypeName::TypeName(DeclarationSpecifiers &&specifierQualifiers,
-         std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
-    : mSpecifierQualifiers(std::move(specifierQualifiers)),
+TypeName::TypeName(TokIter begin,
+                   DeclarationSpecifiers &&specifierQualifiers,
+                   std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
+    : Node(begin), mSpecifierQualifiers(std::move(specifierQualifiers)),
       mAbstractDeclarator(std::move(abstractDeclarator)) {}
 
-[[nodiscard]] const DeclarationSpecifiers &TypeName::getSpecifierQualifiers() const {
+[[nodiscard]] const DeclarationSpecifiers &
+TypeName::getSpecifierQualifiers() const {
   return mSpecifierQualifiers;
 }
-[[nodiscard]] const AbstractDeclarator *TypeName::getAbstractDeclarator() const {
+[[nodiscard]] const AbstractDeclarator *
+TypeName::getAbstractDeclarator() const {
   return mAbstractDeclarator.get();
 }
 
-Declaration::Declaration(DeclarationSpecifiers &&declarationSpecifiers,
-            std::vector<InitDeclarator> &&initDeclarators)
-    : mDeclarationSpecifiers(std::move(declarationSpecifiers)),
+Declaration::Declaration(TokIter begin,
+                         DeclarationSpecifiers &&declarationSpecifiers,
+                         std::vector<InitDeclarator> &&initDeclarators)
+    : Node(begin), mDeclarationSpecifiers(std::move(declarationSpecifiers)),
       mInitDeclarators(std::move(initDeclarators)) {}
 [[nodiscard]] const DeclarationSpecifiers &
 Declaration::getDeclarationSpecifiers() const {
   return mDeclarationSpecifiers;
 }
-[[nodiscard]] const std::vector<Declaration::InitDeclarator> &Declaration::getInitDeclarators() const {
+[[nodiscard]] const std::vector<Declaration::InitDeclarator> &
+Declaration::getInitDeclarators() const {
   return mInitDeclarators;
 }
 
-BreakStmt::BreakStmt() {}
+BreakStmt::BreakStmt(TokIter begin) : Node(begin) {}
 
-ContinueStmt::ContinueStmt() {}
+ContinueStmt::ContinueStmt(TokIter begin) : Node(begin) {}
 
-ReturnStmt::ReturnStmt(std::unique_ptr<Expr> &&optExpr)
-    : mOptExpr(std::move(optExpr)) {}
-[[nodiscard]] const Expr *ReturnStmt::getExpression() const { return mOptExpr.get(); }
+ReturnStmt::ReturnStmt(TokIter begin, std::unique_ptr<Expr> &&optExpr)
+    : Node(begin), mOptExpr(std::move(optExpr)) {}
+[[nodiscard]] const Expr *ReturnStmt::getExpression() const {
+  return mOptExpr.get();
+}
 
-BlockStmt::BlockStmt(std::vector<BlockItem> &&blockItems)
-    : mBlockItems(std::move(blockItems)) {}
+BlockStmt::BlockStmt(TokIter begin, std::vector<BlockItem> &&blockItems)
+    : Node(begin), mBlockItems(std::move(blockItems)) {}
 [[nodiscard]] const std::vector<BlockItem> &BlockStmt::getBlockItems() const {
   return mBlockItems;
 }
 
 DirectAbstractDeclaratorParentheses::DirectAbstractDeclaratorParentheses(
-    std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
-    : mAbstractDeclarator(std::move(abstractDeclarator)) {}
+    TokIter begin, std::unique_ptr<AbstractDeclarator> &&abstractDeclarator)
+    : Node(begin), mAbstractDeclarator(std::move(abstractDeclarator)) {}
 
-[[nodiscard]] const AbstractDeclarator *DirectAbstractDeclaratorParentheses::getAbstractDeclarator() const {
+[[nodiscard]] const AbstractDeclarator *
+DirectAbstractDeclaratorParentheses::getAbstractDeclarator() const {
   return mAbstractDeclarator.get();
 }
 
 DirectAbstractDeclaratorAssignExpr::DirectAbstractDeclaratorAssignExpr(
+    TokIter begin,
     std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
     std::vector<TypeQualifier> &&typeQualifiers,
-    std::unique_ptr<AssignExpr> &&assignmentExpression,
-    bool hasStatic)
-    : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
+    std::unique_ptr<AssignExpr> &&assignmentExpression, bool hasStatic)
+    : Node(begin), mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
       mTypeQualifiers(std::move(typeQualifiers)),
       mAssignmentExpression(std::move(assignmentExpression)),
-      mHasStatic(hasStatic){}
+      mHasStatic(hasStatic) {}
 
 [[nodiscard]] const DirectAbstractDeclarator *
 DirectAbstractDeclaratorAssignExpr::getDirectAbstractDeclarator() const {
   return mDirectAbstractDeclarator.get();
 }
 
-[[nodiscard]] const std::vector<TypeQualifier> &DirectAbstractDeclaratorAssignExpr::getTypeQualifiers() const {
+[[nodiscard]] const std::vector<TypeQualifier> &
+DirectAbstractDeclaratorAssignExpr::getTypeQualifiers() const {
   return mTypeQualifiers;
 }
 
-[[nodiscard]] const AssignExpr *DirectAbstractDeclaratorAssignExpr::getAssignmentExpression() const {
+[[nodiscard]] const AssignExpr *
+DirectAbstractDeclaratorAssignExpr::getAssignmentExpression() const {
   return mAssignmentExpression.get();
 }
 
@@ -452,8 +563,10 @@ DirectAbstractDeclaratorAssignExpr::getDirectAbstractDeclarator() const {
 }
 
 DirectAbstractDeclaratorAsterisk::DirectAbstractDeclaratorAsterisk(
+    TokIter begin,
     std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator)
-    : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)){}
+    : Node(begin),
+      mDirectAbstractDeclarator(std::move(directAbstractDeclarator)) {}
 
 [[nodiscard]] const DirectAbstractDeclarator *
 DirectAbstractDeclaratorAsterisk::getDirectAbstractDeclarator() const {
@@ -461,9 +574,10 @@ DirectAbstractDeclaratorAsterisk::getDirectAbstractDeclarator() const {
 }
 
 DirectAbstractDeclaratorParamTypeList::DirectAbstractDeclaratorParamTypeList(
+    TokIter begin,
     std::unique_ptr<DirectAbstractDeclarator> &&directAbstractDeclarator,
     std::unique_ptr<ParamTypeList> &&parameterTypeList)
-    : mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
+    : Node(begin), mDirectAbstractDeclarator(std::move(directAbstractDeclarator)),
       mParameterTypeList(std::move(parameterTypeList)) {}
 
 [[nodiscard]] const DirectAbstractDeclarator *
@@ -471,24 +585,27 @@ DirectAbstractDeclaratorParamTypeList::getDirectAbstractDeclarator() const {
   return mDirectAbstractDeclarator.get();
 }
 
-[[nodiscard]] const ParamTypeList *DirectAbstractDeclaratorParamTypeList::getParameterTypeList() const {
+[[nodiscard]] const ParamTypeList *
+DirectAbstractDeclaratorParamTypeList::getParameterTypeList() const {
   return mParameterTypeList.get();
 }
 
-Pointer::Pointer(std::vector<TypeQualifier> &&typeQualifiers)
-    : mTypeQualifiers(std::move(typeQualifiers)) {}
+Pointer::Pointer(TokIter begin, std::vector<TypeQualifier> &&typeQualifiers)
+    : Node(begin), mTypeQualifiers(std::move(typeQualifiers)) {}
 
-[[nodiscard]] const std::vector<TypeQualifier> &Pointer::getTypeQualifiers() const {
+[[nodiscard]] const std::vector<TypeQualifier> &
+Pointer::getTypeQualifiers() const {
   return mTypeQualifiers;
 }
 
 AbstractDeclarator::AbstractDeclarator(
-    std::vector<Pointer> &&pointers,
+    TokIter begin, std::vector<Pointer> &&pointers,
     std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator)
-    : mPointers(std::move(pointers)),
+    : Node(begin), mPointers(std::move(pointers)),
       mDirectAbstractDeclarator(std::move(directAbstractDeclarator)) {}
 
-[[nodiscard]] const std::vector<Pointer> &AbstractDeclarator::getPointers() const {
+[[nodiscard]] const std::vector<Pointer> &
+AbstractDeclarator::getPointers() const {
   return mPointers;
 }
 
@@ -497,23 +614,27 @@ AbstractDeclarator::getDirectAbstractDeclarator() const {
   return mDirectAbstractDeclarator ? &*mDirectAbstractDeclarator : nullptr;
 }
 
-ParameterDeclaration::ParameterDeclaration(DeclarationSpecifiers declarationSpecifiers,
-                     std::variant<std::unique_ptr<Declarator>,
-                                  std::optional<std::unique_ptr<AbstractDeclarator>>>
-                         variant)
-    : declarationSpecifiers(std::move(declarationSpecifiers)),
+ParameterDeclaration::ParameterDeclaration(
+    TokIter begin, DeclarationSpecifiers declarationSpecifiers,
+    std::variant<std::unique_ptr<Declarator>,
+                 std::optional<std::unique_ptr<AbstractDeclarator>>>
+        variant)
+    : Node(begin), declarationSpecifiers(std::move(declarationSpecifiers)),
       declarator(std::move(variant)) {}
 
-ParamList::ParamList(std::vector<ParameterDeclaration> &&parameterList)
-    : mParameterList(std::move(parameterList)) {}
+ParamList::ParamList(TokIter begin,
+                     std::vector<ParameterDeclaration> &&parameterList)
+    : Node(begin), mParameterList(std::move(parameterList)) {}
 
 [[nodiscard]] const std::vector<ParameterDeclaration> &
 ParamList::getParameterDeclarations() const {
   return mParameterList;
 }
 
-ParamTypeList::ParamTypeList(ParamList &&parameterList, bool hasEllipse)
-    : mParameterList(std::move(parameterList)), mHasEllipse(hasEllipse) {}
+ParamTypeList::ParamTypeList(TokIter begin, ParamList &&parameterList,
+                             bool hasEllipse)
+    : Node(begin), mParameterList(std::move(parameterList)),
+      mHasEllipse(hasEllipse) {}
 
 [[nodiscard]] const ParamList &ParamTypeList::getParameterList() const {
   return mParameterList;
@@ -521,52 +642,62 @@ ParamTypeList::ParamTypeList(ParamList &&parameterList, bool hasEllipse)
 
 [[nodiscard]] bool ParamTypeList::hasEllipse() const { return mHasEllipse; }
 
-DirectDeclaratorIdent::DirectDeclaratorIdent(std::string_view ident)
-    : mIdent(ident) {}
+DirectDeclaratorIdent::DirectDeclaratorIdent(TokIter begin,
+                                             std::string_view ident)
+    : Node(begin), mIdent(ident) {}
 
-[[nodiscard]] const std::string_view& DirectDeclaratorIdent::getIdent() const { return mIdent; }
+[[nodiscard]] const std::string_view &DirectDeclaratorIdent::getIdent() const {
+  return mIdent;
+}
 
-DirectDeclaratorParentheses::DirectDeclaratorParentheses(std::unique_ptr<Declarator> &&declarator)
-    : mDeclarator(std::move(declarator)) {}
+DirectDeclaratorParentheses::DirectDeclaratorParentheses(
+    TokIter begin, std::unique_ptr<Declarator> &&declarator)
+    : Node(begin), mDeclarator(std::move(declarator)) {}
 
-[[nodiscard]] const Declarator *DirectDeclaratorParentheses::getDeclarator() const {
+[[nodiscard]] const Declarator *
+DirectDeclaratorParentheses::getDeclarator() const {
   return mDeclarator.get();
 }
 
-DirectDeclaratorParamTypeList::DirectDeclaratorParamTypeList(std::unique_ptr<DirectDeclarator> &&directDeclarator,
-                              ParamTypeList &&parameterTypeList)
-    : mDirectDeclarator(std::move(directDeclarator)),
+DirectDeclaratorParamTypeList::DirectDeclaratorParamTypeList(
+    TokIter begin, std::unique_ptr<DirectDeclarator> &&directDeclarator,
+    ParamTypeList &&parameterTypeList)
+    : Node(begin), mDirectDeclarator(std::move(directDeclarator)),
       mParameterTypeList(std::move(parameterTypeList)) {}
 
-[[nodiscard]] const DirectDeclarator *DirectDeclaratorParamTypeList::getDirectDeclarator() const {
+[[nodiscard]] const DirectDeclarator *
+DirectDeclaratorParamTypeList::getDirectDeclarator() const {
   return mDirectDeclarator.get();
 }
 
-[[nodiscard]] const ParamTypeList &DirectDeclaratorParamTypeList::getParameterTypeList() const {
+[[nodiscard]] const ParamTypeList &
+DirectDeclaratorParamTypeList::getParameterTypeList() const {
   return mParameterTypeList;
 }
 
 DirectDeclaratorAssignExpr::DirectDeclaratorAssignExpr(
-    std::unique_ptr<DirectDeclarator> &&directDeclarator,
+    TokIter begin, std::unique_ptr<DirectDeclarator> &&directDeclarator,
     std::vector<TypeQualifier> &&typeQualifierList,
-    std::unique_ptr<AssignExpr> &&assignmentExpression,
-    bool hasStatic)
-    : mDirectDeclarator(std::move(directDeclarator)),
+    std::unique_ptr<AssignExpr> &&assignmentExpression, bool hasStatic)
+    : Node(begin), mDirectDeclarator(std::move(directDeclarator)),
       mTypeQualifierList(std::move(typeQualifierList)),
       mAssignmentExpression(std::move(assignmentExpression)),
-      mHasStatic(hasStatic){}
+      mHasStatic(hasStatic) {}
 
-[[nodiscard]] const DirectDeclarator *DirectDeclaratorAssignExpr::getDirectDeclarator() const {
+[[nodiscard]] const DirectDeclarator *
+DirectDeclaratorAssignExpr::getDirectDeclarator() const {
   return mDirectDeclarator.get();
 }
 
-[[nodiscard]] const std::vector<TypeQualifier> &DirectDeclaratorAssignExpr::getTypeQualifierList() const {
+[[nodiscard]] const std::vector<TypeQualifier> &
+DirectDeclaratorAssignExpr::getTypeQualifierList() const {
   return mTypeQualifierList;
 }
 
 [[nodiscard]] const AssignExpr *
 DirectDeclaratorAssignExpr::getAssignmentExpression() const {
-  return mAssignmentExpression == nullptr ? nullptr : mAssignmentExpression.get();
+  return mAssignmentExpression == nullptr ? nullptr
+                                          : mAssignmentExpression.get();
 }
 
 [[nodiscard]] bool DirectDeclaratorAssignExpr::hasStatic() const {
@@ -574,22 +705,24 @@ DirectDeclaratorAssignExpr::getAssignmentExpression() const {
 }
 
 DirectDeclaratorAsterisk::DirectDeclaratorAsterisk(
-    std::unique_ptr<DirectDeclarator> &&directDeclarator,
+    TokIter begin, std::unique_ptr<DirectDeclarator> &&directDeclarator,
     std::vector<TypeQualifier> &&typeQualifierList)
-    : mDirectDeclarator(std::move(directDeclarator)),
-      mTypeQualifierList(std::move(typeQualifierList)){}
+    : Node(begin), mDirectDeclarator(std::move(directDeclarator)),
+      mTypeQualifierList(std::move(typeQualifierList)) {}
 
-[[nodiscard]] const DirectDeclarator *DirectDeclaratorAsterisk::getDirectDeclarator() const {
+[[nodiscard]] const DirectDeclarator *
+DirectDeclaratorAsterisk::getDirectDeclarator() const {
   return mDirectDeclarator.get();
 }
 
-[[nodiscard]] const std::vector<TypeQualifier> &DirectDeclaratorAsterisk::getTypeQualifierList() const {
+[[nodiscard]] const std::vector<TypeQualifier> &
+DirectDeclaratorAsterisk::getTypeQualifierList() const {
   return mTypeQualifierList;
 }
 
-Declarator::Declarator(std::vector<Pointer> &&pointers,
-           DirectDeclarator &&directDeclarator)
-    : mPointers(std::move(pointers)),
+Declarator::Declarator(TokIter begin, std::vector<Pointer> &&pointers,
+                       DirectDeclarator &&directDeclarator)
+    : Node(begin), mPointers(std::move(pointers)),
       mDirectDeclarator(std::move(directDeclarator)) {}
 
 [[nodiscard]] const std::vector<Pointer> &Declarator::getPointers() const {
@@ -600,52 +733,68 @@ Declarator::Declarator(std::vector<Pointer> &&pointers,
   return mDirectDeclarator;
 }
 
-StructOrUnionSpecifier::StructOrUnionSpecifier(bool isUnion, std::string_view identifier,
-                       std::vector<StructDeclaration> &&structDeclarations)
-    : mIsUnion(isUnion), mId(identifier),
+StructOrUnionSpecifier::StructOrUnionSpecifier(
+    TokIter begin, bool isUnion, std::string_view identifier,
+    std::vector<StructDeclaration> &&structDeclarations)
+    : Node(begin), mIsUnion(isUnion), mId(identifier),
       mStructDeclarations(std::move(structDeclarations)) {}
 
 [[nodiscard]] bool StructOrUnionSpecifier::isUnion() const { return mIsUnion; }
 
-[[nodiscard]] std::string_view StructOrUnionSpecifier::getTag() const { return mId; }
+[[nodiscard]] std::string_view StructOrUnionSpecifier::getTag() const {
+  return mId;
+}
 
 [[nodiscard]] const std::vector<StructOrUnionSpecifier::StructDeclaration> &
 StructOrUnionSpecifier::getStructDeclarations() const {
   return mStructDeclarations;
 }
 
-EnumSpecifier::EnumSpecifier(std::string_view id, std::vector<Enumerator> &&enumerators)
-    : mId(id), mEnumerators(std::move(enumerators)) {}
+EnumSpecifier::EnumSpecifier(TokIter begin, std::string_view id,
+                             std::vector<Enumerator> &&enumerators)
+    : Node(begin), mId(id), mEnumerators(std::move(enumerators)) {}
 
 [[nodiscard]] const std::string_view &EnumSpecifier::getName() const {
   return mId;
 }
-[[nodiscard]] const std::vector<EnumSpecifier::Enumerator> &EnumSpecifier::getEnumerators() const {
+[[nodiscard]] const std::vector<EnumSpecifier::Enumerator> &
+EnumSpecifier::getEnumerators() const {
   return mEnumerators;
 }
 
-Initializer::Initializer(Initializer::variant &&variant) : mVariant(std::move(variant)) {}
+Initializer::Initializer(TokIter begin, Initializer::variant &&variant)
+    : Node(begin), mVariant(std::move(variant)) {}
 
-[[nodiscard]] const Initializer::variant &Initializer::getVariant() const { return mVariant; }
+[[nodiscard]] const Initializer::variant &Initializer::getVariant() const {
+  return mVariant;
+}
 
-InitializerList::InitializerList(InitializerList::vector &&initializer)
-    : mInitializer(std::move(initializer)) {}
+InitializerList::InitializerList(TokIter begin,
+                                 InitializerList::vector &&initializer)
+    : Node(begin), mInitializer(std::move(initializer)) {}
 
-const InitializerList::vector &InitializerList::getInitializerList() const { return mInitializer; }
+const InitializerList::vector &InitializerList::getInitializerList() const {
+  return mInitializer;
+}
 
-FunctionDefinition::FunctionDefinition(DeclarationSpecifiers &&declarationSpecifiers,
-                   Declarator &&declarator, BlockStmt &&compoundStatement)
-    : mDeclarationSpecifiers(std::move(declarationSpecifiers)),
+FunctionDefinition::FunctionDefinition(
+    TokIter begin, DeclarationSpecifiers &&declarationSpecifiers,
+    Declarator &&declarator, BlockStmt &&compoundStatement)
+    : Node(begin), mDeclarationSpecifiers(std::move(declarationSpecifiers)),
       mDeclarator(std::move(declarator)),
       mCompoundStatement(std::move(compoundStatement)) {}
 
-[[nodiscard]] const DeclarationSpecifiers & FunctionDefinition::getDeclarationSpecifiers() const {
+[[nodiscard]] const DeclarationSpecifiers &
+FunctionDefinition::getDeclarationSpecifiers() const {
   return mDeclarationSpecifiers;
 }
 
-[[nodiscard]] const Declarator &FunctionDefinition::getDeclarator() const { return mDeclarator; }
+[[nodiscard]] const Declarator &FunctionDefinition::getDeclarator() const {
+  return mDeclarator;
+}
 
-[[nodiscard]] const BlockStmt &FunctionDefinition::getCompoundStatement() const {
+[[nodiscard]] const BlockStmt &
+FunctionDefinition::getCompoundStatement() const {
   return mCompoundStatement;
 }
-}
+} // namespace lcc::Syntax

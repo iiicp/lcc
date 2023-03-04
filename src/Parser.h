@@ -26,7 +26,6 @@ public:
   using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
 private:
   std::vector<Token> mTokens;
-  using TokIter = std::vector<Token>::const_iterator;
   TokIter mTokCursor;
   TokIter mTokEnd;
   bool mIsCheckTypedefType{true};
@@ -67,7 +66,7 @@ private:
 //  Syntax::SpecifierQualifiers ParseSpecifierQualifierList();
   std::optional<Syntax::Declarator> ParseDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
-  std::optional<Syntax::DirectDeclarator> ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator);
+  std::optional<Syntax::DirectDeclarator> ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator, TokIter begin);
   std::optional<Syntax::AbstractDeclarator> ParseAbstractDeclarator();
   std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclarator();
   std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclaratorSuffix(std::unique_ptr<Syntax::DirectAbstractDeclarator>&& directAbstractDeclarator);
@@ -116,7 +115,7 @@ private:
   std::optional<Syntax::CastExpr> ParseCastExpr();
   std::optional<Syntax::UnaryExpr> ParseUnaryExpr();
   std::optional<Syntax::PostFixExpr> ParsePostFixExpr();
-  void ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& current);
+  void ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& current, TokIter begin);
 
   std::optional<Syntax::TypeName> ParseTypeName();
   bool IsAssignment(tok::TokenKind type);

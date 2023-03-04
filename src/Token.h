@@ -75,7 +75,7 @@ public:
     return llvm::SMLoc::getFromPointer(getOffset());
   }
 };
-
+using TokIter = std::vector<Token>::const_iterator;
 } // namespace lcc::lexer
 
 #endif // LCC_CTOKEN_H

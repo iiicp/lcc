@@ -1,6 +1,7 @@
 #ifndef DIAG
 #define DIAG(ID, Level, Msg)
 #endif
+/// lex
 DIAG(err_lex_illegal_char, Error, "illegal char")
 DIAG(err_lex_illegal_newline_in_after_include, Error, "illegal newline in after include")
 DIAG(err_lex_illegal_token_in_c, Error, "illegal token kind in c token")
@@ -22,6 +23,7 @@ DIAG(err_lex_unclosed_after_include, Error, "unclosed after include")
 DIAG(err_lex_implicit_newline_in_char, Error, "implicit newline in char literal")
 DIAG(err_lex_implicit_newline_in_string, Error, "implicit newline in string literal")
 
+/// parser
 DIAG(err_parse_skip_to_first_external_declaration, Error, "the beginning of external declaration")
 DIAG(err_parse_skip_to_first_struct_declaration, Error, "the start of struct declaration or }")
 DIAG(err_parse_expect_n, Error, "expect {0}")
@@ -33,4 +35,7 @@ DIAG(err_parse_type_name_appear_storage_class, Error, "type name should not have
 DIAG(err_parse_skip_to_first_statement_or_first_declaration, Error, "the beginning of a statement or a declaration")
 DIAG(err_parse_accidently_add_semi, Error, "maybe you accidently add the ;")
 DIAG(err_parse_func_param_declaration_miss_name, Error, "miss param name")
+
+/// semantics
+DIAG(err_sema_only_static_or_extern_allowed_in_function_definition, Error, "only static or extern allowed in function definition")
 #undef DIAG

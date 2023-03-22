@@ -14,17 +14,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace lcc {
-//void LOGE(uint32_t row, uint32_t col, const std::string &msg) {
-//  llvm::errs() << row << ":" << col << ", " << msg << "\n";
-//  LCC_ASSERT(0);
-//}
-//
-//void LOGE(const Token& tok, const std::string &msg) {
-//  auto pair = tok.getLineAndColumn();
-//  llvm::errs() << pair.first << ":" << pair.second << ", " << msg << "\n";
-//  LCC_ASSERT(0);
-//}
-
 
 std::string_view getDeclaratorName(const Syntax::Declarator& declarator) {
   auto visitor = overload{

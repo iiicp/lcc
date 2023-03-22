@@ -31,9 +31,15 @@
     std::abort();                                                              \
   } while (0)
 
+#ifdef __clang__
+#define LCC_NON_NULL _Nonnull
+#define LCC_NULLABLE _Nullable
+#else
+#define LCC_NON_NULL
+#define LCC_NULLABLE
+#endif
+
 namespace lcc {
-//void LOGE(uint32_t row, uint32_t col, const std::string &msg);
-//void LOGE(const Token& tok, const std::string &msg);
 
 template <class... Ts>
 struct overload : Ts...

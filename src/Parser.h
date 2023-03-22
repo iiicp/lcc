@@ -25,7 +25,7 @@ class Parser {
 public:
   using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
 private:
-  std::vector<Token> mTokens;
+  const std::vector<Token>& mTokens;
   TokIter mTokCursor;
   TokIter mTokEnd;
   bool mIsCheckTypedefType{true};
@@ -53,7 +53,7 @@ private:
   TokenBitSet FirstDeclaration, FirstExpression, FirstStatement;
   TokenBitSet FirstStructDeclaration, FirstExternalDeclaration;
 public:
-  explicit Parser(std::vector<Token> && tokens, DiagnosticEngine &diag);
+  explicit Parser(const std::vector<Token> & tokens, DiagnosticEngine &diag);
   Syntax::TranslationUnit ParseTranslationUnit();
   
 private:

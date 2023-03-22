@@ -1,18 +1,19 @@
-#include <iostream>
-#include <fstream>
-#include "Version.h"
+#include "Diagnostic.h"
+#include "DumpTool.h"
 #include "Lexer.h"
 #include "Parser.h"
-#include "DumpTool.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/SMLoc.h"
+#include "SemaAnalysis.h"
+#include "Version.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "Diagnostic.h"
+#include "llvm/Support/SMLoc.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include <fstream>
+#include <iostream>
 
 static const char *Head = "lcc - based llvm c compiler";
 
@@ -57,7 +58,7 @@ int main(int argc, char *argv[]) {
       lcc::DiagnosticEngine diag(mgr, llvm::errs());
       std::string code((*FileOrErr)->getBuffer());
       std::string_view path = (*FileOrErr)->getBufferIdentifier();
-      lcc::Lexer lexer(mgr, diag, std::move(code), path, lcc::LanguageOption::PreProcess);
+      lcc::Lexer lexer(mgr, diag, std::move(code), path);
       auto ppTokens = lexer.tokenize();
       if (diag.numErrors())
         break;
@@ -69,11 +70,13 @@ int main(int argc, char *argv[]) {
       }
       if (diag.numErrors())
         break;
-      lcc::Parser parser(std::move(tokens), diag);
+      lcc::Parser parser(tokens, diag);
       auto translationUnit = parser.ParseTranslationUnit();
       if (DumpAST) {
         lcc::dump::dumpAst(translationUnit);
       }
+      lcc::SemaAnalysis sema(tokens, diag);
+      sema.Analyse(translationUnit);
     }
 
 #if 0

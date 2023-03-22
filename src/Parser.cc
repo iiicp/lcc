@@ -15,8 +15,8 @@
 #include <iostream>
 
 namespace lcc {
-Parser::Parser(std::vector<Token> && tokens, DiagnosticEngine &diag)
-    : mTokens(std::move(tokens)), mTokCursor(mTokens.cbegin()),
+Parser::Parser(const std::vector<Token> & tokens, DiagnosticEngine &diag)
+    : mTokens(tokens), mTokCursor(mTokens.cbegin()),
       mTokEnd(mTokens.cend()), Diag(diag) {
 
   FirstDeclaration = FormTokenKinds(tok::kw_auto, tok::kw_extern, tok::kw_static,
@@ -46,6 +46,8 @@ Syntax::TranslationUnit Parser::ParseTranslationUnit() {
   while (mTokCursor != mTokEnd) {
     if (Peek(tok::semi)) {
       ConsumeAny();
+      /// fixed: A semicolon alone is an external declaration
+      continue;
     }
     auto result = ParseExternalDeclaration();
     if (result) {

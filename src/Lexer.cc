@@ -19,8 +19,8 @@ namespace lcc {
 
 using namespace llvm;
 
-Lexer::Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag, std::string &&sourceCode, std::string_view sourcePath, LanguageOption option)
-    : Mgr(mgr), Diag(diag),mSourceCode(std::move(sourceCode)),mLangOption(option) {
+Lexer::Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag, std::string &&sourceCode, std::string_view sourcePath)
+    : Mgr(mgr), Diag(diag),mSourceCode(std::move(sourceCode)) {
 
   RegularSourceCode();
   auto memBuf = MemoryBuffer::getMemBuffer(mSourceCode, sourcePath);
@@ -641,10 +641,6 @@ std::vector<Token> Lexer::tokenize() {
     DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_block_comment);
   }else if (state == State::AfterInclude) {
     DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_after_include);
-  }
-
-  if (mLangOption == LanguageOption::C99) {
-    return toCTokens(std::move(results));
   }
 
   return results;

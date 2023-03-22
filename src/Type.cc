@@ -10,6 +10,7 @@
 
 #include "Type.h"
 #include "Utilities.h"
+#include "RecursiveVisitor.h"
 namespace lcc::Sema {
 
 template <class T1, class T2>
@@ -370,5 +371,152 @@ bool Type::operator==(const Type &rhs) const {
 
 bool Type::operator!=(const Type &rhs) const { return !(rhs == *this); }
 
+bool Type::isVoid() const{
+  auto *primitive = std::get_if<PrimitiveType>(&m_type);
+  if (!primitive) {
+    return false;
+  }
+  return primitive->getKind() == PrimitiveType::Kind::Void;
+}
+
+bool Type::isArray() const{
+  return std::holds_alternative<ArrayType>(m_type) ||
+      std::holds_alternative<ValArrayType>(m_type) ||
+          std::holds_alternative<AbstractArrayType>(m_type);
+}
+
+bool Type::isCharArray() const{
+  if (!isArray()) return false;
+  auto type = getArrayElementType();
+  auto *primitive = std::get_if<PrimitiveType>(&type.getVariant());
+  if (!primitive) return false;
+  return primitive->getKind() == PrimitiveType::Kind::Char ||
+         primitive->getKind() == PrimitiveType::Kind::UnsignedChar;
+}
+
+bool Type::isInteger() const{
+  return std::holds_alternative<PrimitiveType>(m_type) &&
+      !std::get<PrimitiveType>(m_type).isFloatingPoint() &&
+      std::get<PrimitiveType>(m_type).getBitCount() != 0;
+}
+
+bool Type::isArithmetic() const{
+  return (std::holds_alternative<PrimitiveType>(m_type)
+      && std::get<PrimitiveType>(m_type).getBitCount() != 0) ||
+  std::holds_alternative<EnumType>(m_type);
+}
+
+bool Type::isScalar() const{
+  return isArithmetic() || std::holds_alternative<PointerType>(m_type);
+}
+
+bool Type::isRecord() const{
+  return isUnion() || isStruct();
+}
+
+bool Type::isStruct() const{
+  return std::holds_alternative<StructType>(m_type);
+}
+
+bool Type::isUnion() const{
+  return std::holds_alternative<UnionType>(m_type);
+}
+
+bool Type::isAnonymous() const{
+  return
+      (std::holds_alternative<EnumType>(m_type) && std::get<EnumType>(m_type).isAnonymous()) ||
+      (std::holds_alternative<StructType>(m_type) && std::get<StructType>(m_type).isAnonymous()) ||
+      (std::holds_alternative<UnionType>(m_type) && std::get<UnionType>(m_type).isAnonymous());
+}
+
+bool Type::isEnum() const{
+  return std::holds_alternative<EnumType>(m_type);
+}
+
+bool Type::isBool() const{
+  auto *primitive = std::get_if<PrimitiveType>(&m_type);
+  if (!primitive) return false;
+  return primitive->getKind() == PrimitiveType::Kind::Bool;
+}
+
+bool Type::isCharType() const{
+  auto *primitive = std::get_if<PrimitiveType>(&m_type);
+  if (!primitive) return false;
+  return primitive->getKind() == PrimitiveType::Kind::Char ||
+  primitive->getKind() == PrimitiveType::Kind::UnsignedChar;
+}
+
+bool Type::isAggregate() const{
+  return isRecord() || isArray();
+}
+
+bool Type::isVariablyModified() const{
+  auto typeVisitor = RecursiveVisitor(*this, TYPE_NEXT_FN);
+  return std::any_of(typeVisitor.begin(), typeVisitor.end(),
+                     [](const Type &type) {return std::holds_alternative<ValArrayType>(type.getVariant());});
+}
+
+bool Type::isVariableLengthArray() const{
+  auto typeVisitor = RecursiveVisitor(*this, ARRAY_TYPE_NEXT_FN);
+  return std::any_of(typeVisitor.begin(), typeVisitor.end(),
+                     [](const Type &type) {return std::holds_alternative<ValArrayType>(type.getVariant());});
+}
+
+const Type& Type::getArrayElementType() const{
+  return std::visit(
+      overload{
+          [](const auto &)->const Type& {LCC_UNREACHABLE;},
+          [](const ArrayType &arrayType)->const Type&{
+                return arrayType.getType();
+              },
+          [](const AbstractArrayType &abstractArrayType)->const Type&{
+            return abstractArrayType.getType();
+          },
+          [](const ValArrayType &valArrayType)->const Type&{
+            return valArrayType.getType();
+          },
+    }, m_type);
+}
 /// Type end
+
+lcc::Sema::Type adjustParameterType(lcc::Sema::Type type){
+  if (type.isArray())
+  {
+    auto elementType = std::visit([](auto&& value) -> Type {
+      using T = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<ArrayType,
+                                   T> || std::is_same_v<AbstractArrayType, T> || std::is_same_v<ValArrayType, T>)
+      {
+        return value.getType();
+      }
+      LCC_UNREACHABLE;
+    }, type.getVariant());
+    bool restrict = std::visit([](auto&& value) -> bool {
+      using T = std::decay_t<decltype(value)>;
+      if constexpr (std::is_same_v<ArrayType,
+                                   T> || std::is_same_v<AbstractArrayType, T> || std::is_same_v<ValArrayType, T>)
+      {
+        return value.isRestricted();
+      }
+      LCC_UNREACHABLE;
+    },type.getVariant());
+    return PointerType::create(type.isConst(), type.isVolatile(), restrict, std::move(elementType));
+  }
+  return type;
+}
+lcc::Sema::Type removeQualifiers(lcc::Sema::Type type) {
+  if (type.isConst() || type.isVolatile()
+      || (std::holds_alternative<PointerType>(type.getVariant())
+          && std::get<PointerType>(type.getVariant()).isRestricted()))
+  {
+    if (!std::holds_alternative<PointerType>(type.getVariant())
+        || !std::get<PointerType>(type.getVariant()).isRestricted())
+    {
+      return Type(false, false, std::move(type).getVariant());
+    }
+    return PointerType::create(false, false, false,
+                               std::get<lcc::Sema::PointerType>(type.getVariant()).getElementType());
+  }
+  return type;
+}
 } // namespace lcc::Sema

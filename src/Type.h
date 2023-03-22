@@ -405,8 +405,12 @@ public:
                 variant type = std::monostate{})
       : m_type(std::move(type)), m_isConst(isConst), m_isVolatile(isVolatile) {}
 
-  [[nodiscard]] const variant &getVariant() const {
+  [[nodiscard]] const variant &getVariant() const& {
     return m_type;
+  }
+
+  [[nodiscard]] variant &&getVariant() && {
+    return std::move(m_type);
   }
 
   [[nodiscard]] bool isConst() const {
@@ -441,45 +445,43 @@ public:
 
   [[nodiscard]] std::uint64_t getAlignOf() const;
 
-  [[nodiscard]] bool isVoid();
+  [[nodiscard]] bool isVoid() const;
 
-  [[nodiscard]] bool isArray();
+  [[nodiscard]] bool isArray() const;
 
-  [[nodiscard]] bool isCharArray();
+  [[nodiscard]] bool isCharArray() const;
 
-  [[nodiscard]] bool isInteger();
+  [[nodiscard]] bool isInteger() const;
 
-  [[nodiscard]] bool isArithmetic();
+  [[nodiscard]] bool isArithmetic() const;
 
-  [[nodiscard]] bool isScalar();
+  [[nodiscard]] bool isScalar() const;
 
-  [[nodiscard]] bool isRecord();
+  [[nodiscard]] bool isRecord() const;
 
-  [[nodiscard]] bool isStruct();
+  [[nodiscard]] bool isStruct() const;
 
-  [[nodiscard]] bool isUnion();
+  [[nodiscard]] bool isUnion() const;
 
-  [[nodiscard]] bool isAnonymous();
+  [[nodiscard]] bool isAnonymous() const;
 
-  [[nodiscard]] bool isEnum();
+  [[nodiscard]] bool isEnum() const;
 
-  [[nodiscard]] bool isBool();
+  [[nodiscard]] bool isBool() const;
 
-  [[nodiscard]] bool isCharType();
+  [[nodiscard]] bool isCharType() const;
 
-  [[nodiscard]] bool isAggregate();
+  [[nodiscard]] bool isAggregate() const;
 
-  [[nodiscard]] bool isVariablyModified();
+  [[nodiscard]] bool isVariablyModified() const;
 
-  [[nodiscard]] bool isVariableLengthArray();
+  [[nodiscard]] bool isVariableLengthArray() const;
 
-  [[nodiscard]] bool isCharacterLikeType();
-
-  [[nodiscard]] const Type& getArrayElementType();
-
-  [[nodiscard]] Type adjustParameterType();
-
-  [[nodiscard]] Type removeQualifiers();
+  [[nodiscard]] const Type& getArrayElementType() const;
 };
+
+Type adjustParameterType(Type type);
+Type removeQualifiers(Type type);
+
 } // namespace lcc::Sema
 #endif // LCC_TYPE_H

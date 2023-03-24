@@ -24,7 +24,6 @@ public:
   explicit SemaAnalysis(const std::vector<Token> &tokens, DiagnosticEngine &diag);
   Sema::TranslationUnit Analyse(const Syntax::TranslationUnit &node);
 private:
-
   Sema::TranslationUnit visit(const Syntax::TranslationUnit &node);
   std::vector<Sema::TranslationUnit::Variant> visit(const Syntax::FunctionDefinition &node);
   std::vector<Sema::TranslationUnit::Variant> visit(const Syntax::Declaration &node);
@@ -74,6 +73,13 @@ private:
   void visit(const Syntax::PrimaryExprConstant &node);
   void visit(const Syntax::PrimaryExprIdent &node);
   void visit(const Syntax::PrimaryExprParentheses &node);
+
+  /// type
+  Sema::Type declarationSpecifierToType(const Syntax::DeclarationSpecifiers &declarationSpecifiers);
+  Sema::Type declaratorToType(Sema::Type type, const Syntax::AbstractDeclarator* declarator = nullptr);
+  Sema::Type declaratorToType(Sema::Type type, const Syntax::Declarator* declarator);
+
+  Sema::Type primitiveTypeSpecifiersToType(bool isConst, bool isVolatile, const std::vector<Syntax::TypeSpecifier> &typeSpecs);
 };
 }
 

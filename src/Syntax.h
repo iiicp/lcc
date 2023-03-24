@@ -405,11 +405,11 @@ public:
     Short = 0b100,
     Int = 0b1000,
     Long = 0b10000,
-    Float = 0b1000000,
-    Double = 0b10000000,
-    Signed = 0b100000000,
-    Unsigned = 0b1000000000,
-    Bool = 0b10000000000,
+    Float = 0b100000,
+    Double = 0b1000000,
+    Signed = 0b10000000,
+    Unsigned = 0b100000000,
+    Bool = 0b1000000000
   };
 
 private:

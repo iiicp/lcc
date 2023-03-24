@@ -38,4 +38,7 @@ DIAG(err_parse_func_param_declaration_miss_name, Error, "miss param name")
 
 /// semantics
 DIAG(err_sema_only_static_or_extern_allowed_in_function_definition, Error, "only static or extern allowed in function definition")
+DIAG(err_sema_at_least_one_type_specifier_required, Error, "at least one type specifier required")
+DIAG(err_sema_expected_no_further_type_specifiers_after, Error, "expected no further type specifiers after {0}")
+DIAG(err_sema_cannot_combine_n_with_n, Error, "cannot combine {0} with {1}")
 #undef DIAG

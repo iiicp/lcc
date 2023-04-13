@@ -12,8 +12,8 @@ ISO C 99 Doc link (pdf file): [C99](https://www.open-std.org/jtc1/sc22/wg14/www/
 |  ----       |------------|   
 | Preprocess  | working... |   
 | Lexer       | 100%       |      
-| Parser      | 99.99%     |       
-| Semantics   | working... |       
+| Parser      | 100%       |       
+| Semantics   | 5%         |       
 | CodeGen     | working... |    
 
 ## Test Status:

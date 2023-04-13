@@ -54,7 +54,7 @@ std::vector<Sema::TranslationUnit::Variant> SemaAnalysis::visit(const Syntax::Fu
 }
 
 std::vector<Sema::TranslationUnit::Variant> SemaAnalysis::visit(const Syntax::Declaration &node) {
-
+  return {};
 }
 
 Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpecifiers &declarationSpecifiers) {

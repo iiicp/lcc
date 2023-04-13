@@ -17,7 +17,9 @@
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <unordered_map>
 #include "Utilities.h"
+#include "Token.h"
 namespace lcc::Sema {
 
 class Type;
@@ -482,6 +484,119 @@ public:
 
 Type adjustParameterType(Type type);
 Type removeQualifiers(Type type);
+
+struct Field {
+  std::shared_ptr<const Type> type; // NOT NULL
+  std::string_view name;
+  const TokIter nameToken;
+  std::vector<std::size_t> indices;
+  std::optional<std::pair<std::uint32_t, std::uint32_t>> bitFieldBounds;
+  std::vector<std::shared_ptr<const Type>> parentTypes;
+};
+
+struct FieldInLayout {
+  std::shared_ptr<const Type> type;
+  std::size_t layoutIndex;
+  std::optional<std::pair<std::uint32_t, std::uint32_t>> bitFieldBounds;
+};
+
+using FieldMap = std::unordered_map<std::string_view, Field>;
+
+struct MemoryLayout {
+  Type type;
+  std::size_t offset;
+};
+
+class StructDefinition {
+  std::string_view m_name;
+  FieldMap m_fields;
+  std::vector<FieldInLayout> m_fieldLayout;
+  std::vector<MemoryLayout> m_memLayout;
+  std::uint64_t m_sizeOf;
+  std::uint64_t m_alignOf;
+
+public:
+  StructDefinition(std::string_view name, FieldMap fields,
+                   std::vector<FieldInLayout> fieldLayout,
+                   std::vector<MemoryLayout> memLayout, std::uint64_t sizeOf,
+                   std::uint64_t alignOf)
+      : m_name(name), m_fields(std::move(fields)),
+        m_fieldLayout(std::move(fieldLayout)),
+        m_memLayout(std::move(memLayout)), m_sizeOf(sizeOf),
+        m_alignOf(alignOf) {}
+
+  [[nodiscard]] std::string_view getName() const { return m_name; }
+
+  [[nodiscard]] bool isAnonymous() const { return m_name.empty(); }
+
+  [[nodiscard]] const FieldMap &getFields() const { return m_fields; }
+
+  [[nodiscard]] const std::vector<FieldInLayout> &getFieldLayout() const {
+    return m_fieldLayout;
+  }
+
+  [[nodiscard]] const std::vector<MemoryLayout> &getMemLayout() const {
+    return m_memLayout;
+  }
+
+  [[nodiscard]] std::uint64_t getSizeOf() const { return m_sizeOf; }
+
+  [[nodiscard]] std::uint64_t getAlignOf() const { return m_alignOf; }
+};
+
+class UnionDefinition {
+  std::string_view m_name;
+  FieldMap m_fields;
+  std::vector<FieldInLayout> m_fieldLayout;
+  std::uint64_t m_sizeOf;
+  std::uint64_t m_alignOf;
+
+public:
+  UnionDefinition(std::string_view name, FieldMap fields,
+                  std::vector<FieldInLayout> fieldLayout, std::uint64_t sizeOf,
+                  std::uint64_t alignOf)
+      : m_name(name), m_fields(std::move(fields)),
+        m_fieldLayout(std::move(fieldLayout)), m_sizeOf(sizeOf),
+        m_alignOf(alignOf) {}
+
+  [[nodiscard]] std::string_view getName() const { return m_name; }
+
+  [[nodiscard]] bool isAnonymous() const { return m_name.empty(); }
+
+  [[nodiscard]] const FieldMap &getFields() const { return m_fields; }
+
+  [[nodiscard]] const std::vector<FieldInLayout> &getFieldLayout() const {
+    return m_fieldLayout;
+  }
+
+  [[nodiscard]] std::uint64_t getSizeOf() const { return m_sizeOf; }
+
+  [[nodiscard]] std::uint64_t getAlignOf() const { return m_alignOf; }
+};
+
+class EnumDefinition {
+public:
+  using IntValue = std::variant<int32_t, uint32_t, int64_t, uint64_t>;
+
+private:
+  std::string_view m_name;
+  Type m_type;
+  std::vector<std::pair<std::string_view, IntValue>> m_values;
+
+public:
+  EnumDefinition(std::string_view name, Type type,
+                 std::vector<std::pair<std::string_view, IntValue>> values)
+      : m_name(name), m_type(std::move(type)), m_values(std::move(values)) {}
+
+  [[nodiscard]] std::string_view getName() const { return m_name; }
+
+  [[nodiscard]] const Type &getType() const { return m_type; }
+
+  [[nodiscard]] const std::vector<std::pair<std::string_view, IntValue>> &
+  getValues() const {
+    return m_values;
+  }
+};
 
 } // namespace lcc::Sema
 #endif // LCC_TYPE_H

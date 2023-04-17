@@ -10,16 +10,16 @@
 
 #ifndef LCC_TYPE_H
 #define LCC_TYPE_H
+#include "Token.h"
+#include "Utilities.h"
 #include <bitset>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
-#include <unordered_map>
-#include "Utilities.h"
-#include "Token.h"
 namespace lcc::Sema {
 
 class Type;

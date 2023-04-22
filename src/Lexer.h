@@ -11,11 +11,11 @@
 #ifndef LCC_LEXER_H
 #define LCC_LEXER_H
 
+#include "Diagnostic.h"
 #include "Token.h"
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
-#include "Diagnostic.h"
 
 namespace lcc {
 
@@ -39,27 +39,31 @@ private:
   std::string mSourceCode;
   const char *P{nullptr};
   const char *Ep{nullptr};
+
 public:
-  explicit Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag, std::string &&sourceCode, std::string_view sourcePath = "<stdin>");
+  explicit Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag,
+                 std::string &&sourceCode,
+                 std::string_view sourcePath = "<stdin>");
   std::vector<Token> tokenize();
-  std::vector<Token> toCTokens(std::vector<Token>&& ppTokens);
+  std::vector<Token> toCTokens(std::vector<Token> &&ppTokens);
 
 private:
   void RegularSourceCode();
-  static bool IsLetter(char ch) ;
-  static bool IsWhiteSpace(char ch) ;
-  static bool IsDigit(char ch) ;
-  static bool IsOctDigit(char ch) ;
-  static bool IsHexDigit(char ch) ;
-  static bool IsPunctuation(char ch) ;
-  static uint32_t OctalToNum(std::string_view value) ;
-  static tok::TokenKind ParsePunctuation(const char* &offset, char curChar, char nextChar, char nnChar);
+  static bool IsLetter(char ch);
+  static bool IsWhiteSpace(char ch);
+  static bool IsDigit(char ch);
+  static bool IsOctDigit(char ch);
+  static bool IsHexDigit(char ch);
+  static bool IsPunctuation(char ch);
+  static uint32_t OctalToNum(std::string_view value);
+  static tok::TokenKind ParsePunctuation(const char *&offset, char curChar,
+                                         char nextChar, char nnChar);
 
   Token::ValueType ParseNumber(const Token &ppToken);
   std::vector<char> ParseCharacters(const Token &ppToken, bool handleCharMode);
   std::uint32_t ParseEscapeChar(const char *p, char escape);
   static bool IsJudgeNumber(const std::string &preCharacters, char curChar);
 };
-}
+} // namespace lcc
 
 #endif // LCC_LEXER_H

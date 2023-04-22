@@ -12,15 +12,16 @@
 #include "Utilities.h"
 #include <algorithm>
 #include <charconv> // std::from_chars
-#include <set>
 #include <limits>
+#include <set>
 
 namespace lcc {
 
 using namespace llvm;
 
-Lexer::Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag, std::string &&sourceCode, std::string_view sourcePath)
-    : Mgr(mgr), Diag(diag),mSourceCode(std::move(sourceCode)) {
+Lexer::Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag,
+             std::string &&sourceCode, std::string_view sourcePath)
+    : Mgr(mgr), Diag(diag), mSourceCode(std::move(sourceCode)) {
 
   RegularSourceCode();
   auto memBuf = MemoryBuffer::getMemBuffer(mSourceCode, sourcePath);
@@ -53,7 +54,7 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
   /// prefix
   bool isHex = character.size() > 2 &&
                (character.startswith("0x") || character.startswith("0X")) &&
-                (IsHexDigit(character[2]) || character[2] == '.');
+               (IsHexDigit(character[2]) || character[2] == '.');
   std::vector<char> charSet{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   if (isHex) {
     charSet = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
@@ -90,10 +91,16 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
     suffixBegin = std::find_if(suffixBegin, end, searchFunction);
     /// first character must be digit
     if (prev == suffixBegin) {
-      DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset()+(suffixBegin-begin)),diag::err_lex_expected_digits_after_exponent);
+      DiagReport(
+          Diag,
+          SMLoc::getFromPointer(ppToken.getOffset() + (suffixBegin - begin)),
+          diag::err_lex_expected_digits_after_exponent);
     }
   } else if (isHex && isFloat) {
-      DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset()+(suffixBegin-begin)),diag::err_lex_binary_floating);
+    DiagReport(
+        Diag,
+        SMLoc::getFromPointer(ppToken.getOffset() + (suffixBegin - begin)),
+        diag::err_lex_binary_floating);
   }
 
   bool isHexOrOctal = isHex;
@@ -102,7 +109,8 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
     size_t len = std::distance(begin, suffixBegin);
     for (int i = 0; i < len; ++i) {
       if (character[i] >= '8') {
-        DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset() + i),diag::err_lex_invalid_octal_character);
+        DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset() + i),
+                   diag::err_lex_invalid_octal_character);
       }
     }
   }
@@ -110,17 +118,20 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
   auto suffix = std::string_view(suffixBegin, std::distance(suffixBegin, end));
   bool valid;
   if (!isFloat) {
-    static std::set<std::string_view> variants = {"u",   "U",   "ul",  "Ul",  "uL",  "UL",
-                                     "uLL", "ULL", "ull", "Ull", "lu",  "lU",
-                                     "Lu",  "LU",  "LLu", "LLU", "llu", "llU",
-                                     "l",   "L",   "ll",  "LL",  ""};
+    static std::set<std::string_view> variants = {
+        "u",   "U",   "ul", "Ul", "uL", "UL", "uLL", "ULL",
+        "ull", "Ull", "lu", "lU", "Lu", "LU", "LLu", "LLU",
+        "llu", "llU", "l",  "L",  "ll", "LL", ""};
     valid = variants.find(suffix) != variants.end();
   } else {
     static std::set<std::string_view> variants = {"f", "l", "F", "L", ""};
     valid = variants.find(suffix) != variants.end();
   }
   if (!valid) {
-    DiagReport(Diag, SMLoc::getFromPointer(ppToken.getOffset()+(suffixBegin-begin)),diag::err_lex_invalid_literal_suffix);
+    DiagReport(
+        Diag,
+        SMLoc::getFromPointer(ppToken.getOffset() + (suffixBegin - begin)),
+        diag::err_lex_invalid_literal_suffix);
   }
 
   if (!isFloat) {
@@ -134,12 +145,14 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
       if (number > static_cast<uint64_t>(std::numeric_limits<int32_t>::max())) {
         if (isHexOrOctal && number <= std::numeric_limits<uint32_t>::max()) {
           return static_cast<uint32_t>(number);
-        }else if (isHexOrOctal && number > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+        } else if (isHexOrOctal &&
+                   number > static_cast<uint64_t>(
+                                std::numeric_limits<int64_t>::max())) {
           return number;
-        }else {
+        } else {
           return static_cast<int64_t>(number);
         }
-      }else {
+      } else {
         return static_cast<int32_t>(number);
       }
     } else if (suffix == "u" || suffix == "U") {
@@ -150,7 +163,8 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
     } else if (suffix == "L" || suffix == "l") {
       /// think about long case
       if (isHexOrOctal) {
-        if (number > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+        if (number >
+            static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
           return number;
         }
       }
@@ -164,7 +178,8 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
       return static_cast<uint64_t>(number);
     } else if (suffix == "ll" || suffix == "LL") {
       if (isHexOrOctal) {
-        if (number > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+        if (number >
+            static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
           return number;
         }
       }
@@ -194,8 +209,8 @@ Token::ValueType Lexer::ParseNumber(const Token &ppToken) {
   LCC_UNREACHABLE;
 }
 
-tok::TokenKind Lexer::ParsePunctuation(const char * & offset, char curChar, char nextChar,
-                                char nnChar) {
+tok::TokenKind Lexer::ParsePunctuation(const char *&offset, char curChar,
+                                       char nextChar, char nnChar) {
   tok::TokenKind type = tok::unknown;
   switch (curChar) {
   case '[': {
@@ -438,9 +453,10 @@ std::vector<Token> Lexer::tokenize() {
   std::string strBuilder;
   char includeDelimiter{' '};
 
-  auto InsertToken = [&](const char * sp, const char *p, tok::TokenKind tokenKind,
-                         std::string value = {}) {
-    auto &newToken = results.emplace_back(tokenKind, sp, p - sp, Mgr, std::move(value));
+  auto InsertToken = [&](const char *sp, const char *p,
+                         tok::TokenKind tokenKind, std::string value = {}) {
+    auto &newToken =
+        results.emplace_back(tokenKind, sp, p - sp, Mgr, std::move(value));
     strBuilder.clear();
   };
 
@@ -455,8 +471,7 @@ std::vector<Token> Lexer::tokenize() {
         Sp = P;
         break;
       }
-      if (IsDigit(curChar) ||
-          (curChar == '.' && IsDigit(nextChar))) {
+      if (IsDigit(curChar) || (curChar == '.' && IsDigit(nextChar))) {
         state = State::Number;
         Sp = P;
         break;
@@ -486,7 +501,7 @@ std::vector<Token> Lexer::tokenize() {
       }
       /// \r\n meaning \n in windows
       if (curChar == '\r' && nextChar == '\n') {
-        InsertToken(Sp+1, P+=2, tok::pp_newline);
+        InsertToken(Sp + 1, P += 2, tok::pp_newline);
         break;
       }
       if (curChar == '\n') {
@@ -531,11 +546,12 @@ std::vector<Token> Lexer::tokenize() {
       if (curChar == '\'' && strBuilder.empty()) {
         state = State::Start;
         InsertToken(Sp, P, tok::char_constant, strBuilder);
-        DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_empty_char_literal);
-      }else if (curChar == '\'' && !strBuilder.ends_with('\\')) {
+        DiagReport(Diag, SMLoc::getFromPointer(Sp),
+                   diag::err_lex_empty_char_literal);
+      } else if (curChar == '\'' && !strBuilder.ends_with('\\')) {
         state = State::Start;
         InsertToken(Sp, P, tok::char_constant, strBuilder);
-      }else {
+      } else {
         strBuilder += curChar;
       }
       P++;
@@ -553,7 +569,7 @@ std::vector<Token> Lexer::tokenize() {
       break;
     }
     case State::Identifier: {
-      if (IsLetter(curChar) ||  IsDigit(curChar)) {
+      if (IsLetter(curChar) || IsDigit(curChar)) {
         strBuilder += curChar;
         P++;
       } else {
@@ -569,13 +585,9 @@ std::vector<Token> Lexer::tokenize() {
         P++;
       } else {
         char lower_char = (curChar | toLower);
-        if (!IsJudgeNumber(strBuilder, lower_char) &&
-            (lower_char != 'e') &&
-            (lower_char != 'p') &&
-            (lower_char != 'f') &&
-            (lower_char != 'u') &&
-            (lower_char != 'l') &&
-            (lower_char != '.') &&
+        if (!IsJudgeNumber(strBuilder, lower_char) && (lower_char != 'e') &&
+            (lower_char != 'p') && (lower_char != 'f') && (lower_char != 'u') &&
+            (lower_char != 'l') && (lower_char != '.') &&
             (((strBuilder.back() | toLower) != 'e' &&
               (strBuilder.back() | toLower) != 'p') ||
              (lower_char != '+' && lower_char != '-'))) {
@@ -622,12 +634,12 @@ std::vector<Token> Lexer::tokenize() {
       }
       /// curChar is delimiter
       if (curChar != '\n') {
-        InsertToken(Sp, P++, tok::string_literal,
-                    strBuilder);
+        InsertToken(Sp, P++, tok::string_literal, strBuilder);
         state = State::Start;
         break;
       }
-      DiagReport(Diag, SMLoc::getFromPointer(P), diag::err_lex_illegal_newline_in_after_include);
+      DiagReport(Diag, SMLoc::getFromPointer(P),
+                 diag::err_lex_illegal_newline_in_after_include);
     }
     }
   }
@@ -635,25 +647,28 @@ std::vector<Token> Lexer::tokenize() {
 
   if (state == State::CharacterLiteral) {
     DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_char);
-  }else if (state == State::StringLiteral) {
+  } else if (state == State::StringLiteral) {
     DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_string);
-  }else if (state == State::BlockComment) {
-    DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_block_comment);
-  }else if (state == State::AfterInclude) {
-    DiagReport(Diag, SMLoc::getFromPointer(Sp), diag::err_lex_unclosed_after_include);
+  } else if (state == State::BlockComment) {
+    DiagReport(Diag, SMLoc::getFromPointer(Sp),
+               diag::err_lex_unclosed_block_comment);
+  } else if (state == State::AfterInclude) {
+    DiagReport(Diag, SMLoc::getFromPointer(Sp),
+               diag::err_lex_unclosed_after_include);
   }
 
   return results;
 }
 
-std::vector<Token> Lexer::toCTokens(std::vector<Token>&& ppTokens) {
+std::vector<Token> Lexer::toCTokens(std::vector<Token> &&ppTokens) {
   std::vector<Token> results;
   for (auto &iter : ppTokens) {
     switch (iter.getTokenKind()) {
     case tok::pp_hash:
     case tok::pp_hashhash:
     case tok::pp_backslash:
-      DiagReport(Diag, SMLoc::getFromPointer(iter.getOffset()), diag::err_lex_illegal_token_in_c);
+      DiagReport(Diag, SMLoc::getFromPointer(iter.getOffset()),
+                 diag::err_lex_illegal_token_in_c);
       break;
     case tok::pp_newline:
       break;
@@ -728,7 +743,7 @@ bool Lexer::IsWhiteSpace(char ch) {
 
 bool Lexer::IsDigit(char ch) { return ch >= '0' && ch <= '9'; }
 
-bool Lexer::IsOctDigit(char ch) {return ch >= '0' && ch <= '7';}
+bool Lexer::IsOctDigit(char ch) { return ch >= '0' && ch <= '7'; }
 
 bool Lexer::IsHexDigit(char ch) {
   return IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
@@ -742,15 +757,15 @@ bool Lexer::IsPunctuation(char ch) {
          ch == ':' || ch == ';' || ch == '=' || ch == ',' || ch == '#';
 }
 
-uint32_t Lexer::OctalToNum(std::string_view value)
-{
+uint32_t Lexer::OctalToNum(std::string_view value) {
   std::uint32_t result;
-  auto errors = std::from_chars(value.data(), value.data() + value.size(), result, 8);
+  auto errors =
+      std::from_chars(value.data(), value.data() + value.size(), result, 8);
   LCC_ASSERT(errors.ec == std::errc{});
   return result;
 }
 
-std::uint32_t Lexer::ParseEscapeChar(const char *p, char escape){
+std::uint32_t Lexer::ParseEscapeChar(const char *p, char escape) {
   switch (escape) {
   case '\\':
     return '\\';
@@ -775,13 +790,15 @@ std::uint32_t Lexer::ParseEscapeChar(const char *p, char escape){
   case '?':
     return '\?';
   default:
-    DiagReport(Diag, SMLoc::getFromPointer(p), diag::err_lex_invalid_escaped_char);
+    DiagReport(Diag, SMLoc::getFromPointer(p),
+               diag::err_lex_invalid_escaped_char);
     return escape;
   }
   return 0;
 }
 
-std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMode) {
+std::vector<char> Lexer::ParseCharacters(const Token &ppToken,
+                                         bool handleCharMode) {
   const auto *sp = ppToken.getOffset();
 
   llvm::StringRef characters = ppToken.getRepresentation();
@@ -792,10 +809,11 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
     char ch = characters[offset];
     if (ch == '\n') {
       if (handleCharMode) {
-        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_implicit_newline_in_char);
-      }
-      else{
-        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_implicit_newline_in_string);
+        DiagReport(Diag, SMLoc::getFromPointer(sp + offset),
+                   diag::err_lex_implicit_newline_in_char);
+      } else {
+        DiagReport(Diag, SMLoc::getFromPointer(sp + offset),
+                   diag::err_lex_implicit_newline_in_string);
       }
       offset++;
       continue;
@@ -806,7 +824,8 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
       offset++;
       if (handleCharMode) {
         if (resultStart > 1) {
-          DiagReport(Diag, SMLoc::getFromPointer(sp + offset), diag::warn_lex_multi_character);
+          DiagReport(Diag, SMLoc::getFromPointer(sp + offset),
+                     diag::warn_lex_multi_character);
         }
       }
       continue;
@@ -815,7 +834,7 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
       break;
     }
     /// meaning ch == '\'
-    if (characters[offset+1] == 'x') {
+    if (characters[offset + 1] == 'x') {
       offset += 2;
       int lastHex = offset;
       while (lastHex < characters.size()) {
@@ -826,12 +845,13 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
         break;
       }
       if (offset == lastHex) {
-        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_at_least_one_hexadecimal_digit_required);
+        DiagReport(Diag, SMLoc::getFromPointer(sp + offset),
+                   diag::err_lex_at_least_one_hexadecimal_digit_required);
         result.resize(1);
         result[0] = 'x';
         return result;
       }
-      std::string_view sv(characters.data()+offset, lastHex-offset);
+      std::string_view sv(characters.data() + offset, lastHex - offset);
       auto value = std::strtol(sv.data(), nullptr, 16);
       result.push_back((char)value);
       resultStart++;
@@ -839,40 +859,41 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
       break;
     }
     /// '\0' is octal char
-    else if (IsDigit(characters[offset+1])) {
+    else if (IsDigit(characters[offset + 1])) {
       offset++;
       int start = offset;
       /// first octal char
       if (offset < characters.size() && IsOctDigit(characters[offset])) {
         offset++;
-      }else {
+      } else {
         goto end;
       }
       /// second octal char
       if (offset < characters.size() && IsOctDigit(characters[offset])) {
         offset++;
-      }else {
+      } else {
         goto end;
       }
       /// third octal char
       if (offset < characters.size() && IsOctDigit(characters[offset])) {
         offset++;
-      }else {
+      } else {
         goto end;
       }
-      end:
+    end:
       if (offset == start) {
-        DiagReport(Diag, SMLoc::getFromPointer(sp+offset), diag::err_lex_at_least_one_oct_digit_required);
+        DiagReport(Diag, SMLoc::getFromPointer(sp + offset),
+                   diag::err_lex_at_least_one_oct_digit_required);
         result.resize(1);
         result[0] = '0';
         return result;
       }
-      auto value = OctalToNum(characters.substr(start, offset-start));
+      auto value = OctalToNum(characters.substr(start, offset - start));
       result.push_back((char)value);
       resultStart++;
       break;
-    }else {
-      auto character = ParseEscapeChar(sp+offset,characters[offset + 1]);
+    } else {
+      auto character = ParseEscapeChar(sp + offset, characters[offset + 1]);
       result.push_back((char)character);
       resultStart++;
       offset += 2;
@@ -883,7 +904,8 @@ std::vector<char> Lexer::ParseCharacters(const Token &ppToken, bool handleCharMo
 }
 
 bool Lexer::IsJudgeNumber(const std::string &preCharacters, char curChar) {
-  if (preCharacters.size() == 1 && preCharacters.back() == '0' && (curChar == 'x'|| curChar == 'X')) {
+  if (preCharacters.size() == 1 && preCharacters.back() == '0' &&
+      (curChar == 'x' || curChar == 'X')) {
     return true;
   }
 

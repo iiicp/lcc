@@ -45,7 +45,7 @@ std::vector<Sema::TranslationUnit::Variant> SemaAnalysis::visit(const Syntax::Fu
   for (auto &iter : node.getDeclarationSpecifiers().getStorageClassSpecifiers()) {
     if (iter.getSpecifier() != Syntax::StorageClassSpecifier::Extern &&
         iter.getSpecifier() != Syntax::StorageClassSpecifier::Static) {
-      DiagReport(Diag, iter.getBegin()->getSMLoc(), diag::err_sema_only_static_or_extern_allowed_in_function_definition);
+      DiagReport(Diag, iter.getBeginLoc()->getSMLoc(), diag::err_sema_only_static_or_extern_allowed_in_function_definition);
       continue;
     }
     storageClassSpecifier = &iter;
@@ -69,7 +69,7 @@ Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpe
     }
   }
   if (declarationSpecifiers.getTypeSpecifiers().empty()) {
-    DiagReport(Diag, declarationSpecifiers.getBegin()->getSMLoc(), diag::err_sema_at_least_one_type_specifier_required);
+    DiagReport(Diag, declarationSpecifiers.getBeginLoc()->getSMLoc(), diag::err_sema_at_least_one_type_specifier_required);
     return Sema::Type{};
   }
 
@@ -79,7 +79,7 @@ Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpe
     return primitiveTypeSpecifiersToType(isConst, isVolatile, typeSpecs);
   }else if (auto *name = std::get_if<std::string_view>(&typeSpecs[0].getVariant())) {
     if (typeSpecs.size() != 1) {
-      DiagReport(Diag, typeSpecs[1].getBegin()->getSMLoc(), diag::err_sema_expected_no_further_type_specifiers_after, "typedef typename");
+      DiagReport(Diag, typeSpecs[1].getBeginLoc()->getSMLoc(), diag::err_sema_expected_no_further_type_specifiers_after, "typedef typename");
     }
     /// todo typedef typename
   }else if (auto *structOrUnionPtr = std::get_if<std::unique_ptr<Syntax::StructOrUnionSpecifier>>(&typeSpecs[0].getVariant())) {
@@ -87,7 +87,7 @@ Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpe
   }else {
     LCC_ASSERT(std::holds_alternative<std::unique_ptr<Syntax::EnumSpecifier>>(typeSpecs[0].getVariant()));
     if (typeSpecs.size() != 1) {
-      DiagReport(Diag, typeSpecs[1].getBegin()->getSMLoc(), diag::err_sema_expected_no_further_type_specifiers_after, "enum specifier");
+      DiagReport(Diag, typeSpecs[1].getBeginLoc()->getSMLoc(), diag::err_sema_expected_no_further_type_specifiers_after, "enum specifier");
     }
     /// todo enum type
   }
@@ -106,11 +106,11 @@ Sema::Type SemaAnalysis::primitiveTypeSpecifiersToType(bool isConst, bool isVola
 
   auto displaySpecifierError = [this](const std::string desc, const Syntax::TypeSpecifier& typeSpec) {
     if (std::holds_alternative<std::string_view>(typeSpec.getVariant())) {
-      DiagReport(Diag, typeSpec.getBegin()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, "typename");
+      DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, "typename");
     }else if (auto *structOrUnionPtr = std::get_if<std::unique_ptr<Syntax::StructOrUnionSpecifier>>(&typeSpec.getVariant())) {
-      DiagReport(Diag, typeSpec.getBegin()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, "struct or union");
+      DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, "struct or union");
     }else if (std::holds_alternative<std::unique_ptr<Syntax::EnumSpecifier>>(typeSpec.getVariant())) {
-      DiagReport(Diag, typeSpec.getBegin()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc,"enum");
+      DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc,"enum");
     }else {
       tok::TokenKind tokenKind;
       switch (std::get<SyntaxPrimTypeSpec>(typeSpec.getVariant())) {
@@ -125,7 +125,7 @@ Sema::Type SemaAnalysis::primitiveTypeSpecifiersToType(bool isConst, bool isVola
       case SyntaxPrimTypeSpec::Unsigned:tokenKind = tok::kw_unsigned;break;
       case SyntaxPrimTypeSpec::Bool:tokenKind = tok::kw__Bool;break;
       }
-      DiagReport(Diag, typeSpec.getBegin()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, getTokenName(tokenKind));
+      DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, getTokenName(tokenKind));
     }
   };
   constexpr auto bitCount = [](std::size_t value) {

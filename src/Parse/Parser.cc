@@ -212,16 +212,14 @@ std::optional<Syntax::Declaration> Parser::ParseDeclarationSuffix(
       mScope.addToScope(name);
     }
     if (!Peek(tok::equal)) {
-      initDeclarators.push_back({
-          (*alreadyParsedDeclarator).getBegin(),
+      initDeclarators.push_back({(*alreadyParsedDeclarator).getBeginLoc(),
           std::make_unique<Syntax::Declarator>
               (std::move(*alreadyParsedDeclarator)),nullptr});
     }else {
       Expect(tok::equal);
       auto initializer = ParseInitializer();
       if (initializer) {
-        initDeclarators.push_back({
-            (*alreadyParsedDeclarator).getBegin(),
+        initDeclarators.push_back({(*alreadyParsedDeclarator).getBeginLoc(),
             std::make_unique<Syntax::Declarator>(std::move(*alreadyParsedDeclarator)),
             std::make_unique<Syntax::Initializer>(std::move(*initializer))});
       }
@@ -272,7 +270,7 @@ End:
       mScope.addTypedef(name);
     }
   }
-  return Syntax::Declaration(declarationSpecifiers.getBegin(),
+  return Syntax::Declaration(declarationSpecifiers.getBeginLoc(),
                              std::move(declarationSpecifiers),
                              std::move(initDeclarators));
 }
@@ -345,7 +343,7 @@ std::optional<Syntax::ExternalDeclaration> Parser::ParseExternalDeclaration() {
       if (std::holds_alternative<
               std::optional<std::unique_ptr<Syntax::AbstractDeclarator>>>(
               parameterDeclarator)) {
-        DiagReport(Diag, declSpecifiers.getBegin()->getSMLoc(), diag::err_parse_func_param_declaration_miss_name);
+        DiagReport(Diag, declSpecifiers.getBeginLoc()->getSMLoc(), diag::err_parse_func_param_declaration_miss_name);
         continue;
       }
       auto &decl =

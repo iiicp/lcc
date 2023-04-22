@@ -12,6 +12,7 @@
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
 #include "Token.h"
+#include "Box.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -23,6 +24,7 @@ namespace lcc::Syntax {
 class PrimaryExprIdent;
 class PrimaryExprConstant;
 class PrimaryExprParentheses;
+
 class PostFixExprSubscript;
 class PostFixExprIncrement;
 class PostFixExprDecrement;
@@ -31,9 +33,11 @@ class PostFixExprArrow;
 class PostFixExprFuncCall;
 class PostFixExprPrimaryExpr;
 class PostFixExprTypeInitializer;
+
 class UnaryExprPostFixExpr;
 class UnaryExprUnaryOperator;
 class UnaryExprSizeOf;
+
 class TypeName;
 class CastExpr;
 class MultiExpr;
@@ -97,7 +101,8 @@ class InitializerList;
 
 class Node {
 private:
-   TokIter mBeginTok;
+  TokIter mBeginTokLoc;
+
 public:
   Node(TokIter begin);
   virtual ~Node() = default;
@@ -105,7 +110,7 @@ public:
   Node &operator=(const Node &) = delete;
   Node(Node &&) = default;
   Node &operator=(Node &&) noexcept = default;
-  TokIter getBegin() const;
+  TokIter getBeginLoc() const;
 };
 
 /*
@@ -127,8 +132,8 @@ public:
  */
 class PrimaryExprConstant final : public Node {
 public:
-  using Variant = std::variant<std::int32_t, std::uint32_t, std::int64_t,
-                               std::uint64_t, float, double, std::string>;
+  using Variant = std::variant<int32_t, uint32_t, int64_t, uint64_t,
+                               float, double, std::string>;
 
 private:
   Variant mValue;
@@ -145,7 +150,6 @@ public:
 class PrimaryExprParentheses final : public Node {
 private:
   std::unique_ptr<Expr> mExpr;
-
 public:
   PrimaryExprParentheses(TokIter begin, Expr &&expr);
   [[nodiscard]] const Expr &getExpr() const;
@@ -223,8 +227,7 @@ private:
   std::vector<std::unique_ptr<AssignExpr>> mOptParams;
 
 public:
-  PostFixExprFuncCall(TokIter begin,
-                      std::unique_ptr<PostFixExpr> &&postFixExpr,
+  PostFixExprFuncCall(TokIter begin, std::unique_ptr<PostFixExpr> &&postFixExpr,
                       std::vector<std::unique_ptr<AssignExpr>> &&optParams);
 
   [[nodiscard]] const PostFixExpr *getPostFixExpr() const;
@@ -1117,8 +1120,7 @@ class DirectAbstractDeclaratorParentheses final : public Node {
 
 public:
   DirectAbstractDeclaratorParentheses(
-      TokIter begin,
-      std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
+      TokIter begin, std::unique_ptr<AbstractDeclarator> &&abstractDeclarator);
 
   [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const;
 };
@@ -1251,8 +1253,7 @@ private:
   std::vector<ParameterDeclaration> mParameterList;
 
 public:
-  ParamList(TokIter begin,
-            std::vector<ParameterDeclaration> &&parameterList);
+  ParamList(TokIter begin, std::vector<ParameterDeclaration> &&parameterList);
 
   [[nodiscard]] const std::vector<ParameterDeclaration> &
   getParameterDeclarations() const;

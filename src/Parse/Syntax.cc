@@ -1,8 +1,8 @@
 #include "Syntax.h"
 namespace lcc::Syntax {
-Node::Node(TokIter begin):mBeginTok(begin) {
+Node::Node(TokIter begin): mBeginTokLoc(begin) {
 }
-TokIter Node::getBegin() const { return mBeginTok; }
+TokIter Node::getBeginLoc() const { return mBeginTokLoc; }
 
 PrimaryExprIdent::PrimaryExprIdent(TokIter begin,
                                    std::string_view identifier)

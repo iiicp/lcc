@@ -10,13 +10,15 @@ set(LLVM_DIR "" CACHE PATH "path to llvm cmake dir")
 find_package(LLVM REQUIRED 14)
 llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes ExecutionEngine MCJIT)
 
+include_directories(src/Lex src/Parse src/Sema src/CodeGen src/Support)
+
 # find source file
-file(GLOB lcc_src "src/*.cc")
+file(GLOB lcc_src "src/Lex/*.cc" "src/Parse/*.cc" "src/Sema/*.cc" "src/CodeGen/*.cc" "src/Support/*.cc")
 
 set(LCC_VERSION_STRING "0.3")
 configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/Version.inc.in
-        ${CMAKE_CURRENT_BINARY_DIR}/src/Version.inc)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/Support/Version.inc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/src/Support/Version.inc)
 
 # compiler and set search include and link llvm lib
 add_executable(${PROJECT_NAME} main.cpp ${lcc_src})

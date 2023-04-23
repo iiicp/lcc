@@ -38,6 +38,9 @@ public:
 
   T *operator->() { return impl_.get(); }
   const T *operator->() const { return impl_.get(); }
+
+  T *get() { return impl_.get(); }
+  const T *get() const { return impl_.get(); }
 };
 } // namespace lcc
 

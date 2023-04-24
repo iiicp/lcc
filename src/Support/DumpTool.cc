@@ -12,28 +12,20 @@
 #include "DumpTool.h"
 #include "Utilities.h"
 #include "llvm/Support/raw_ostream.h"
+#include "ValueReset.h"
 namespace lcc::dump {
 
 static uint64_t LeftAlign = 1;
 
-void IncAlign() {
-  LeftAlign++;
-}
-
-void DecAlign() {
-  assert(LeftAlign > 1);
-  LeftAlign--;
-}
-
-//void Print(const std::string &content) {
-//  std::string ws(LeftAlign, ' ');
-//  llvm::outs() << ws << content << " ";
+//void IncAlign() {
+//  LeftAlign++;
+//}
+//
+//void DecAlign() {
+//  assert(LeftAlign > 1);
+//  LeftAlign--;
 //}
 
-//void Println(const std::string &content) {
-//  std::string ws(LeftAlign, ' ');
-//  llvm::outs() << ws << content << "\n";
-//}
 
 void Print(std::string_view content) {
   std::string ws(LeftAlign, '-');
@@ -74,14 +66,14 @@ void visitor(const Syntax::TranslationUnit &unit) {
   for (auto &externalDecl : unit.getGlobals()) {
     std::visit(overload{
                    [](const Syntax::Declaration &declaration) {
-                     IncAlign();
+                     ValueReset v(LeftAlign, LeftAlign+1);
                      visitor(declaration);
-                     DecAlign();
+
                    },
                    [](const Syntax::FunctionDefinition &functionDefinition) {
-                     IncAlign();
+                     ValueReset v(LeftAlign, LeftAlign+1);
                      visitor(functionDefinition);
-                     DecAlign();
+
                    }
                }, externalDecl);
   }
@@ -89,31 +81,30 @@ void visitor(const Syntax::TranslationUnit &unit) {
 void visitor(const Syntax::Declaration &declaration) {
   Print("Declaration");
   llvm::outs() << &declaration << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(declaration.getDeclarationSpecifiers());
   for (auto &initDec : declaration.getInitDeclarators()) {
-    if (initDec.mDeclarator) {
-      visitor(*initDec.mDeclarator);
-    }
-    if (initDec.mOptInitializer) {
-      visitor(*initDec.mOptInitializer);
+      visitor(*initDec.declarator_);
+
+    if (initDec.optionalInitializer_) {
+      visitor(*initDec.optionalInitializer_);
     }
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::FunctionDefinition &functionDefinition) {
   Print("FunctionDefinition");
   llvm::outs() << &functionDefinition << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(functionDefinition.getDeclarationSpecifiers());
   visitor(functionDefinition.getDeclarator());
   visitor(functionDefinition.getCompoundStatement());
-  DecAlign();
+
 }
 void visitor(const Syntax::DeclarationSpecifiers &declarationSpecifiers) {
   Print("DeclarationSpecifiers");
   llvm::outs() << &declarationSpecifiers << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &storage : declarationSpecifiers.getStorageClassSpecifiers()) {
     visitor(storage);
   }
@@ -123,71 +114,72 @@ void visitor(const Syntax::DeclarationSpecifiers &declarationSpecifiers) {
   for (const auto &specifier : declarationSpecifiers.getTypeSpecifiers()) {
     visitor(specifier);
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::Declarator &declarator) {
   Print("Declarator");
   llvm::outs() << &declarator << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &point : declarator.getPointers()) {
     visitor(point);
   }
   visitor(declarator.getDirectDeclarator());
-  DecAlign();
+
 }
 
 void visitor(const Syntax::AbstractDeclarator &abstractDeclarator) {
   Print("AbstractDeclarator");
   llvm::outs() << &abstractDeclarator << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &point : abstractDeclarator.getPointers()) {
     visitor(point);
   }
   if (abstractDeclarator.getDirectAbstractDeclarator()) {
     visitor(*abstractDeclarator.getDirectAbstractDeclarator());
   }
-  DecAlign();
+
 }
 
 void visitor(const Syntax::Initializer &initializer) {
   Print("Initializer");
   llvm::outs() << &initializer << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
       [](const Syntax::AssignExpr &assignExpr) {
          visitor(assignExpr);
-      },[](const std::unique_ptr<Syntax::InitializerList> &initializerList) {
+      },[](const box<Syntax::InitializerList> &initializerList) {
        visitor(*initializerList);}
   }, initializer.getVariant());
-  DecAlign();
 }
 
 void visitor(const Syntax::InitializerList &initializerList) {
   Print("InitializerList");
   llvm::outs() << &initializerList << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &vec : initializerList.getInitializerList()) {
-    for (const auto &designator : vec.second) {
-      std::visit(overload{
-          [](const Syntax::ConstantExpr &constantExpr) {
-             visitor(constantExpr);
-          },
-          [](const std::string_view &ident) {
-             IncAlign();
-             Println(ident);
-             DecAlign();
-          },
-      }, designator);
+    if (vec.first) {
+      for (const auto &designator : *vec.first) {
+        std::visit(overload{
+                       [](const Syntax::ConstantExpr &constantExpr) {
+                         visitor(constantExpr);
+                       },
+                       [](const std::string_view &ident) {
+                         ValueReset v(LeftAlign, LeftAlign+1);
+                         Println(ident);
+
+                       },
+                   }, designator);
+      }
     }
-    visitor(vec.first);
+    visitor(vec.second);
   }
-  DecAlign();
+
 }
 
 void visitor(const Syntax::StorageClassSpecifier &storageClassSpecifier) {
   Print("StorageClassSpecifier");
   llvm::outs() << &storageClassSpecifier << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   switch (storageClassSpecifier.getSpecifier()) {
   case Syntax::StorageClassSpecifier::Typedef:
     Println("Typedef");
@@ -207,12 +199,12 @@ void visitor(const Syntax::StorageClassSpecifier &storageClassSpecifier) {
   default:
     break;
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::TypeQualifier &typeQualifier) {
   Print("TypeQualifier");
   llvm::outs() << &typeQualifier << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   switch (typeQualifier.getQualifier()) {
   case Syntax::TypeQualifier::Const:
     Println("Const");
@@ -226,17 +218,17 @@ void visitor(const Syntax::TypeQualifier &typeQualifier) {
   default:
     break;
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
   Print("TypeSpecifier");
   llvm::outs() << &typeSpecifier << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
       [](const Syntax::TypeSpecifier::PrimitiveTypeSpecifier & primitiveTypeSpecifier) {
             Print("PrimitiveTypeSpecifier");
             llvm::outs() << &primitiveTypeSpecifier << "\n";
-            IncAlign();
+            ValueReset v(LeftAlign, LeftAlign+1);
             switch (primitiveTypeSpecifier) {
             case Syntax::TypeSpecifier::Void: {
               Println("Void");
@@ -281,224 +273,197 @@ void visitor(const Syntax::TypeSpecifier &typeSpecifier) {
             default:
               break;
             }
-            DecAlign();
+
           },
-      [](const std::unique_ptr<Syntax::StructOrUnionSpecifier> & structOrUnionSpecifier) {
+      [](const box<Syntax::StructOrUnionSpecifier> & structOrUnionSpecifier) {
            Print("StructOrUnionSpecifier");
            llvm::outs() << &structOrUnionSpecifier << " " << structOrUnionSpecifier->isUnion() << ", "
                         << structOrUnionSpecifier->getTag() << "\n";
            {
-             IncAlign();
+             ValueReset v(LeftAlign, LeftAlign+1);
              for (const auto &structDeclaration : structOrUnionSpecifier->getStructDeclarations()) {
-               visitor(structDeclaration.specifierQualifiers);
-               for (const auto &structDeclarator : structDeclaration.structDeclarators) {
-                 if (structDeclarator.optionalDeclarator) {
-                   visitor(*structDeclarator.optionalDeclarator);
+               visitor(structDeclaration.specifierQualifiers_);
+               for (const auto &structDeclarator : structDeclaration.structDeclarators_) {
+                 if (structDeclarator.optionalDeclarator_) {
+                   visitor(*structDeclarator.optionalDeclarator_);
                  }
-                 if (structDeclarator.optionalBitfield) {
-                   visitor(*structDeclarator.optionalBitfield);
+                 if (structDeclarator.optionalBitfield_) {
+                   visitor(*structDeclarator.optionalBitfield_);
                  }
                }
              }
-             DecAlign();
            }
       },
-      [](const std::unique_ptr<Syntax::EnumSpecifier> & enumSpecifier) {
+      [](const box<Syntax::EnumSpecifier> & enumSpecifier) {
            Print("EnumSpecifier");
            llvm::outs() << &enumSpecifier << " " << enumSpecifier->getName() << "\n";
            {
-              IncAlign();
+              ValueReset v(LeftAlign, LeftAlign+1);
               for (const auto &enumerator : enumSpecifier->getEnumerators()) {
-                Print(enumerator.mName);
-                if (enumerator.mValue) {
-                  visitor(enumerator.mValue.value());
+                Print(enumerator.name_);
+                if (enumerator.optionalConstantExpr_) {
+                  visitor(*enumerator.optionalConstantExpr_);
                 }
               }
-              DecAlign();
+
            }
       },
-      [](const std::string_view& stringView) {
+      [](const Syntax::TypeSpecifier::TypedefName& stringView) {
           Println(stringView);
       }
   }, typeSpecifier.getVariant());
-  DecAlign();
+
 }
 void visitor(const Syntax::FunctionSpecifier &functionSpecifier ) {
   Print("FunctionSpecifier");
   llvm::outs() << &functionSpecifier << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   Println("inline");
-  DecAlign();
 }
 
-//void visitor(const Syntax::SpecifierQualifiers &specifierQualifiers) {
-//  Print("SpecifierQualifiers");
-//  llvm::outs() << &specifierQualifiers << "\n";
-//  IncAlign();
-//  for (const auto &qualifier : specifierQualifiers.getTypeQualifiers()) {
-//    visitor(qualifier);
-//  }
-//  for (const auto &specifier : specifierQualifiers.getTypeSpecifiers()) {
-//    visitor(specifier);
-//  }
-//  DecAlign();
-//}
 
 void visitor(const Syntax::Pointer &pointer) {
   Print("Pointer");
   llvm::outs() << &pointer << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &p : pointer.getTypeQualifiers()) {
     visitor(p);
   }
-  DecAlign();
 }
 
 void visitor(const Syntax::DirectDeclarator &directDeclarator) {
 //  Print("DirectDeclarator");
 //  llvm::outs() << &directDeclarator << "\n";
-//  IncAlign();
+//  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
-      [](const Syntax::DirectDeclaratorIdent &ident) {
+      [](const box<Syntax::DirectDeclaratorIdent> &ident) {
          Print("DirectDeclaratorIdent");
          llvm::outs() << &ident << "\n";
-         IncAlign();
-         Println(ident.getIdent());
-         DecAlign();
+         ValueReset v(LeftAlign, LeftAlign+1);
+         Println(ident->getIdent());
+
       },
-      [](const Syntax::DirectDeclaratorParentheses &directDeclaratorParent) {
+      [](const box<Syntax::DirectDeclaratorParentheses> &directDeclaratorParent) {
          Print("DirectDeclaratorParentheses");
          llvm::outs() << &directDeclaratorParent << "\n";
-         IncAlign();
-         visitor(*directDeclaratorParent.getDeclarator());
-         DecAlign();
+         ValueReset v(LeftAlign, LeftAlign+1);
+         visitor(directDeclaratorParent->getDeclarator());
+
       },
-      [](const Syntax::DirectDeclaratorAssignExpr &directDeclaratorAssignExpr) {
+      [](const box<Syntax::DirectDeclaratorAssignExpr> &directDeclaratorAssignExpr) {
          Print("DirectDeclaratorAssignExpr");
          llvm::outs() << &directDeclaratorAssignExpr << "\n";
-         IncAlign();
-         visitor(*directDeclaratorAssignExpr.getDirectDeclarator());
-         if (directDeclaratorAssignExpr.hasStatic()) {
+         ValueReset v(LeftAlign, LeftAlign+1);
+         visitor(directDeclaratorAssignExpr->getDirectDeclarator());
+         if (directDeclaratorAssignExpr->hasStatic()) {
            Println("has static");
          }
-         for (const auto &typeQualifier : directDeclaratorAssignExpr.getTypeQualifierList()) {
+         for (const auto &typeQualifier : directDeclaratorAssignExpr->getTypeQualifierList()) {
            visitor(typeQualifier);
          }
-         if (directDeclaratorAssignExpr.getAssignmentExpression()) {
-           visitor(*directDeclaratorAssignExpr.getAssignmentExpression());
+         if (directDeclaratorAssignExpr->getAssignmentExpression()) {
+           visitor(*directDeclaratorAssignExpr->getAssignmentExpression());
          }
-         DecAlign();
       },
-      [](const Syntax::DirectDeclaratorParamTypeList
+      [](const box<Syntax::DirectDeclaratorParamTypeList>
                  &directDeclaratorParentParamTypeList) {
          Print("DirectDeclaratorParamTypeList");
          llvm::outs() << &directDeclaratorParentParamTypeList << "\n";
-         IncAlign();
-         visitor(*directDeclaratorParentParamTypeList.getDirectDeclarator());
-         visitor(directDeclaratorParentParamTypeList.getParameterTypeList());
-         DecAlign();
+         ValueReset v(LeftAlign, LeftAlign+1);
+         visitor(directDeclaratorParentParamTypeList->getDirectDeclarator());
+         visitor(directDeclaratorParentParamTypeList->getParamTypeList());
       },
-     [](const Syntax::DirectDeclaratorAsterisk &directDeclaratorAsterisk) {
+     [](const box<Syntax::DirectDeclaratorAsterisk> &directDeclaratorAsterisk) {
        Print("DirectDeclaratorAsterisk");
        llvm::outs() << &directDeclaratorAsterisk << "\n";
-       IncAlign();
-       visitor(*directDeclaratorAsterisk.getDirectDeclarator());
-       for (const auto &typeQualifier : directDeclaratorAsterisk.getTypeQualifierList()) {
+       ValueReset v(LeftAlign, LeftAlign+1);
+       visitor(directDeclaratorAsterisk->getDirectDeclarator());
+       for (const auto &typeQualifier : directDeclaratorAsterisk->getTypeQualifierList()) {
          visitor(typeQualifier);
        }
-       DecAlign();
      },
   }, directDeclarator);
- // DecAlign();
 }
 
 void visitor(const Syntax::DirectAbstractDeclarator &directAbstractDeclarator) {
 //  Print("DirectAbstractDeclarator");
 //  llvm::outs() << &directAbstractDeclarator << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
-                 [](const Syntax::DirectAbstractDeclaratorParentheses
+                 [](const box<Syntax::DirectAbstractDeclaratorParentheses>
                         &directAbstractDeclaratorParent) {
                    Print("DirectAbstractDeclaratorParentheses");
                    llvm::outs() << &directAbstractDeclaratorParent << "\n";
-                   IncAlign();
-                   visitor(*directAbstractDeclaratorParent.getAbstractDeclarator());
-                   DecAlign();
+                   ValueReset v(LeftAlign, LeftAlign+1);
+                   visitor(directAbstractDeclaratorParent->getAbstractDeclarator());
                  },
-                 [](const Syntax::DirectAbstractDeclaratorAssignExpr &directAbstractDeclaratorAssignExpr) {
+                 [](const box<Syntax::DirectAbstractDeclaratorAssignExpr> &directAbstractDeclaratorAssignExpr) {
                    Print("DirectAbstractDeclaratorAssignExpr");
                    llvm::outs() << &directAbstractDeclaratorAssignExpr << "\n";
-                   IncAlign();
-                   if (directAbstractDeclaratorAssignExpr.getDirectAbstractDeclarator()) {
+                   ValueReset v(LeftAlign, LeftAlign+1);
+                   if (directAbstractDeclaratorAssignExpr->getDirectAbstractDeclarator()) {
                      visitor(*directAbstractDeclaratorAssignExpr
-                                  .getDirectAbstractDeclarator());
+                                  ->getDirectAbstractDeclarator());
                    }
-                   if (directAbstractDeclaratorAssignExpr.hasStatic()) {
+                   if (directAbstractDeclaratorAssignExpr->hasStatic()) {
                      Println("has static");
                    }
-                   for (const auto &typeQualifier : directAbstractDeclaratorAssignExpr.getTypeQualifiers()) {
+                   for (const auto &typeQualifier : directAbstractDeclaratorAssignExpr->getTypeQualifiers()) {
                      visitor(typeQualifier);
                    }
-                   if (directAbstractDeclaratorAssignExpr.getAssignmentExpression()) {
-                     visitor(*directAbstractDeclaratorAssignExpr
-                                  .getAssignmentExpression());
+                   if (directAbstractDeclaratorAssignExpr->getAssignmentExpression()) {
+                     visitor(*directAbstractDeclaratorAssignExpr->getAssignmentExpression());
                    }
-                   DecAlign();
                  },
-                 [](const Syntax::DirectAbstractDeclaratorParamTypeList &directAbstractDeclaratorParamTypeList) {
+                 [](const box<Syntax::DirectAbstractDeclaratorParamTypeList> &directAbstractDeclaratorParamTypeList) {
                    Print("DirectAbstractDeclaratorParamTypeList");
                    llvm::outs() << &directAbstractDeclaratorParamTypeList << "\n";
-                   IncAlign();
-                   if (directAbstractDeclaratorParamTypeList.getDirectAbstractDeclarator()) {
-                     visitor(*directAbstractDeclaratorParamTypeList
-                                  .getDirectAbstractDeclarator());
+                   ValueReset v(LeftAlign, LeftAlign+1);
+                   if (directAbstractDeclaratorParamTypeList->getDirectAbstractDeclarator()) {
+                     visitor(*directAbstractDeclaratorParamTypeList->getDirectAbstractDeclarator());
                    }
-                   if (directAbstractDeclaratorParamTypeList.getParameterTypeList())
-                    visitor(*directAbstractDeclaratorParamTypeList.getParameterTypeList());
-                   DecAlign();
+                   if (directAbstractDeclaratorParamTypeList->getParameterTypeList())
+                    visitor(*directAbstractDeclaratorParamTypeList->getParameterTypeList());
                  },
-                 [](const Syntax::DirectAbstractDeclaratorAsterisk &directAbstractDeclaratorAsterisk) {
+                 [](const box<Syntax::DirectAbstractDeclaratorAsterisk> &directAbstractDeclaratorAsterisk) {
                    Print("DirectAbstractDeclaratorAsterisk");
                    llvm::outs() << &directAbstractDeclaratorAsterisk << "\n";
-                   IncAlign();
-                   if (directAbstractDeclaratorAsterisk.getDirectAbstractDeclarator()) {
-                     visitor(*directAbstractDeclaratorAsterisk
-                                  .getDirectAbstractDeclarator());
+                   ValueReset v(LeftAlign, LeftAlign+1);
+                   if (directAbstractDeclaratorAsterisk->getDirectAbstractDeclarator()) {
+                     visitor(*directAbstractDeclaratorAsterisk->getDirectAbstractDeclarator());
                    }
-                   DecAlign();
                  },
              }, directAbstractDeclarator);
-  DecAlign();
+
 }
 
 void visitor(const Syntax::ParamTypeList &paramTypeList) {
   Print("ParamTypeList");
   llvm::outs() << &paramTypeList << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(paramTypeList.getParameterList());
   if (paramTypeList.hasEllipse()) {
     Println("...");
   }
-  DecAlign();
+
 }
 
 void visitor(const Syntax::ParamList &paramList) {
   Print("ParamList");
   llvm::outs() << &paramList << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &paramDecl : paramList.getParameterDeclarations()) {
-    visitor(paramDecl.declarationSpecifiers);
+    visitor(paramDecl.declarationSpecifiers_);
     std::visit(overload{
-        [](const std::unique_ptr<Syntax::Declarator> &declarator) {
-           visitor(*declarator);
+        [](const Syntax::Declarator &declarator) {
+           visitor(declarator);
         },
-        [](const std::optional<std::unique_ptr<Syntax::AbstractDeclarator>> &abstractDeclarator) {
-            if (abstractDeclarator.has_value())
-              visitor(*abstractDeclarator.value());
+        [](const std::optional<Syntax::AbstractDeclarator> &abstractDeclarator) {
+            if (abstractDeclarator)
+              visitor(*abstractDeclarator);
         },
-    }, paramDecl.declarator);
+    }, paramDecl.declaratorKind_);
   }
-  DecAlign();
 }
 
 void visitor(const Syntax::BlockStmt &blockStmt) {
@@ -512,99 +477,74 @@ void visitor(const Syntax::BlockStmt &blockStmt) {
 void visitor(const Syntax::BlockItem &blockItem) {
 //  Print("BlockItem");
 //  llvm::outs() << &blockItem << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
       [](const Syntax::Stmt &stmt) {
-         std::visit(overload{
-            [](const Syntax::IfStmt &ifStmt){ visitor(ifStmt);},
-            [](const Syntax::ForStmt &forStmt){ visitor(forStmt);},
-            [](const Syntax::WhileStmt &whileStmt){ visitor(whileStmt);},
-            [](const Syntax::DoWhileStmt &doWhileStmt){ visitor(doWhileStmt);},
-            [](const Syntax::BreakStmt &breakStmt){ visitor(breakStmt);},
-            [](const Syntax::ContinueStmt &continueStmt){ visitor(continueStmt);},
-            [](const Syntax::SwitchStmt &switchStmt){ visitor(switchStmt);},
-            [](const Syntax::CaseStmt &caseStmt){ visitor(caseStmt);},
-            [](const Syntax::DefaultStmt &defaultStmt){ visitor(defaultStmt);},
-            [](const Syntax::ReturnStmt &returnStmt){ visitor(returnStmt);},
-            [](const Syntax::ExprStmt &exprStmt){ visitor(exprStmt);},
-            [](const Syntax::GotoStmt &gotoStmt){ visitor(gotoStmt);},
-            [](const Syntax::LabelStmt &labelStmt){ visitor(labelStmt);},
-            [](const Syntax::BlockStmt &blockStmt){ visitor(blockStmt);},
-         }, stmt);
+         visitor(stmt);
       },
       [](const Syntax::Declaration &declaration) {
          visitor(declaration);
       }
   }, blockItem);
-  DecAlign();
 }
 
 void visitor(const Syntax::Stmt &stmt) {
   std::visit(overload{
-                 [](const Syntax::IfStmt &ifStmt){ visitor(ifStmt);},
-                 [](const Syntax::ForStmt &forStmt){ visitor(forStmt);},
-                 [](const Syntax::WhileStmt &whileStmt){ visitor(whileStmt);},
-                 [](const Syntax::DoWhileStmt &doWhileStmt){ visitor(doWhileStmt);},
-                 [](const Syntax::BreakStmt &breakStmt){ visitor(breakStmt);},
-                 [](const Syntax::ContinueStmt &continueStmt){ visitor(continueStmt);},
-                 [](const Syntax::SwitchStmt &switchStmt){ visitor(switchStmt);},
-                 [](const Syntax::CaseStmt &caseStmt){ visitor(caseStmt);},
-                 [](const Syntax::DefaultStmt &defaultStmt){ visitor(defaultStmt);},
-                 [](const Syntax::ReturnStmt &returnStmt){ visitor(returnStmt);},
-                 [](const Syntax::ExprStmt &exprStmt){ visitor(exprStmt);},
-                 [](const Syntax::GotoStmt &gotoStmt){ visitor(gotoStmt);},
-                 [](const Syntax::LabelStmt &labelStmt){ visitor(labelStmt);},
-                 [](const Syntax::BlockStmt &blockStmt){ visitor(blockStmt);},
+                 [](const box<Syntax::IfStmt> &ifStmt){ visitor(*ifStmt);},
+                 [](const box<Syntax::ForStmt> &forStmt){ visitor(*forStmt);},
+                 [](const box<Syntax::WhileStmt> &whileStmt){ visitor(*whileStmt);},
+                 [](const box<Syntax::DoWhileStmt> &doWhileStmt){ visitor(*doWhileStmt);},
+                 [](const box<Syntax::BreakStmt> &breakStmt){ visitor(*breakStmt);},
+                 [](const box<Syntax::ContinueStmt> &continueStmt){ visitor(*continueStmt);},
+                 [](const box<Syntax::SwitchStmt> &switchStmt){ visitor(*switchStmt);},
+                 [](const box<Syntax::CaseStmt> &caseStmt){ visitor(*caseStmt);},
+                 [](const box<Syntax::DefaultStmt> &defaultStmt){ visitor(*defaultStmt);},
+                 [](const box<Syntax::ReturnStmt> &returnStmt){ visitor(*returnStmt);},
+                 [](const box<Syntax::ExprStmt> &exprStmt){ visitor(*exprStmt);},
+                 [](const box<Syntax::GotoStmt> &gotoStmt){ visitor(*gotoStmt);},
+                 [](const box<Syntax::LabelStmt> &labelStmt){ visitor(*labelStmt);},
+                 [](const box<Syntax::BlockStmt> &blockStmt){ visitor(*blockStmt);},
              }, stmt);
 }
 
 void visitor(const Syntax::IfStmt &ifStmt){
   Print("IfStmt");
   llvm::outs() << &ifStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(ifStmt.getExpression());
-  visitor(*ifStmt.getThenStmt());
+  visitor(ifStmt.getThenStmt());
   if (ifStmt.getElseStmt()) {
     visitor(*ifStmt.getElseStmt());
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::ForStmt &forStmt){
   Print("ForStmt");
   llvm::outs() << &forStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
-      [](const std::unique_ptr<Syntax::Declaration>& declaration) { visitor(*declaration);},
-      [](const std::unique_ptr<Syntax::Expr>& expr) { visitor(*expr);},
+      [](const box<Syntax::Declaration>& declaration) { visitor(*declaration);},
+      [](const std::optional<Syntax::Expr>& expr) { if (expr) visitor(*expr);},
   }, forStmt.getInitial());
   if (forStmt.getControlling())
     visitor(*forStmt.getControlling());
   if (forStmt.getPost())
     visitor(*forStmt.getPost());
-  if (forStmt.getStatement()) {
-    visitor(*forStmt.getStatement());
-  }
-  DecAlign();
+  visitor(forStmt.getStatement());
 }
 void visitor(const Syntax::WhileStmt &whileStmt){
   Print("WhileStmt");
   llvm::outs() << &whileStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(whileStmt.getExpression());
-  if (whileStmt.getStatement()) {
-    visitor(*whileStmt.getStatement());
-  }
-  DecAlign();
+  visitor(whileStmt.getStatement());
 }
 void visitor(const Syntax::DoWhileStmt &doWhileStmt){
   Print("DoWhileStmt");
   llvm::outs() << &doWhileStmt << "\n";
-  IncAlign();
-  if (doWhileStmt.getStatement()) {
-    visitor(*doWhileStmt.getStatement());
-  }
+  ValueReset v(LeftAlign, LeftAlign+1);
+  visitor(doWhileStmt.getStatement());
   visitor(doWhileStmt.getExpression());
-  DecAlign();
 }
 void visitor(const Syntax::BreakStmt &breakStmt){
   Print("BreakStmt");
@@ -617,45 +557,35 @@ void visitor(const Syntax::ContinueStmt &continueStmt){
 void visitor(const Syntax::SwitchStmt &switchStmt){
   Print("SwitchStmt");
   llvm::outs() << &switchStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(switchStmt.getExpression());
-  if (switchStmt.getStatement()) {
-    visitor(*switchStmt.getStatement());
-  }
-  DecAlign();
+  visitor(switchStmt.getStatement());
 }
 void visitor(const Syntax::CaseStmt &caseStmt){
   Print("CaseStmt");
   llvm::outs() << &caseStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(caseStmt.getConstantExpr());
-  if (caseStmt.getStatement()) {
-    visitor(*caseStmt.getStatement());
-  }
-  DecAlign();
+  visitor(caseStmt.getStatement());
 }
 void visitor(const Syntax::DefaultStmt &defaultStmt){
   Print("DefaultStmt");
   llvm::outs() << &defaultStmt << "\n";
-  IncAlign();
-  if (defaultStmt.getStatement()) {
-    visitor(*defaultStmt.getStatement());
-  }
-  DecAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
+  visitor(defaultStmt.getStatement());
 }
 void visitor(const Syntax::GotoStmt &gotoStmt){
   Print("GotoStmt");
   llvm::outs() << &gotoStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   Println(gotoStmt.getIdentifier());
-  DecAlign();
 }
 void visitor(const Syntax::LabelStmt &labelStmt){
   Print("LabelStmt");
   llvm::outs() << &labelStmt << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   Println(labelStmt.getIdentifier());
-  DecAlign();
+
 }
 void visitor(const Syntax::ExprStmt &exprStmt){
   Print("ExprStmt");
@@ -668,26 +598,24 @@ void visitor(const Syntax::ReturnStmt &returnStmt){
   Print("ReturnStmt");
   llvm::outs() << &returnStmt << "\n";
   if (returnStmt.getExpression()) {
-    IncAlign();
+    ValueReset v(LeftAlign, LeftAlign+1);
     visitor(*returnStmt.getExpression());
-    DecAlign();
   }
 }
 
 void visitor(const Syntax::Expr &expr) {
   Print("Expr");
   llvm::outs() << &expr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &assignExpr : expr.getAssignExpressions()) {
     visitor(assignExpr);
   }
-  DecAlign();
 }
 
 void visitor(const Syntax::AssignExpr &assignExpr) {
   Print("AssignExpr");
   llvm::outs() << &assignExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(assignExpr.getConditionalExpr());
   for (const auto &pair : assignExpr.getOptionalConditionalExpr()) {
     switch (pair.first) {
@@ -740,14 +668,13 @@ void visitor(const Syntax::AssignExpr &assignExpr) {
     }
     visitor(pair.second);
   }
-  DecAlign();
 }
 
 /// conditionalExpr
 void visitor(const Syntax::ConstantExpr &constantExpr) {
   Print("ConditionalExpr");
   llvm::outs() << &constantExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(constantExpr.getLogicalOrExpression());
   if (constantExpr.getOptionalExpression()) {
     visitor(*constantExpr.getOptionalExpression());
@@ -755,62 +682,58 @@ void visitor(const Syntax::ConstantExpr &constantExpr) {
   if (constantExpr.getOptionalConditionalExpression()) {
     visitor(*constantExpr.getOptionalConditionalExpression());
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::LogOrExpr &logOrExpr){
   Print("LogOrExpr");
   llvm::outs() << &logOrExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(logOrExpr.getAndExpression());
   for (const auto &logAndExpr: logOrExpr.getOptionalAndExpressions()) {
     visitor(logAndExpr);
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::LogAndExpr &logAndExpr){
   Print("LogAndExpr");
   llvm::outs() << &logAndExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(logAndExpr.getBitOrExpression());
   for (const auto &bitOrExpr: logAndExpr.getOptionalBitOrExpressions()) {
     visitor(bitOrExpr);
   }
-  DecAlign();
 }
 void visitor(const Syntax::BitOrExpr &bitOrExpr){
   Print("BitOrExpr");
   llvm::outs() << &bitOrExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(bitOrExpr.getBitXorExpression());
   for (const auto &bitXorExpr: bitOrExpr.getOptionalBitXorExpressions()) {
     visitor(bitXorExpr);
   }
-  DecAlign();
 }
 void visitor(const Syntax::BitXorExpr &bitXorExpr){
   Print("BitXorExpr");
   llvm::outs() << &bitXorExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(bitXorExpr.getBitAndExpr());
   for (const auto &bitAndExpr: bitXorExpr.getOptionalBitAndExpressions()) {
     visitor(bitAndExpr);
   }
-  DecAlign();
 }
 void visitor(const Syntax::BitAndExpr &bitAndExpr){
   Print("BitAndExpr");
   llvm::outs() << &bitAndExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(bitAndExpr.getEqualExpr());
   for (const auto &equalExpr: bitAndExpr.getOptionalEqualExpr()) {
     visitor(equalExpr);
   }
-  DecAlign();
 }
 void visitor(const Syntax::EqualExpr &equalExpr){
   Print("EqualExpr");
   llvm::outs() << &equalExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(equalExpr.getRelationalExpr());
   for (const auto &relationExpr: equalExpr.getOptionalRelationalExpr()) {
     switch (relationExpr.first) {
@@ -827,12 +750,11 @@ void visitor(const Syntax::EqualExpr &equalExpr){
     }
     visitor(relationExpr.second);
   }
-  DecAlign();
 }
 void visitor(const Syntax::RelationalExpr &relationalExpr){
   Print("RelationalExpr");
   llvm::outs() << &relationalExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(relationalExpr.getShiftExpr());
   for (const auto &shiftExpr: relationalExpr.getOptionalShiftExpressions()) {
     switch (shiftExpr.first) {
@@ -857,12 +779,11 @@ void visitor(const Syntax::RelationalExpr &relationalExpr){
     }
     visitor(shiftExpr.second);
   }
-  DecAlign();
 }
 void visitor(const Syntax::ShiftExpr &shiftExpr){
   Print("ShiftExpr");
   llvm::outs() << &shiftExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(shiftExpr.getAdditiveExpr());
   for (const auto &additiveExpr: shiftExpr.getOptAdditiveExps()) {
     switch (additiveExpr.first) {
@@ -879,14 +800,13 @@ void visitor(const Syntax::ShiftExpr &shiftExpr){
     }
     visitor(additiveExpr.second);
   }
-  DecAlign();
 }
 void visitor(const Syntax::AdditiveExpr &additiveExpr){
   Print("AdditiveExpr");
   llvm::outs() << &additiveExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(additiveExpr.getMultiExpr());
-  for (const auto &multiExpr: additiveExpr.getOptionalMultiExpr()) {
+  for (const auto &multiExpr: additiveExpr.getOptionalMultiExps()) {
     switch (multiExpr.first) {
     case Syntax::AdditiveExpr::Minus: {
       Println("-");
@@ -901,14 +821,13 @@ void visitor(const Syntax::AdditiveExpr &additiveExpr){
     }
     visitor(multiExpr.second);
   }
-  DecAlign();
 }
 void visitor(const Syntax::MultiExpr &multiExpr){
   Print("MultiExpr");
   llvm::outs() << &multiExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(multiExpr.getCastExpr());
-  for (const auto &castExpr: multiExpr.getOptionalCastExpr()) {
+  for (const auto &castExpr: multiExpr.getOptionalCastExps()) {
     switch (castExpr.first) {
     case Syntax::MultiExpr::Multiply: {
       Println("*");
@@ -927,33 +846,32 @@ void visitor(const Syntax::MultiExpr &multiExpr){
     }
     visitor(castExpr.second);
   }
-  DecAlign();
+
 }
 void visitor(const Syntax::CastExpr &castExpr){
   Print("CastExpr");
   llvm::outs() << &castExpr << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   std::visit(overload{
       [](const Syntax::UnaryExpr &unaryExpr) {visitor(unaryExpr);},
-      [](const std::pair<Syntax::TypeName, std::unique_ptr<Syntax::CastExpr>> &pair) {
+      [](const Syntax::CastExpr::TypeNameCast &pair) {
          visitor(pair.first);
          visitor(*pair.second);
       }
   }, castExpr.getVariant());
-  DecAlign();
 }
 void visitor(const Syntax::UnaryExpr &unaryExpr){
   std::visit(overload{
-    [](const Syntax::UnaryExprPostFixExpr &unaryExprPostFixExpr) {
+    [](const Syntax::PostFixExpr &postFixExpr) {
        Print("UnaryExprPostFixExpr");
-       llvm::outs() << &unaryExprPostFixExpr << "\n";
-       visitor(unaryExprPostFixExpr.getPostExpr());
+       llvm::outs() << &postFixExpr << "\n";
+       visitor(postFixExpr);
     },
-    [](const Syntax::UnaryExprUnaryOperator &unaryExprUnaryOperator) {
+    [](const box<Syntax::UnaryExprUnaryOperator> &unaryExprUnaryOperator) {
        Print("UnaryExprUnaryOperator");
        llvm::outs() << &unaryExprUnaryOperator << "\n";
-       IncAlign();
-       switch (unaryExprUnaryOperator.getOperator()) {
+       ValueReset v(LeftAlign, LeftAlign+1);
+       switch (unaryExprUnaryOperator->getOperator()) {
        case Syntax::UnaryExprUnaryOperator::UnaryOperator::Increment: {
          Println("++");
          break;
@@ -989,133 +907,119 @@ void visitor(const Syntax::UnaryExpr &unaryExpr){
        default:
          break;
        }
-       visitor(*unaryExprUnaryOperator.getCastExpr());
-       DecAlign();
+       visitor(*unaryExprUnaryOperator->getCastExpr());
     },
-    [](const Syntax::UnaryExprSizeOf &unaryExprSizeOf) {
+    [](const box<Syntax::UnaryExprSizeOf> &unaryExprSizeOf) {
        Print("UnaryExprSizeOf");
        llvm::outs() << &unaryExprSizeOf << "\n";
-       IncAlign();
+       ValueReset v(LeftAlign, LeftAlign+1);
        std::visit(overload{
-         [](const std::unique_ptr<Syntax::UnaryExpr>& unaryExpr){visitor(*unaryExpr);},
-         [](const std::unique_ptr<Syntax::TypeName>& typeName){visitor(*typeName);},
+         [](const Syntax::UnaryExpr& unaryExpr){visitor(unaryExpr);},
+         [](const Syntax::TypeNameBox& typeName){visitor(*typeName);},
        },
-       unaryExprSizeOf.getVariant());
-       DecAlign();
+       unaryExprSizeOf->getVariant());
     },
   }, unaryExpr);
 }
 void visitor(const Syntax::TypeName &typeName){
   Print("TypeName");
   llvm::outs() << &typeName << "\n";
-  IncAlign();
+  ValueReset v(LeftAlign, LeftAlign+1);
   visitor(typeName.getSpecifierQualifiers());
   if (typeName.getAbstractDeclarator())
     visitor(*typeName.getAbstractDeclarator());
-  DecAlign();
+
 }
 void visitor(const Syntax::PostFixExpr &postFixExpr){
   std::visit(overload{
-     [](const Syntax::PostFixExprPrimaryExpr &primaryExpr) {
-          IncAlign();
+     [](const Syntax::PrimaryExpr &primaryExpr) {
+          ValueReset v(LeftAlign, LeftAlign+1);
           Print("PostFixExprPrimaryExpr");
           llvm::outs() << &primaryExpr << "\n";
-          visitor(primaryExpr.getPrimaryExpr());
-          DecAlign();
+          visitor(primaryExpr);
      },
-     [](const Syntax::PostFixExprSubscript &subscript) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprSubscript> &subscript) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprSubscript");
          llvm::outs() << &subscript << "\n";
-         visitor(*subscript.getPostFixExpr());
-         visitor(subscript.getExpr());
-         DecAlign();
+         visitor(subscript->getPostFixExpr());
+         visitor(subscript->getExpr());
+
      },
-     [](const Syntax::PostFixExprFuncCall &funcCall) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprFuncCall> &funcCall) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprFuncCall");
          llvm::outs() << &funcCall << "\n";
-         visitor(*funcCall.getPostFixExpr());
-         for (const auto &assignExpr : funcCall.getOptionalAssignExpressions()) {
+         visitor(funcCall->getPostFixExpr());
+         for (const auto &assignExpr : funcCall->getOptionalAssignExpressions()) {
            visitor(*assignExpr);
          }
-         DecAlign();
      },
-     [](const Syntax::PostFixExprDot &dot) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprDot> &dot) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprDot");
          llvm::outs() << &dot << "\n";
-         visitor(*dot.getPostFixExpr());
-         Println(dot.getIdentifier());
-         DecAlign();
+         visitor(dot->getPostFixExpr());
+         Println(dot->getIdentifier());
        },
-     [](const Syntax::PostFixExprArrow &arrow) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprArrow> &arrow) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprArrow");
          llvm::outs() << &arrow << "\n";
-         visitor(*arrow.getPostFixExpr());
-         Println(arrow.getIdentifier());
-         DecAlign();
+         visitor(arrow->getPostFixExpr());
+         Println(arrow->getIdentifier());
        },
-     [](const Syntax::PostFixExprIncrement &increment) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprIncrement> &increment) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprIncrement");
          llvm::outs() << &increment << "\n";
-         visitor(*increment.getPostFixExpr());
-         DecAlign();
+         visitor(increment->getPostFixExpr());
      },
-     [](const Syntax::PostFixExprDecrement &decrement) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprDecrement> &decrement) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprDecrement");
          llvm::outs() << &decrement << "\n";
-         visitor(*decrement.getPostFixExpr());
-         DecAlign();
+         visitor(decrement->getPostFixExpr());
      },
-     [](const Syntax::PostFixExprTypeInitializer &typeInitializer) {
-         IncAlign();
+     [](const box<Syntax::PostFixExprTypeInitializer> &typeInitializer) {
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PostFixExprTypeInitializer");
          llvm::outs() << &typeInitializer << "\n";
-         visitor(*typeInitializer.getTypeName());
-         visitor(*typeInitializer.getInitializerList());
-         DecAlign();
+         visitor(typeInitializer->getTypeName());
+         visitor(typeInitializer->getInitializerList());
      },
   }, postFixExpr);
 }
 void visitor(const Syntax::PrimaryExpr &primaryExpr){
   std::visit(overload{
      [](const Syntax::PrimaryExprIdent& ident) {
-       IncAlign();
+       ValueReset v(LeftAlign, LeftAlign+1);
        Print("PrimaryExprIdent");
        llvm::outs() << &ident << "\n";
        {
-         IncAlign();
+         ValueReset v(LeftAlign, LeftAlign+1);
          Println(ident.getIdentifier());
-         DecAlign();
        }
-       DecAlign();
      },
      [](const Syntax::PrimaryExprConstant& constant) {
-       IncAlign();
+       ValueReset v(LeftAlign, LeftAlign+1);
        Print("PrimaryExprConstant");
        llvm::outs() << &constant << "\n";
        std::visit([](auto &&value) {
-         IncAlign();
+         ValueReset v(LeftAlign, LeftAlign+1);
          using T = std::decay_t<decltype(value)>;
          if constexpr (std::is_same_v<T, std::string>) {
            Println(value);
          }else {
            Println(std::to_string(value));
          }
-         DecAlign();
        }, constant.getValue());
-       DecAlign();
      },
      [](const Syntax::PrimaryExprParentheses & parent) {
-         IncAlign();
+         ValueReset v(LeftAlign, LeftAlign+1);
          Print("PrimaryExprParentheses");
          llvm::outs() << &parent << "\n";
          visitor(parent.getExpr());
-         DecAlign();
      },
   }, primaryExpr);
 }

@@ -34,7 +34,6 @@ class PostFixExprFuncCall;
 class PostFixExprPrimaryExpr;
 class PostFixExprTypeInitializer;
 
-class UnaryExprPostFixExpr;
 class UnaryExprUnaryOperator;
 class UnaryExprSizeOf;
 
@@ -375,9 +374,11 @@ public:
       : Node(begin), operator_(anOperator), value_(value) {}
 
   [[nodiscard]] UnaryOperator getOperator() const { return operator_; }
-  [[nodiscard]] const Variant &getCastExpr() const {
-    /// todo fixme
-    return value_;
+  [[nodiscard]] const CastExpr *getCastExpr() const {
+    if (std::holds_alternative<CastExprBox>(value_)) {
+      return std::get<CastExprBox>(value_).get();
+    }
+    return nullptr;
   }
 };
 
@@ -551,6 +552,7 @@ public:
  *      ( type-name ) cast-expression
  */
 class CastExpr final : public Node {
+public:
   using TypeNameCast = std::pair<TypeName, CastExprBox>;
   using Variant = std::variant<UnaryExpr, TypeNameCast>;
 
@@ -1049,7 +1051,7 @@ private:
 public:
   LabelStmt(TokIter begin, std::string_view identifier)
       : Node(begin), mIdentifier(identifier) {}
-  [[nodiscard]] std::string_view getIdentifier() { return mIdentifier; }
+  [[nodiscard]] std::string_view getIdentifier() const{ return mIdentifier; }
 };
 
 /**
@@ -1063,7 +1065,7 @@ private:
 public:
   GotoStmt(TokIter begin, std::string_view identifier)
       : Node(begin), mIdentifier(identifier) {}
-  [[nodiscard]] std::string_view getIdentifier() { return mIdentifier; }
+  [[nodiscard]] std::string_view getIdentifier() const { return mIdentifier; }
 };
 
 /**
@@ -1473,37 +1475,44 @@ public:
 /**
  * direct-abstract-declarator:
  *      direct-abstract-declarator{opt} [ type-qualifier-list{opt}
- * assignment-expression{opt} ] direct-abstract-declarator{opt} [ static
- * type-qualifier-list{opt} assignment-expression ]
+ *                                                  assignment-expression{opt} ]
+ *      direct-abstract-declarator{opt} [ static
+ *                              type-qualifier-list{opt} assignment-expression ]
  *      direct-abstract-declarator{opt} [ type-qualifier-list static
  * assignment-expression ]
  */
 class DirectAbstractDeclaratorAssignExpr final : public Node {
-  DirectAbstractDeclarator directAbstractDeclarator_;
+  std::optional<DirectAbstractDeclarator> optionalDirectAbstractDeclarator_;
   std::vector<TypeQualifier> typeQualifiers_;
-  AssignExpr assignExpr_;
+  std::optional<AssignExpr> optionalAssignExpr_;
   bool hasStatic_{false};
 
 public:
   DirectAbstractDeclaratorAssignExpr(
-      TokIter begin, DirectAbstractDeclarator directAbstractDeclarator,
-      std::vector<TypeQualifier> typeQualifiers, AssignExpr assignExpr,
+      TokIter begin, std::optional<DirectAbstractDeclarator> directAbstractDeclarator,
+      std::vector<TypeQualifier> typeQualifiers, std::optional<AssignExpr> assignExpr,
       bool hasStatic)
-      : Node(begin), directAbstractDeclarator_(directAbstractDeclarator),
-        typeQualifiers_(typeQualifiers), assignExpr_(assignExpr),
+      : Node(begin), optionalDirectAbstractDeclarator_(directAbstractDeclarator),
+        typeQualifiers_(typeQualifiers), optionalAssignExpr_(assignExpr),
         hasStatic_(hasStatic) {}
 
-  [[nodiscard]] const DirectAbstractDeclarator &
+  [[nodiscard]] const DirectAbstractDeclarator *
   getDirectAbstractDeclarator() const {
-    return directAbstractDeclarator_;
+    if (optionalDirectAbstractDeclarator_) {
+      return &optionalDirectAbstractDeclarator_.value();
+    }
+    return nullptr;
   }
 
   [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
     return typeQualifiers_;
   }
 
-  [[nodiscard]] const AssignExpr &getAssignmentExpression() const {
-    return assignExpr_;
+  [[nodiscard]] const AssignExpr *getAssignmentExpression() const {
+    if (optionalAssignExpr_) {
+      return &optionalAssignExpr_.value();
+    }
+    return nullptr;
   }
 
   [[nodiscard]] bool hasStatic() const { return hasStatic_; }
@@ -1511,16 +1520,18 @@ public:
 
 /// direct-abstract-declarator{opt} [*]
 class DirectAbstractDeclaratorAsterisk final : public Node {
-  DirectAbstractDeclarator directAbstractDeclarator_;
+  std::optional<DirectAbstractDeclarator> optionalDirectAbstractDeclarator_;
 
 public:
   DirectAbstractDeclaratorAsterisk(
-      TokIter begin, DirectAbstractDeclarator directAbstractDeclarator)
-      : Node(begin), directAbstractDeclarator_(directAbstractDeclarator) {}
+      TokIter begin, std::optional<DirectAbstractDeclarator> directAbstractDeclarator)
+      : Node(begin), optionalDirectAbstractDeclarator_(directAbstractDeclarator) {}
 
-  [[nodiscard]] const DirectAbstractDeclarator &
-  getDirectAbstractDeclarator() const {
-    return directAbstractDeclarator_;
+  [[nodiscard]] const DirectAbstractDeclarator * getDirectAbstractDeclarator() const {
+    if (optionalDirectAbstractDeclarator_) {
+      return &optionalDirectAbstractDeclarator_.value();
+    }
+    return nullptr;
   }
 };
 
@@ -1529,23 +1540,29 @@ public:
  *  direct-abstract-declarator{opt} ( parameter-type-list{opt} )
  */
 class DirectAbstractDeclaratorParamTypeList final : public Node {
-  DirectAbstractDeclarator directAbstractDeclarator_;
-  ParamTypeList paramTypeList_;
+  std::optional<DirectAbstractDeclarator> optionalDirectAbstractDeclarator_;
+  std::optional<ParamTypeList> optionalParamTypeList_;
 
 public:
   DirectAbstractDeclaratorParamTypeList(
-      TokIter begin, DirectAbstractDeclarator directAbstractDeclarator,
-      ParamTypeList paramTypeList)
-      : Node(begin), directAbstractDeclarator_(directAbstractDeclarator),
-        paramTypeList_(paramTypeList) {}
+      TokIter begin, std::optional<DirectAbstractDeclarator> directAbstractDeclarator,
+      std::optional<ParamTypeList> paramTypeList)
+      : Node(begin), optionalDirectAbstractDeclarator_(directAbstractDeclarator),
+        optionalParamTypeList_(paramTypeList) {}
 
-  [[nodiscard]] const DirectAbstractDeclarator &
+  [[nodiscard]] const DirectAbstractDeclarator *
   getDirectAbstractDeclarator() const {
-    return directAbstractDeclarator_;
+    if (optionalDirectAbstractDeclarator_) {
+      return &optionalDirectAbstractDeclarator_.value();
+    }
+    return nullptr;
   }
 
-  [[nodiscard]] const ParamTypeList &getParameterTypeList() const {
-    return paramTypeList_;
+  [[nodiscard]] const ParamTypeList *getParameterTypeList() const {
+    if (optionalParamTypeList_) {
+      return &optionalParamTypeList_.value();
+    }
+    return nullptr;
   }
 };
 
@@ -1752,7 +1769,7 @@ public:
                 std::vector<Enumerator> enumerators)
       : Node(begin), tagName_(tagName), enumerators_(enumerators) {}
 
-  [[nodiscard]] std::string_view getName() { return tagName_; }
+  [[nodiscard]] std::string_view getName() const { return tagName_; }
   [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const {
     return enumerators_;
   }

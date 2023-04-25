@@ -41,10 +41,11 @@ Sema::TranslationUnit SemaAnalysis::visit(const Syntax::TranslationUnit &node) {
 
 std::vector<Sema::TranslationUnit::Variant> SemaAnalysis::visit(const Syntax::FunctionDefinition &node) {
   std::vector<Sema::TranslationUnit::Variant> result;
-  const Syntax::StorageClassSpecifier* storageClassSpecifier = nullptr;
-  for (auto &iter : node.getDeclarationSpecifiers().getStorageClassSpecifiers()) {
-    if (iter.getSpecifier() != Syntax::StorageClassSpecifier::Extern &&
-        iter.getSpecifier() != Syntax::StorageClassSpecifier::Static) {
+  const Syntax::StorageClsSpec *storageClassSpecifier = nullptr;
+  for (auto &iter :
+       node.getDeclarationSpecifiers().getStorageClassSpecifiers()) {
+    if (iter.getSpecifier() != Syntax::StorageClsSpec::Extern &&
+        iter.getSpecifier() != Syntax::StorageClsSpec::Static) {
       DiagReport(Diag, iter.getBeginLoc()->getSMLoc(), diag::err_sema_only_static_or_extern_allowed_in_function_definition);
       continue;
     }
@@ -57,7 +58,8 @@ std::vector<Sema::TranslationUnit::Variant> SemaAnalysis::visit(const Syntax::De
   return {};
 }
 
-Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpecifiers &declarationSpecifiers) {
+Sema::Type SemaAnalysis::declarationSpecifierToType(
+    const Syntax::DeclSpec &declarationSpecifiers) {
   bool isConst = false, isVolatile = false;
   for (auto &iter : declarationSpecifiers.getTypeQualifiers()) {
     switch (iter.getQualifier()) {
@@ -68,13 +70,14 @@ Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpe
       break;
     }
   }
-  if (declarationSpecifiers.getTypeSpecifiers().empty()) {
+  if (declarationSpecifiers.getTypeSpecs().empty()) {
     DiagReport(Diag, declarationSpecifiers.getBeginLoc()->getSMLoc(), diag::err_sema_at_least_one_type_specifier_required);
     return Sema::Type{};
   }
 
-  const auto &typeSpecs = declarationSpecifiers.getTypeSpecifiers();
-  if (std::holds_alternative<Syntax::TypeSpecifier::PrimitiveTypeSpecifier>(typeSpecs[0].getVariant())) {
+  const auto &typeSpecs = declarationSpecifiers.getTypeSpecs();
+#if 0
+  if (std::holds_alternative<Syntax::TypeSpec::PrimTypeKind>(typeSpecs[0].getVariant())) {
     /// primitive type
     return primitiveTypeSpecifiersToType(isConst, isVolatile, typeSpecs);
   }else if (auto *name = std::get_if<std::string_view>(&typeSpecs[0].getVariant())) {
@@ -82,7 +85,7 @@ Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpe
       DiagReport(Diag, typeSpecs[1].getBeginLoc()->getSMLoc(), diag::err_sema_expected_no_further_type_specifiers_after, "typedef typename");
     }
     /// todo typedef typename
-  }else if (auto *structOrUnionPtr = std::get_if<std::unique_ptr<Syntax::StructOrUnionSpecifier>>(&typeSpecs[0].getVariant())) {
+  }else if (auto *structOrUnionPtr = std::get_if<std::unique_ptr<Syntax::StructOrUnionSpec>>(&typeSpecs[0].getVariant())) {
     /// todo struct type or union type
   }else {
     LCC_ASSERT(std::holds_alternative<std::unique_ptr<Syntax::EnumSpecifier>>(typeSpecs[0].getVariant()));
@@ -91,6 +94,7 @@ Sema::Type SemaAnalysis::declarationSpecifierToType(const Syntax::DeclarationSpe
     }
     /// todo enum type
   }
+#endif
 }
 
 Sema::Type SemaAnalysis::declaratorToType(Sema::Type type, const Syntax::AbstractDeclarator* declarator) {
@@ -100,14 +104,17 @@ Sema::Type SemaAnalysis::declaratorToType(Sema::Type type, const Syntax::Declara
 
 }
 
-Sema::Type SemaAnalysis::primitiveTypeSpecifiersToType(bool isConst, bool isVolatile, const std::vector<Syntax::TypeSpecifier> &typeSpecs) {
-  using SyntaxPrimTypeSpec = Syntax::TypeSpecifier::PrimitiveTypeSpecifier;
+Sema::Type SemaAnalysis::primitiveTypeSpecifiersToType(
+    bool isConst, bool isVolatile,
+    const std::vector<Syntax::TypeSpec> &typeSpecs) {
+#if 0
+  using SyntaxPrimTypeSpec = Syntax::TypeSpec::PrimTypeKind;
   LCC_ASSERT(std::holds_alternative<SyntaxPrimTypeSpec>(typeSpecs[0].getVariant()));
 
-  auto displaySpecifierError = [this](const std::string desc, const Syntax::TypeSpecifier& typeSpec) {
+  auto displaySpecifierError = [this](const std::string desc, const Syntax::TypeSpec & typeSpec) {
     if (std::holds_alternative<std::string_view>(typeSpec.getVariant())) {
       DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, "typename");
-    }else if (auto *structOrUnionPtr = std::get_if<std::unique_ptr<Syntax::StructOrUnionSpecifier>>(&typeSpec.getVariant())) {
+    }else if (auto *structOrUnionPtr = std::get_if<std::unique_ptr<Syntax::StructOrUnionSpec>>(&typeSpec.getVariant())) {
       DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc, "struct or union");
     }else if (std::holds_alternative<std::unique_ptr<Syntax::EnumSpecifier>>(typeSpec.getVariant())) {
       DiagReport(Diag, typeSpec.getBeginLoc()->getSMLoc(), diag::err_sema_cannot_combine_n_with_n, desc,"enum");
@@ -340,16 +347,16 @@ Sema::Type SemaAnalysis::primitiveTypeSpecifiersToType(bool isConst, bool isVola
   auto primTypeSpecToString = [](SyntaxPrimTypeSpec spec) -> std::string_view {
     switch (spec)
     {
-    case Syntax::TypeSpecifier::Void: return "void";
-    case Syntax::TypeSpecifier::Char: return "char";
-    case Syntax::TypeSpecifier::Short: return "short";
-    case Syntax::TypeSpecifier::Int: return "int";
-    case Syntax::TypeSpecifier::Long: return "long";
-    case Syntax::TypeSpecifier::Float: return "float";
-    case Syntax::TypeSpecifier::Double: return "double";
-    case Syntax::TypeSpecifier::Signed: return "signed";
-    case Syntax::TypeSpecifier::Unsigned: return "unsigned";
-    case Syntax::TypeSpecifier::Bool: return "_Bool";
+    case Syntax::TypeSpec::Void: return "void";
+    case Syntax::TypeSpec::Char: return "char";
+    case Syntax::TypeSpec::Short: return "short";
+    case Syntax::TypeSpec::Int: return "int";
+    case Syntax::TypeSpec::Long: return "long";
+    case Syntax::TypeSpec::Float: return "float";
+    case Syntax::TypeSpec::Double: return "double";
+    case Syntax::TypeSpec::Signed: return "signed";
+    case Syntax::TypeSpec::Unsigned: return "unsigned";
+    case Syntax::TypeSpec::Bool: return "_Bool";
     }
     LCC_UNREACHABLE;
   };
@@ -380,5 +387,6 @@ Sema::Type SemaAnalysis::primitiveTypeSpecifiersToType(bool isConst, bool isVola
   auto result = hashTable.find(typeSpec);
   LCC_ASSERT(result != hashTable.end());
   return primKindToType(result->second.second);
+#endif
 }
 }

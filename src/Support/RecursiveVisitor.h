@@ -94,15 +94,19 @@ public:
   }
 };
 
-constexpr auto DIRECT_DECL_NEXT_FN = [](const Syntax::DirectDeclarator& value) -> const Syntax::DirectDeclarator* {
+constexpr auto DIRECT_DECL_NEXT_FN = [](const Syntax::DirectDeclarator &value)
+    -> const Syntax::DirectDeclarator * {
   return std::visit(
-      overload {
-      [](const Syntax::DirectDeclaratorParentheses& parentheses) -> const Syntax::DirectDeclarator* {
-        return &parentheses.getDeclarator()->getDirectDeclarator();
-      },
-      [](const Syntax::DirectDeclaratorIdent&) -> const Syntax::DirectDeclarator* { return nullptr; },
-      [](const auto& value) -> const Syntax::DirectDeclarator* { return value.getDirectDeclarator(); }
-      }, value);
+      overload{[](const box<Syntax::DirectDeclaratorParentheses> &parentheses)
+                   -> const Syntax::DirectDeclarator * {
+                 return &parentheses->getDeclarator().getDirectDeclarator();
+               },
+               [](const box<Syntax::DirectDeclaratorIdent> &)
+                   -> const Syntax::DirectDeclarator * { return nullptr; },
+               [](const auto &value) -> const Syntax::DirectDeclarator * {
+                 return &value->getDirectDeclarator();
+               }},
+      value);
 };
 
 constexpr auto ARRAY_TYPE_NEXT_FN = [](const Sema::Type& type) -> const Sema::Type* {

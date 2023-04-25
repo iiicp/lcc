@@ -31,7 +31,6 @@ class PostFixExprDecrement;
 class PostFixExprDot;
 class PostFixExprArrow;
 class PostFixExprFuncCall;
-class PostFixExprPrimaryExpr;
 class PostFixExprTypeInitializer;
 
 class UnaryExprUnaryOperator;
@@ -49,8 +48,8 @@ class BitXorExpr;
 class BitOrExpr;
 class LogAndExpr;
 class LogOrExpr;
-class ConditionalExpr;
-using ConstantExpr = ConditionalExpr;
+class CondExpr;
+using ConstantExpr = CondExpr;
 class AssignExpr;
 class Expr;
 
@@ -72,14 +71,14 @@ class LabelStmt;
 class TranslationUnit;
 class FunctionDefinition;
 class Declaration;
-class DeclarationSpecifiers;
+class DeclSpec;
 class SpecifierQualifiers;
-class StorageClassSpecifier;
+class StorageClsSpec;
 class TypeQualifier;
-class TypeSpecifier;
+class TypeSpec;
 class EnumSpecifier;
 class EnumeratorList;
-class StructOrUnionSpecifier;
+class StructOrUnionSpec;
 class Declarator;
 class DirectDeclaratorIdent;
 class DirectDeclaratorParentheses;
@@ -353,7 +352,7 @@ using UnaryExpr = std::variant<PostFixExpr, box<UnaryExprUnaryOperator>,
  */
 class UnaryExprUnaryOperator final : public Node {
 public:
-  enum class UnaryOperator : uint8_t {
+  enum class Op : uint8_t {
     Increment,
     Decrement,
     Ampersand,
@@ -366,14 +365,14 @@ public:
   using Variant = std::variant<UnaryExpr, CastExprBox>;
 
 private:
-  UnaryOperator operator_;
+  Op operator_;
   Variant value_;
 
 public:
-  UnaryExprUnaryOperator(TokIter begin, UnaryOperator anOperator, Variant value)
+  UnaryExprUnaryOperator(TokIter begin, Op anOperator, Variant value)
       : Node(begin), operator_(anOperator), value_(value) {}
 
-  [[nodiscard]] UnaryOperator getOperator() const { return operator_; }
+  [[nodiscard]] Op getOperator() const { return operator_; }
   [[nodiscard]] const CastExpr *getCastExpr() const {
     if (std::holds_alternative<CastExprBox>(value_)) {
       return std::get<CastExprBox>(value_).get();
@@ -405,32 +404,30 @@ public:
  *  enum-specifier
  *  typedef-name
  */
-class TypeSpecifier final : public Node {
+class TypeSpec final : public Node {
 public:
-  enum PrimitiveTypeSpecifier {
-    Void = 0b1,
-    Char = 0b10,
-    Short = 0b100,
-    Int = 0b1000,
-    Long = 0b10000,
-    Float = 0b100000,
-    Double = 0b1000000,
-    Signed = 0b10000000,
-    Unsigned = 0b100000000,
-    Bool = 0b1000000000
+  enum PrimTypeKind {
+    Void = 1 << 0,
+    Char = 1 << 1,
+    Short = 1 << 2,
+    Int = 1 << 3,
+    Long = 1 << 4,
+    Float = 1 << 5,
+    Double = 1 << 6,
+    Signed = 1 << 7,
+    Unsigned = 1 << 8,
+    Bool = 1 << 9
   };
   using TypedefName = std::string_view;
 
 private:
-  using variant =
-      std::variant<PrimitiveTypeSpecifier, box<StructOrUnionSpecifier>,
-                   box<EnumSpecifier>, TypedefName>;
+  using variant = std::variant<PrimTypeKind, box<StructOrUnionSpec>,
+                               box<EnumSpecifier>, TypedefName>;
 
   variant mVariant;
 
 public:
-  TypeSpecifier(TokIter begin, variant variant)
-      : Node(begin), mVariant(variant) {}
+  TypeSpec(TokIter begin, variant variant) : Node(begin), mVariant(variant) {}
 
   [[nodiscard]] const variant &getVariant() const { return mVariant; }
 };
@@ -471,7 +468,7 @@ public:
  *      auto
  *      register
  */
-class StorageClassSpecifier final : public Node {
+class StorageClsSpec final : public Node {
 public:
   enum Specifiers { Typedef, Extern, Static, Auto, Register };
 
@@ -479,7 +476,7 @@ private:
   Specifiers mSpecifier;
 
 public:
-  StorageClassSpecifier(TokIter begin, Specifiers specifier)
+  StorageClsSpec(TokIter begin, Specifiers specifier)
       : Node(begin), mSpecifier(specifier) {}
   [[nodiscard]] Specifiers getSpecifier() const { return mSpecifier; }
 };
@@ -491,27 +488,44 @@ public:
         type-qualifier declaration-specifiers{opt}
         function-specifier declaration-specifiers{opt}
  */
-class DeclarationSpecifiers final : public Node {
+class DeclSpec final : public Node {
 private:
-  std::vector<StorageClassSpecifier> mStorageClassSpecifiers;
-  std::vector<TypeSpecifier> mTypeSpecifiers;
-  std::vector<TypeQualifier> mTypeQualifiers;
-  std::vector<FunctionSpecifier> mFunctionSpecifiers;
+  std::vector<StorageClsSpec> storageClassSpecifiers_;
+  std::vector<TypeSpec> typeSpecifiers_;
+  std::vector<TypeQualifier> typeQualifiers_;
+  std::vector<FunctionSpecifier> functionSpecifiers_;
 
 public:
-  DeclarationSpecifiers(TokIter begin);
-  void addStorageClassSpecifier(StorageClassSpecifier &&specifier);
-  void addTypeSpecifier(TypeSpecifier &&specifier);
-  void addTypeQualifier(TypeQualifier &&qualifier);
-  void addFunctionSpecifier(FunctionSpecifier &&specifier);
+  DeclSpec(TokIter begin) : Node(begin) {}
+  void addStorageClassSpecifiers(StorageClsSpec specifier) {
+    storageClassSpecifiers_.push_back(specifier);
+  }
+  void addTypeSpec(TypeSpec specifier) { typeSpecifiers_.push_back(specifier); }
+  void addTypeQualifiers(TypeQualifier qualifier) {
+    typeQualifiers_.push_back(qualifier);
+  }
+  void addFunctionSpecifier(FunctionSpecifier specifier) {
+    functionSpecifiers_.push_back(specifier);
+  }
 
-  [[nodiscard]] const std::vector<StorageClassSpecifier> &
-  getStorageClassSpecifiers() const;
-  [[nodiscard]] const std::vector<TypeSpecifier> &getTypeSpecifiers() const;
-  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const;
+  [[nodiscard]] const std::vector<StorageClsSpec> &
+  getStorageClassSpecifiers() const {
+    return storageClassSpecifiers_;
+  }
+  [[nodiscard]] const std::vector<TypeSpec> &getTypeSpecs() const {
+    return typeSpecifiers_;
+  }
+  [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
+    return typeQualifiers_;
+  }
   [[nodiscard]] const std::vector<FunctionSpecifier> &
-  getFunctionSpecifiers() const;
-  [[nodiscard]] bool isEmpty() const;
+  getFunctionSpecifier() const {
+    return functionSpecifiers_;
+  }
+  [[nodiscard]] bool isEmpty() const {
+    return storageClassSpecifiers_.empty() && typeSpecifiers_.empty() &&
+           typeQualifiers_.empty() && functionSpecifiers_.empty();
+  }
 };
 
 /**
@@ -526,16 +540,16 @@ public:
  */
 class TypeName final : public Node {
 private:
-  DeclarationSpecifiers mSpecifierQualifiers;
+  DeclSpec mSpecifierQualifiers;
   std::optional<AbstractDeclaratorBox> mAbstractDeclarator;
 
 public:
   TypeName(
-      TokIter begin, DeclarationSpecifiers specifierQualifiers,
+      TokIter begin, DeclSpec specifierQualifiers,
       std::optional<AbstractDeclaratorBox> abstractDeclarator = {std::nullopt})
       : Node(begin), mSpecifierQualifiers(specifierQualifiers),
-        mAbstractDeclarator(mAbstractDeclarator) {}
-  [[nodiscard]] const DeclarationSpecifiers &getSpecifierQualifiers() const {
+        mAbstractDeclarator(abstractDeclarator) {}
+  [[nodiscard]] const DeclSpec &getSpecifierQualifiers() const {
     return mSpecifierQualifiers;
   }
   [[nodiscard]] const AbstractDeclarator *getAbstractDeclarator() const {
@@ -574,19 +588,18 @@ public:
  */
 class MultiExpr final : public Node {
 public:
-  enum MultiOperator { Multiply, Divide, Modulo };
+  enum Op { Multiply, Divide, Modulo };
 
 private:
   CastExpr castExpr_;
-  std::vector<std::pair<MultiOperator, CastExpr>> optionalCastExps_;
+  std::vector<std::pair<Op, CastExpr>> optionalCastExps_;
 
 public:
-  explicit MultiExpr(
-      TokIter begin, CastExpr castExpr,
-      std::vector<std::pair<MultiOperator, CastExpr>> optionalCastExps)
+  explicit MultiExpr(TokIter begin, CastExpr castExpr,
+                     std::vector<std::pair<Op, CastExpr>> optionalCastExps)
       : Node(begin), castExpr_(castExpr), optionalCastExps_(optionalCastExps) {}
   [[nodiscard]] const CastExpr &getCastExpr() const { return castExpr_; }
-  [[nodiscard]] const std::vector<std::pair<MultiOperator, CastExpr>> &
+  [[nodiscard]] const std::vector<std::pair<Op, CastExpr>> &
   getOptionalCastExps() const {
     return optionalCastExps_;
   }
@@ -600,20 +613,19 @@ public:
  */
 class AdditiveExpr final : public Node {
 public:
-  enum AdditiveOperator { Plus, Minus };
+  enum Op { Plus, Minus };
 
 private:
   MultiExpr multiExpr_;
-  std::vector<std::pair<AdditiveOperator, MultiExpr>> optionalMultiExps_;
+  std::vector<std::pair<Op, MultiExpr>> optionalMultiExps_;
 
 public:
-  AdditiveExpr(
-      TokIter begin, MultiExpr multiExpr,
-      std::vector<std::pair<AdditiveOperator, MultiExpr>> optionalMultiExps)
+  AdditiveExpr(TokIter begin, MultiExpr multiExpr,
+               std::vector<std::pair<Op, MultiExpr>> optionalMultiExps)
       : Node(begin), multiExpr_(multiExpr),
         optionalMultiExps_(optionalMultiExps) {}
   [[nodiscard]] const MultiExpr &getMultiExpr() const { return multiExpr_; }
-  [[nodiscard]] const std::vector<std::pair<AdditiveOperator, MultiExpr>> &
+  [[nodiscard]] const std::vector<std::pair<Op, MultiExpr>> &
   getOptionalMultiExps() const {
     return optionalMultiExps_;
   }
@@ -627,22 +639,21 @@ public:
  */
 class ShiftExpr final : public Node {
 public:
-  enum ShiftOperator { Right, Left };
+  enum Op { Right, Left };
 
 private:
   AdditiveExpr additiveExpr_;
-  std::vector<std::pair<ShiftOperator, AdditiveExpr>> optionalAdditiveExps_;
+  std::vector<std::pair<Op, AdditiveExpr>> optionalAdditiveExps_;
 
 public:
-  ShiftExpr(
-      TokIter begin, AdditiveExpr additiveExpr,
-      std::vector<std::pair<ShiftOperator, AdditiveExpr>> optionalAdditiveExps)
+  ShiftExpr(TokIter begin, AdditiveExpr additiveExpr,
+            std::vector<std::pair<Op, AdditiveExpr>> optionalAdditiveExps)
       : Node(begin), additiveExpr_(additiveExpr),
         optionalAdditiveExps_(optionalAdditiveExps) {}
   [[nodiscard]] const AdditiveExpr &getAdditiveExpr() const {
     return additiveExpr_;
   }
-  [[nodiscard]] const std::vector<std::pair<ShiftOperator, AdditiveExpr>> &
+  [[nodiscard]] const std::vector<std::pair<Op, AdditiveExpr>> &
   getOptAdditiveExps() const {
     return optionalAdditiveExps_;
   }
@@ -658,25 +669,19 @@ public:
  */
 class RelationalExpr final : public Node {
 public:
-  enum RelationalOperator {
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual
-  };
+  enum Op { LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual };
 
 private:
   ShiftExpr shiftExpr_;
-  std::vector<std::pair<RelationalOperator, ShiftExpr>> optionalShiftExps_;
+  std::vector<std::pair<Op, ShiftExpr>> optionalShiftExps_;
 
 public:
-  RelationalExpr(
-      TokIter begin, ShiftExpr shiftExpr,
-      std::vector<std::pair<RelationalOperator, ShiftExpr>> optionalShiftExps)
+  RelationalExpr(TokIter begin, ShiftExpr shiftExpr,
+                 std::vector<std::pair<Op, ShiftExpr>> optionalShiftExps)
       : Node(begin), shiftExpr_(shiftExpr),
         optionalShiftExps_(optionalShiftExps) {}
   [[nodiscard]] const ShiftExpr &getShiftExpr() const { return shiftExpr_; }
-  [[nodiscard]] const std::vector<std::pair<RelationalOperator, ShiftExpr>> &
+  [[nodiscard]] const std::vector<std::pair<Op, ShiftExpr>> &
   getOptionalShiftExpressions() const {
     return optionalShiftExps_;
   }
@@ -690,23 +695,22 @@ public:
  */
 class EqualExpr final : public Node {
 public:
-  enum EqualOperator { Equal, NotEqual };
+  enum Op { Equal, NotEqual };
 
 private:
   RelationalExpr relationalExpr_;
-  std::vector<std::pair<EqualOperator, RelationalExpr>> optionalRelationalExps_;
+  std::vector<std::pair<Op, RelationalExpr>> optionalRelationalExps_;
 
 public:
   EqualExpr(TokIter begin, RelationalExpr relationalExpr,
-            std::vector<std::pair<EqualOperator, RelationalExpr>>
-                optionalRelationalExps)
+            std::vector<std::pair<Op, RelationalExpr>> optionalRelationalExps)
       : Node(begin), relationalExpr_(relationalExpr),
         optionalRelationalExps_(optionalRelationalExps) {}
   [[nodiscard]] const RelationalExpr &getRelationalExpr() const {
     return relationalExpr_;
   }
 
-  [[nodiscard]] const std::vector<std::pair<EqualOperator, RelationalExpr>> &
+  [[nodiscard]] const std::vector<std::pair<Op, RelationalExpr>> &
   getOptionalRelationalExpr() const {
     return optionalRelationalExps_;
   }
@@ -719,18 +723,13 @@ public:
  */
 class BitAndExpr final : public Node {
 private:
-  EqualExpr equalExpr_;
-  std::vector<EqualExpr> optionalEqualExps_;
+  std::vector<EqualExpr> equalExps_;
 
 public:
-  BitAndExpr(TokIter begin, EqualExpr equalExpr,
-             std::vector<EqualExpr> optionalEqualExps)
-      : Node(begin), equalExpr_(equalExpr),
-        optionalEqualExps_(optionalEqualExps) {}
-  [[nodiscard]] const EqualExpr &getEqualExpr() const { return equalExpr_; }
-
-  [[nodiscard]] const std::vector<EqualExpr> &getOptionalEqualExpr() const {
-    return optionalEqualExps_;
+  BitAndExpr(TokIter begin, std::vector<EqualExpr> equalExps)
+      : Node(begin), equalExps_(equalExps) {}
+  [[nodiscard]] const std::vector<EqualExpr> &getEqualExpr() const {
+    return equalExps_;
   }
 };
 
@@ -741,18 +740,13 @@ public:
  */
 class BitXorExpr final : public Node {
 private:
-  BitAndExpr bitAndExpr_;
-  std::vector<BitAndExpr> optionalBitAndExps_;
+  std::vector<BitAndExpr> bitAndExps_;
 
 public:
-  BitXorExpr(TokIter begin, BitAndExpr bitAndExpr,
-             std::vector<BitAndExpr> optionalBitAndExps)
-      : Node(begin), bitAndExpr_(bitAndExpr),
-        optionalBitAndExps_(optionalBitAndExps) {}
-  [[nodiscard]] const BitAndExpr &getBitAndExpr() const { return bitAndExpr_; }
-  [[nodiscard]] const std::vector<BitAndExpr> &
-  getOptionalBitAndExpressions() const {
-    return optionalBitAndExps_;
+  BitXorExpr(TokIter begin, std::vector<BitAndExpr> bitAndExps)
+      : Node(begin), bitAndExps_(bitAndExps) {}
+  [[nodiscard]] const std::vector<BitAndExpr> &getBitAndExprs() const {
+    return bitAndExps_;
   }
 };
 
@@ -763,21 +757,14 @@ public:
  */
 class BitOrExpr final : public Node {
 private:
-  BitXorExpr bitXorExpr_;
-  std::vector<BitXorExpr> optionalBitXorExps_;
+  std::vector<BitXorExpr> bitXorExps_;
 
 public:
-  BitOrExpr(TokIter begin, BitXorExpr bitXorExpr,
-            std::vector<BitXorExpr> optionalBitXorExps)
-      : Node(begin), bitXorExpr_(bitXorExpr),
-        optionalBitXorExps_(optionalBitXorExps) {}
-  [[nodiscard]] const BitXorExpr &getBitXorExpression() const {
-    return bitXorExpr_;
-  }
+  BitOrExpr(TokIter begin, std::vector<BitXorExpr> bitXorExps)
+      : Node(begin), bitXorExps_(bitXorExps) {}
 
-  [[nodiscard]] const std::vector<BitXorExpr> &
-  getOptionalBitXorExpressions() const {
-    return optionalBitXorExps_;
+  [[nodiscard]] const std::vector<BitXorExpr> &getBitXorExprs() const {
+    return bitXorExps_;
   }
 };
 
@@ -788,20 +775,13 @@ public:
  */
 class LogAndExpr final : public Node {
 private:
-  BitOrExpr bitOrExpr_;
-  std::vector<BitOrExpr> optionalBitOrExps_;
+  std::vector<BitOrExpr> bitOrExps_;
 
 public:
-  LogAndExpr(TokIter begin, BitOrExpr bitOrExpr,
-             std::vector<BitOrExpr> optionalBitOrExps)
-      : Node(begin), bitOrExpr_(bitOrExpr),
-        optionalBitOrExps_(optionalBitOrExps) {}
-  [[nodiscard]] const BitOrExpr &getBitOrExpression() const {
-    return bitOrExpr_;
-  }
-  [[nodiscard]] const std::vector<BitOrExpr> &
-  getOptionalBitOrExpressions() const {
-    return optionalBitOrExps_;
+  LogAndExpr(TokIter begin, std::vector<BitOrExpr> bitOrExps)
+      : Node(begin), bitOrExps_(bitOrExps) {}
+  [[nodiscard]] const std::vector<BitOrExpr> &getBitOrExprs() const {
+    return bitOrExps_;
   }
 };
 
@@ -812,20 +792,13 @@ public:
  */
 class LogOrExpr final : public Node {
 private:
-  LogAndExpr logAndExpr_;
-  std::vector<LogAndExpr> optionalLogAndExps;
+  std::vector<LogAndExpr> logAndExps_;
 
 public:
-  LogOrExpr(TokIter begin, LogAndExpr logAndExpr,
-            std::vector<LogAndExpr> optionalLogAndExps)
-      : Node(begin), logAndExpr_(logAndExpr),
-        optionalLogAndExps(optionalLogAndExps) {}
-  [[nodiscard]] const LogAndExpr &getAndExpression() const {
-    return logAndExpr_;
-  }
-  [[nodiscard]] const std::vector<LogAndExpr> &
-  getOptionalAndExpressions() const {
-    return optionalLogAndExps;
+  LogOrExpr(TokIter begin, std::vector<LogAndExpr> logAndExps)
+      : Node(begin), logAndExps_(logAndExps) {}
+  [[nodiscard]] const std::vector<LogAndExpr> &getLogAndExprs() const {
+    return logAndExps_;
   }
 };
 
@@ -834,17 +807,17 @@ public:
  *      logical-OR-expression
  *      logical-OR-expression ? expression : conditional-expression
  */
-class ConditionalExpr final : public Node {
+class CondExpr final : public Node {
 private:
   LogOrExpr logOrExpr_;
   std::optional<box<Expr>> optionalExpr_;
-  std::optional<box<ConditionalExpr>> optionalCondExpr_;
+  std::optional<box<CondExpr>> optionalCondExpr_;
 
 public:
-  explicit ConditionalExpr(
+  explicit CondExpr(
       TokIter begin, LogOrExpr logOrExpr,
       std::optional<box<Expr>> optionalExpr = {std::nullopt},
-      std::optional<box<ConditionalExpr>> optionalCondExpr = {std::nullopt})
+      std::optional<box<CondExpr>> optionalCondExpr = {std::nullopt})
       : Node(begin), logOrExpr_(logOrExpr), optionalExpr_(optionalExpr),
         optionalCondExpr_(optionalCondExpr) {}
   [[nodiscard]] const LogOrExpr &getLogicalOrExpression() const {
@@ -856,8 +829,7 @@ public:
     }
     return nullptr;
   }
-  [[nodiscard]] const ConditionalExpr *
-  getOptionalConditionalExpression() const {
+  [[nodiscard]] const CondExpr *getOptionalConditionalExpression() const {
     if (optionalCondExpr_.has_value()) {
       return optionalCondExpr_.value().get();
     }
@@ -882,7 +854,7 @@ public:
  */
 class AssignExpr final : public Node {
 public:
-  enum AssignmentOperator {
+  enum AssignOp {
     Assign,
     PlusAssign,
     MinusAssign,
@@ -897,22 +869,17 @@ public:
   };
 
 private:
-  ConditionalExpr condExpr_;
-  std::vector<std::pair<AssignmentOperator, ConditionalExpr>>
-      optionalConditionExpr_;
+  CondExpr condExpr_;
+  std::vector<std::pair<AssignOp, CondExpr>> optionalConditionExpr_;
 
 public:
-  AssignExpr(TokIter begin, ConditionalExpr conditionalExpression,
-             std::vector<std::pair<AssignmentOperator, ConditionalExpr>>
-                 optionalConditionExpr)
+  AssignExpr(TokIter begin, CondExpr conditionalExpression,
+             std::vector<std::pair<AssignOp, CondExpr>> optionalConditionExpr)
       : Node(begin), condExpr_(conditionalExpression),
         optionalConditionExpr_(optionalConditionExpr) {}
 
-  [[nodiscard]] const ConditionalExpr &getConditionalExpr() const {
-    return condExpr_;
-  }
-  [[nodiscard]] const std::vector<
-      std::pair<AssignmentOperator, ConditionalExpr>> &
+  [[nodiscard]] const CondExpr &getConditionalExpr() const { return condExpr_; }
+  [[nodiscard]] const std::vector<std::pair<AssignOp, CondExpr>> &
   getOptionalConditionalExpr() const {
     return optionalConditionExpr_;
   }
@@ -952,7 +919,8 @@ private:
 
 public:
   ExprStmt(TokIter begin,
-           std::optional<box<Expr>> optionalExpr = {std::nullopt});
+           std::optional<box<Expr>> optionalExpr = {std::nullopt})
+      : Node(begin), optionalExpr_(optionalExpr) {}
   [[nodiscard]] const Expr *getOptionalExpression() const {
     if (optionalExpr_.has_value()) {
       return optionalExpr_.value().get();
@@ -1116,7 +1084,9 @@ public:
   ForStmt(TokIter begin, Stmt stmt,
           std::variant<box<Declaration>, std::optional<Expr>> initial,
           std::optional<Expr> controlExpr = {std::nullopt},
-          std::optional<Expr> postExpr = {std::nullopt});
+          std::optional<Expr> postExpr = {std::nullopt})
+      : Node(begin), stmt_(stmt), initial_(initial), controlExpr_(controlExpr),
+        postExpr_(postExpr) {}
   [[nodiscard]] const Stmt &getStatement() const { return stmt_; }
 
   [[nodiscard]] const std::variant<box<Declaration>, std::optional<Expr>> &
@@ -1252,15 +1222,15 @@ public:
   };
 
 private:
-  DeclarationSpecifiers declarationSpecifiers_;
+  DeclSpec declarationSpecifiers_;
   std::vector<InitDeclarator> initDeclarators_;
 
 public:
-  Declaration(TokIter begin, DeclarationSpecifiers declarationSpecifiers,
+  Declaration(TokIter begin, DeclSpec declarationSpecifiers,
               std::vector<InitDeclarator> initDeclarators)
       : Node(begin), declarationSpecifiers_(declarationSpecifiers),
         initDeclarators_(initDeclarators) {}
-  [[nodiscard]] const DeclarationSpecifiers &getDeclarationSpecifiers() const {
+  [[nodiscard]] const DeclSpec &getDeclarationSpecifiers() const {
     return declarationSpecifiers_;
   }
   [[nodiscard]] const std::vector<InitDeclarator> &getInitDeclarators() const {
@@ -1399,19 +1369,19 @@ public:
  */
 struct ParameterDeclaration final : public Node {
 public:
-  DeclarationSpecifiers declarationSpecifiers_;
+  DeclSpec declarationSpecifiers_;
   using DeclaratorKind =
       std::variant<Declarator, std::optional<AbstractDeclarator>>;
   DeclaratorKind declaratorKind_;
 
 public:
   ParameterDeclaration(
-      TokIter begin, DeclarationSpecifiers declarationSpecifiers,
+      TokIter begin, DeclSpec declarationSpecifiers,
       std::variant<Declarator, std::optional<AbstractDeclarator>> variant =
           {std::nullopt})
       : Node(begin), declarationSpecifiers_(declarationSpecifiers),
         declaratorKind_(variant) {}
-  [[nodiscard]] const DeclarationSpecifiers &getDeclarationSpecifiers() const {
+  [[nodiscard]] const DeclSpec &getDeclarationSpecifiers() const {
     return declarationSpecifiers_;
   }
 };
@@ -1701,7 +1671,7 @@ public:
  *      declarator
  *      declarator{opt} : constant-expression
  */
-class StructOrUnionSpecifier final : public Node {
+class StructOrUnionSpec final : public Node {
 public:
   struct StructDeclarator {
     TokIter beginLoc_;
@@ -1710,7 +1680,7 @@ public:
   };
   struct StructDeclaration {
     TokIter beginLoc_;
-    DeclarationSpecifiers specifierQualifiers_;
+    DeclSpec specifierQualifiers_;
     std::vector<StructDeclarator> structDeclarators_;
   };
 
@@ -1720,9 +1690,8 @@ private:
   std::vector<StructDeclaration> structDeclarations_;
 
 public:
-  StructOrUnionSpecifier(TokIter begin, bool isUnion,
-                         std::string_view identifier,
-                         std::vector<StructDeclaration> structDeclarations)
+  StructOrUnionSpec(TokIter begin, bool isUnion, std::string_view identifier,
+                    std::vector<StructDeclaration> structDeclarations)
       : Node(begin), isUnion_(isUnion), name_(identifier),
         structDeclarations_(structDeclarations) {}
 
@@ -1756,6 +1725,7 @@ public:
 class EnumSpecifier final : public Node {
 public:
   struct Enumerator {
+    TokIter beginLoc_;
     std::string_view name_;
     std::optional<ConstantExpr> optionalConstantExpr_;
   };
@@ -1780,17 +1750,17 @@ public:
  *  declaration-specifiers declarator declaration-list{opt} compound-statement
  */
 class FunctionDefinition final : public Node {
-  DeclarationSpecifiers declarationSpecifiers_;
+  DeclSpec declarationSpecifiers_;
   Declarator declarator_;
   BlockStmt compoundStmt_;
 
 public:
-  FunctionDefinition(TokIter begin, DeclarationSpecifiers declarationSpecifiers,
+  FunctionDefinition(TokIter begin, DeclSpec declarationSpecifiers,
                      Declarator declarator, BlockStmt compoundStmt)
       : Node(begin), declarationSpecifiers_(declarationSpecifiers),
         declarator_(declarator), compoundStmt_(compoundStmt) {}
 
-  [[nodiscard]] const DeclarationSpecifiers &getDeclarationSpecifiers() const {
+  [[nodiscard]] const DeclSpec &getDeclarationSpecifiers() const {
     return declarationSpecifiers_;
   }
 

@@ -45,7 +45,7 @@ private:
   void visit(const Syntax::ExprStmt &node);
 
   void visit(const Syntax::Expr &node);
-  void visit(const Syntax::ConditionalExpr &node);
+  void visit(const Syntax::CondExpr &node);
   void visit(const Syntax::LogOrExpr &node);
   void visit(const Syntax::LogAndExpr &node);
   void visit(const Syntax::BitOrExpr &node);
@@ -57,7 +57,6 @@ private:
   void visit(const Syntax::MultiExpr &node);
   void visit(const Syntax::CastExpr &node);
   void visit(const Syntax::UnaryExpr &node);
-  void visit(const Syntax::UnaryExprPostFixExpr &node);
   void visit(const Syntax::UnaryExprUnaryOperator &node);
   void visit(const Syntax::UnaryExprSizeOf &node);
   void visit(const Syntax::PostFixExpr &node);
@@ -66,7 +65,6 @@ private:
   void visit(const Syntax::PostFixExprIncrement &node);
   void visit(const Syntax::PostFixExprDecrement &node);
   void visit(const Syntax::PostFixExprFuncCall &node);
-  void visit(const Syntax::PostFixExprPrimaryExpr &node);
   void visit(const Syntax::PostFixExprSubscript &node);
   void visit(const Syntax::PostFixExprTypeInitializer &node);
   void visit(const Syntax::PrimaryExpr &node);
@@ -75,11 +73,14 @@ private:
   void visit(const Syntax::PrimaryExprParentheses &node);
 
   /// type
-  Sema::Type declarationSpecifierToType(const Syntax::DeclarationSpecifiers &declarationSpecifiers);
+  Sema::Type
+  declarationSpecifierToType(const Syntax::DeclSpec &declarationSpecifiers);
   Sema::Type declaratorToType(Sema::Type type, const Syntax::AbstractDeclarator* declarator = nullptr);
   Sema::Type declaratorToType(Sema::Type type, const Syntax::Declarator* declarator);
 
-  Sema::Type primitiveTypeSpecifiersToType(bool isConst, bool isVolatile, const std::vector<Syntax::TypeSpecifier> &typeSpecs);
+  Sema::Type
+  primitiveTypeSpecifiersToType(bool isConst, bool isVolatile,
+                                const std::vector<Syntax::TypeSpec> &typeSpecs);
 };
 }
 

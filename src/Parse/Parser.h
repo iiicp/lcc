@@ -21,9 +21,8 @@
 #include <bitset>
 #include "Diagnostic.h"
 namespace lcc {
+using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
 class Parser {
-public:
-  using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
 private:
   const std::vector<Token>& mTokens;
   TokIter mTokCursor;
@@ -35,7 +34,7 @@ private:
   private:
     struct Symbol {
       std::string_view identifier;
-      bool isTypedef{};
+      bool isTypedef{false};
     };
     std::vector<std::unordered_map<std::string_view, Symbol>> mCurrentScope;
   public:
@@ -59,25 +58,28 @@ public:
 private:
   std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
   std::optional<Syntax::Declaration> ParseDeclarationSuffix(
-      Syntax::DeclarationSpecifiers &&declarationSpecifiers,
+      Syntax::DeclSpec declSpec,
       std::optional<Syntax::Declarator> alreadyParsedDeclarator = {});
   std::optional<Syntax::Declaration> ParseDeclaration();
-  Syntax::DeclarationSpecifiers ParseDeclarationSpecifiers();
-//  Syntax::SpecifierQualifiers ParseSpecifierQualifierList();
+  Syntax::DeclSpec ParseDeclarationSpecifiers();
   std::optional<Syntax::Declarator> ParseDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
-  std::optional<Syntax::DirectDeclarator> ParseDirectDeclaratorSuffix(std::unique_ptr<Syntax::DirectDeclarator>&& directDeclarator, TokIter begin);
+  void ParseDirectDeclaratorSuffix(TokIter beginTokLoc, Syntax::DirectDeclarator &directDeclarator);
   std::optional<Syntax::AbstractDeclarator> ParseAbstractDeclarator();
   std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclarator();
-  std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclaratorSuffix(std::unique_ptr<Syntax::DirectAbstractDeclarator>&& directAbstractDeclarator);
+  std::optional<Syntax::DirectAbstractDeclarator>
+  ParseDirectAbstractDeclaratorSuffix();
   std::optional<Syntax::ParamTypeList> ParseParameterTypeList();
   std::optional<Syntax::ParamList> ParseParameterList();
   std::optional<Syntax::ParameterDeclaration> ParseParameterDeclaration();
-  std::optional<Syntax::ParameterDeclaration> ParseParameterDeclarationSuffix(Syntax::DeclarationSpecifiers &declarationSpecifiers);
+  std::optional<Syntax::ParameterDeclaration>
+  ParseParameterDeclarationSuffix(Syntax::DeclSpec &declarationSpecifiers);
   Syntax::Pointer ParsePointer();
-  std::optional<Syntax::StructOrUnionSpecifier> ParseStructOrUnionSpecifier();
-  std::optional<Syntax::StructOrUnionSpecifier::StructDeclaration> ParseStructDeclaration();
-  std::optional<Syntax::StructOrUnionSpecifier::StructDeclaration::StructDeclarator> ParseStructDeclarator();
+  std::optional<Syntax::StructOrUnionSpec> ParseStructOrUnionSpecifier();
+  std::optional<Syntax::StructOrUnionSpec::StructDeclaration>
+  ParseStructDeclaration();
+  std::optional<Syntax::StructOrUnionSpec::StructDeclarator>
+  ParseStructDeclarator();
   std::optional<Syntax::EnumSpecifier> ParseEnumSpecifier();
   std::optional<Syntax::EnumSpecifier::Enumerator> ParseEnumerator();
   std::optional<Syntax::Initializer> ParseInitializer();
@@ -101,7 +103,7 @@ private:
 
   std::optional<Syntax::Expr> ParseExpr();
   std::optional<Syntax::AssignExpr> ParseAssignExpr();
-  std::optional<Syntax::ConditionalExpr> ParseConditionalExpr();
+  std::optional<Syntax::CondExpr> ParseConditionalExpr();
   std::optional<Syntax::LogOrExpr> ParseLogOrExpr();
   std::optional<Syntax::LogAndExpr> ParseLogAndExpr();
   std::optional<Syntax::BitOrExpr> ParseBitOrExpr();
@@ -115,10 +117,11 @@ private:
   std::optional<Syntax::CastExpr> ParseCastExpr();
   std::optional<Syntax::UnaryExpr> ParseUnaryExpr();
   std::optional<Syntax::PostFixExpr> ParsePostFixExpr();
-  void ParsePostFixExprSuffix(std::unique_ptr<Syntax::PostFixExpr>& current, TokIter begin);
+  void ParsePostFixExprSuffix(TokIter beginTokLoc,
+                              Syntax::PostFixExpr &postFixExpr);
 
   std::optional<Syntax::TypeName> ParseTypeName();
-  bool IsAssignment(tok::TokenKind type);
+  bool IsAssignOp(tok::TokenKind type);
   bool Expect(tok::TokenKind tokenType);
   bool ConsumeAny();
   bool Peek(tok::TokenKind tokenType);

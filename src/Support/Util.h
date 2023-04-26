@@ -9,14 +9,14 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_UTILITIES_H
-#define LCC_UTILITIES_H
+#ifndef LCC_UTIL_H
+#define LCC_UTIL_H
 
+#include "Syntax.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include "Syntax.h"
 
 #define LCC_ASSERT(...)                                                        \
   do {                                                                         \
@@ -39,38 +39,4 @@
 #define LCC_NULLABLE
 #endif
 
-namespace lcc {
-
-template <class... Ts>
-struct overload : Ts...
-{
-  using Ts::operator()...;
-};
-template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
-
-template <typename G>
-struct YComb
-{
-  template <typename... X>
-  constexpr decltype(auto) operator()(X&&... x) const
-  {
-    return g(*this, std::forward<X>(x)...);
-  }
-
-  template <typename... X>
-  constexpr decltype(auto) operator()(X&&... x)
-  {
-    return g(*this, std::forward<X>(x)...);
-  }
-
-  G g;
-};
-
-template <typename G>
-YComb(G) -> YComb<G>;
-
-std::string_view getDeclaratorName(const Syntax::Declarator& declarator);
-const Syntax::DirectDeclaratorParamTypeList *getFuncDeclarator(const Syntax::Declarator &declarator);
-}
-#endif // LCC_UTILITIES_H
+#endif // LCC_UTIL_H

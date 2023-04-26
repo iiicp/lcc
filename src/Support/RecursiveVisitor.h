@@ -10,11 +10,12 @@
 
 #ifndef LCC_RECURSIVEVISITOR_H
 #define LCC_RECURSIVEVISITOR_H
-#include <variant>
-#include <iterator>
-#include "Utilities.h"
-#include "Type.h"
+#include "Match.h"
 #include "Syntax.h"
+#include "Type.h"
+#include "Util.h"
+#include <iterator>
+#include <variant>
 namespace lcc {
 template <typename TopType, typename Callable>
 class RecursiveVisitor {
@@ -96,21 +97,22 @@ public:
 
 constexpr auto DIRECT_DECL_NEXT_FN = [](const Syntax::DirectDeclarator &value)
     -> const Syntax::DirectDeclarator * {
-  return std::visit(
-      overload{[](const box<Syntax::DirectDeclaratorParentheses> &parentheses)
-                   -> const Syntax::DirectDeclarator * {
-                 return &parentheses->getDeclarator().getDirectDeclarator();
-               },
-               [](const box<Syntax::DirectDeclaratorIdent> &)
-                   -> const Syntax::DirectDeclarator * { return nullptr; },
-               [](const auto &value) -> const Syntax::DirectDeclarator * {
-                 return &value->getDirectDeclarator();
-               }},
-      value);
+  return match(
+      value,
+      [](const box<Syntax::DirectDeclaratorParentheses> &parentheses)
+          -> const Syntax::DirectDeclarator * {
+        return &parentheses->getDeclarator().getDirectDeclarator();
+      },
+      [](const box<Syntax::DirectDeclaratorIdent> &)
+          -> const Syntax::DirectDeclarator * { return nullptr; },
+      [](const auto &value) -> const Syntax::DirectDeclarator * {
+        return &value->getDirectDeclarator();
+      });
 };
 
-constexpr auto ARRAY_TYPE_NEXT_FN = [](const Sema::Type& type) -> const Sema::Type* {
-  return std::visit([](auto&& value) -> const Sema::Type* {
+constexpr auto ARRAY_TYPE_NEXT_FN =
+    [](const Sema::Type &type) -> const Sema::Type * {
+  return match(type.getVariant(), [](auto &&value) -> const Sema::Type * {
     using T = std::decay_t<decltype(value)>;
     if constexpr (std::is_same_v<Sema::ArrayType,T>
         || std::is_same_v<Sema::AbstractArrayType, T>
@@ -122,13 +124,13 @@ constexpr auto ARRAY_TYPE_NEXT_FN = [](const Sema::Type& type) -> const Sema::Ty
       }
     }
     return nullptr;
-  },type.getVariant());
+  });
 };
 
-constexpr auto TYPE_NEXT_FN = [](const Sema::Type& type) -> const Sema::Type* {
-  return std::visit(
-      overload {
-      [](const auto& value) -> const Sema::Type* {
+constexpr auto TYPE_NEXT_FN = [](const Sema::Type &type) -> const Sema::Type * {
+  return match(
+      type.getVariant(),
+      [](const auto &value) -> const Sema::Type * {
         using T = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<Sema::ArrayType, T>
             || std::is_same_v<Sema::AbstractArrayType, T>
@@ -141,9 +143,12 @@ constexpr auto TYPE_NEXT_FN = [](const Sema::Type& type) -> const Sema::Type* {
           return nullptr;
         }
       },
-      [](const Sema::PointerType& pointerType) -> const Sema::Type* { return &pointerType.getElementType(); },
-      [](const Sema::FunctionType& functionType) -> const Sema::Type* { return &functionType.getReturnType(); }
-      }, type.getVariant());
+      [](const Sema::PointerType &pointerType) -> const Sema::Type * {
+        return &pointerType.getElementType();
+      },
+      [](const Sema::FunctionType &functionType) -> const Sema::Type * {
+        return &functionType.getReturnType();
+      });
 };
 }
 

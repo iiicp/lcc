@@ -9,10 +9,11 @@
  ***********************************/
 
 #include "Parser.h"
+#include "Match.h"
+#include "Util.h"
 #include <algorithm>
-#include "Utilities.h"
-#include <set>
 #include <iostream>
+#include <set>
 
 namespace lcc {
 using namespace Syntax;
@@ -211,7 +212,7 @@ std::optional<Declaration> Parser::ParseDeclarationSuffix(
   std::vector<Declaration::InitDeclarator> initDeclarators;
   if (alreadyParsedDeclarator) {
     if (!hasTypedef) {
-      auto name = getDeclaratorName(*alreadyParsedDeclarator);
+      auto name = GetDeclaratorName(*alreadyParsedDeclarator);
       mScope.addToScope(name);
     }
     if (!Peek(tok::equal)) {
@@ -246,7 +247,7 @@ std::optional<Declaration> Parser::ParseDeclarationSuffix(
     auto begin = mTokCursor;
     auto declarator = ParseDeclarator();
     if (!hasTypedef && declarator) {
-      auto name = getDeclaratorName(*declarator);
+      auto name = GetDeclaratorName(*declarator);
       mScope.addToScope(name);
     }
     if (!Peek(tok::equal) && declarator) {
@@ -264,7 +265,7 @@ End:
   Expect(tok::semi);
   if (hasTypedef) {
     for (auto& iter : initDeclarators) {
-      auto name = getDeclaratorName(*iter.declarator_);
+      auto name = GetDeclaratorName(*iter.declarator_);
       mScope.addTypedef(name);
     }
   }
@@ -287,7 +288,7 @@ std::optional<ExternalDeclaration> Parser::ParseExternalDeclaration() {
   if (!declarator) {
     goto end;
   }
-  parameters = getFuncDeclarator(*declarator);
+  parameters = GetFuncDeclarator(*declarator);
   if (!parameters) {
     goto end;
   }
@@ -341,11 +342,11 @@ std::optional<ExternalDeclaration> Parser::ParseExternalDeclaration() {
         continue;
       }
       auto &decl = std::get<Declarator>(parameterDeclarator);
-      mScope.addToScope(getDeclaratorName(decl));
+      mScope.addToScope(GetDeclaratorName(decl));
     }
     auto compoundStmt = ParseBlockStmt();
     mScope.popScope();
-    mScope.addToScope(getDeclaratorName(*declarator));
+    mScope.addToScope(GetDeclaratorName(*declarator));
     if (compoundStmt) {
       return FunctionDefinition(begin, MV_(declSpecs), MV_(*declarator),
                                 MV_(*compoundStmt));
@@ -458,7 +459,7 @@ Parser::ParseStructDeclarator() {
   auto declarator = ParseDeclarator();
   SetCheckTypedefType(true);
   if (declarator)
-    mScope.addToScope(getDeclaratorName(*declarator));
+    mScope.addToScope(GetDeclaratorName(*declarator));
   if (Peek(tok::colon) && declarator) {
     ConsumeAny();
     auto constant = ParseConditionalExpr();
@@ -2035,16 +2036,15 @@ std::optional<PostFixExpr> Parser::ParsePostFixExpr() {
     ConsumeAny();
   }else if (Peek(tok::char_constant) || Peek(tok::numeric_constant) || Peek(tok::string_literal)) {
     using PrimExprConstantValueType = PrimaryExprConstant::Variant;
-    auto value = std::visit(
-        [](auto &&value) -> PrimExprConstantValueType {
+    auto value = match(
+        mTokCursor->getValue(), [](auto &&value) -> PrimExprConstantValueType {
           using T = std::decay_t<decltype(value)>;
           if constexpr (std::is_constructible_v<PrimExprConstantValueType, T>) {
             return std::forward<decltype(value)>(value);
           } else {
             LCC_UNREACHABLE;
           }
-        },
-        mTokCursor->getValue());
+        });
     primaryExpr = PrimaryExprConstant(beginTokLoc, MV_(value));
     ConsumeAny();
   }else if (Peek(tok::l_paren)) {
@@ -2189,6 +2189,77 @@ void Parser::SkipTo(TokenBitSet recoveryToken, unsigned DiagID) {
     return recoveryToken[tok.getTokenKind()];
   });
   DiagReport(Diag, tok->getSMLoc(), DiagID);
+}
+
+std::string_view
+Parser::GetDeclaratorName(const Syntax::Declarator &declarator) {
+  return match_with_self(
+      declarator.getDirectDeclarator(),
+      [](auto &&, const box<DirectDeclaratorIdent> &name) -> std::string_view {
+        return name->getIdent();
+      },
+      [](auto &&self, const box<DirectDeclaratorParentheses> &declarator)
+          -> std::string_view {
+        return match(
+            declarator->getDeclarator().getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      },
+      [](auto &&self, const box<DirectDeclaratorParamTypeList> &paramTypeList)
+          -> std::string_view {
+        return match(
+            paramTypeList->getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      },
+      [](auto &&self, const box<DirectDeclaratorAssignExpr> &assignExpr)
+          -> std::string_view {
+        return match(
+            assignExpr->getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      },
+      [](auto &&self,
+         const box<DirectDeclaratorAsterisk> &asterisk) -> std::string_view {
+        return match(
+            asterisk->getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      });
+}
+
+const Syntax::DirectDeclaratorParamTypeList *
+Parser::GetFuncDeclarator(const Syntax::Declarator &declarator) {
+  const Syntax::DirectDeclaratorParamTypeList *paramTypeList_ = nullptr;
+  match_with_self(
+      declarator.getDirectDeclarator(),
+      [](auto &&, const box<Syntax::DirectDeclaratorIdent> &name)
+          -> std::string_view { return name->getIdent(); },
+      [](auto &&self,
+         const box<Syntax::DirectDeclaratorParentheses> &declarator)
+          -> std::string_view {
+        return match(
+            declarator->getDeclarator().getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      },
+      [&paramTypeList_](
+          auto &&self,
+          const box<Syntax::DirectDeclaratorParamTypeList> &paramTypeList)
+          -> std::string_view {
+        paramTypeList_ = paramTypeList.get();
+        return match(
+            paramTypeList->getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      },
+      [](auto &&self, const box<Syntax::DirectDeclaratorAssignExpr> &assignExpr)
+          -> std::string_view {
+        return match(
+            assignExpr->getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      },
+      [](auto &&self, const box<Syntax::DirectDeclaratorAsterisk> &asterisk)
+          -> std::string_view {
+        return match(
+            asterisk->getDirectDeclarator(),
+            [&self](auto &&value) -> std::string_view { return self(value); });
+      });
+  return paramTypeList_;
 }
 
 bool Parser::IsFirstInExternalDeclaration() const {

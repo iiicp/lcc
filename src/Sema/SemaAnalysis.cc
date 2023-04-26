@@ -9,6 +9,7 @@
  ***********************************/
 
 #include "SemaAnalysis.h"
+#include "Match.h"
 #include <bitset>
 #include <unordered_map>
 namespace lcc {
@@ -25,14 +26,16 @@ Sema::TranslationUnit SemaAnalysis::Analyse(const Syntax::TranslationUnit &node)
 Sema::TranslationUnit SemaAnalysis::visit(const Syntax::TranslationUnit &node) {
   std::vector<Sema::TranslationUnit::Variant> globals;
   for (auto &iter : node.getGlobals()) {
-    auto result = std::visit(overload{[&](const Syntax::FunctionDefinition &functionDefinition)
-                     -> std::vector<Sema::TranslationUnit::Variant> {
-                    return visit(functionDefinition);
-                 },
-                 [&](const Syntax::Declaration &declaration)
-                     -> std::vector<Sema::TranslationUnit::Variant> {
-                    return visit(declaration);
-                 }}, iter);
+    auto result = match(
+        iter,
+        [&](const Syntax::FunctionDefinition &functionDefinition)
+            -> std::vector<Sema::TranslationUnit::Variant> {
+          return visit(functionDefinition);
+        },
+        [&](const Syntax::Declaration &declaration)
+            -> std::vector<Sema::TranslationUnit::Variant> {
+          return visit(declaration);
+        });
     globals.insert(globals.end(), std::move_iterator(result.begin()), std::move_iterator(result.end()));
 //    globals = std::move(result);
   }

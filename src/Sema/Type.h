@@ -11,7 +11,7 @@
 #ifndef LCC_TYPE_H
 #define LCC_TYPE_H
 #include "Token.h"
-#include "Utilities.h"
+#include "Util.h"
 #include <bitset>
 #include <cstdint>
 #include <memory>

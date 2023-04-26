@@ -180,6 +180,10 @@ private:
   }
 
   void SkipTo(TokenBitSet recoveryToken, unsigned DiagID);
+
+  std::string_view GetDeclaratorName(const Syntax::Declarator &declarator);
+  const Syntax::DirectDeclaratorParamTypeList *
+  GetFuncDeclarator(const Syntax::Declarator &declarator);
 };
 }
 #endif // LCC_PARSER_H

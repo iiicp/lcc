@@ -9,8 +9,9 @@
  ***********************************/
 
 #include "Type.h"
-#include "Utilities.h"
+#include "Match.h"
 #include "RecursiveVisitor.h"
+#include "Util.h"
 namespace lcc::Sema {
 
 template <class T1, class T2>
@@ -336,23 +337,24 @@ uint64_t EnumType::getAlignOf() const {
 /// enumType end
 
 std::uint64_t Type::getSizeOf() const {
-  return std::visit([&](auto && value)->size_t {
-      if constexpr (std::is_same_v<std::monostate, std::decay_t<decltype(value)>>) {
-        LCC_UNREACHABLE;
-      }else {
-        return value.getSizeOf();
-      }
-    }, m_type);
+  return match(m_type, [&](auto &&value) -> size_t {
+    if constexpr (std::is_same_v<std::monostate,
+                                 std::decay_t<decltype(value)>>) {
+      LCC_UNREACHABLE;
+    } else {
+      return value.getSizeOf();
+    }
+  });
 }
 
 std::uint64_t Type::getAlignOf() const {
-  return std::visit([&](auto && value)->size_t {
+  return match(m_type, [&](auto &&value) -> size_t {
     if constexpr (std::is_same_v<std::monostate, std::decay_t<decltype(value)>>) {
       LCC_UNREACHABLE;
     }else {
       return value.getAlignOf();
     }
-  }, m_type);
+  });
 }
 
 /// Type start
@@ -363,10 +365,10 @@ bool Type::operator==(const Type &rhs) const {
   if (m_type.index() != rhs.m_type.index()) {
     return false;
   }
-  return std::visit([&](auto&& value) -> bool {
+  return match(m_type, [&](auto &&value) -> bool {
     using T = std::decay_t<decltype(value)>;
     return value == std::get<T>(rhs.m_type);
-  },m_type);
+  });
 }
 
 bool Type::operator!=(const Type &rhs) const { return !(rhs == *this); }
@@ -463,26 +465,24 @@ bool Type::isVariableLengthArray() const{
 }
 
 const Type& Type::getArrayElementType() const{
-  return std::visit(
-      overload{
-          [](const auto &)->const Type& {LCC_UNREACHABLE;},
-          [](const ArrayType &arrayType)->const Type&{
-                return arrayType.getType();
-              },
-          [](const AbstractArrayType &abstractArrayType)->const Type&{
-            return abstractArrayType.getType();
-          },
-          [](const ValArrayType &valArrayType)->const Type&{
-            return valArrayType.getType();
-          },
-    }, m_type);
+  return match(
+      m_type, [](const auto &) -> const Type & { LCC_UNREACHABLE; },
+      [](const ArrayType &arrayType) -> const Type & {
+        return arrayType.getType();
+      },
+      [](const AbstractArrayType &abstractArrayType) -> const Type & {
+        return abstractArrayType.getType();
+      },
+      [](const ValArrayType &valArrayType) -> const Type & {
+        return valArrayType.getType();
+      });
 }
 /// Type end
 
 lcc::Sema::Type adjustParameterType(lcc::Sema::Type type){
   if (type.isArray())
   {
-    auto elementType = std::visit([](auto&& value) -> Type {
+    auto elementType = match(type.getVariant(), [](auto &&value) -> Type {
       using T = std::decay_t<decltype(value)>;
       if constexpr (std::is_same_v<ArrayType,
                                    T> || std::is_same_v<AbstractArrayType, T> || std::is_same_v<ValArrayType, T>)
@@ -490,8 +490,8 @@ lcc::Sema::Type adjustParameterType(lcc::Sema::Type type){
         return value.getType();
       }
       LCC_UNREACHABLE;
-    }, type.getVariant());
-    bool restrict = std::visit([](auto&& value) -> bool {
+    });
+    bool restrict = match(type.getVariant(), [](auto &&value) -> bool {
       using T = std::decay_t<decltype(value)>;
       if constexpr (std::is_same_v<ArrayType,
                                    T> || std::is_same_v<AbstractArrayType, T> || std::is_same_v<ValArrayType, T>)
@@ -499,7 +499,7 @@ lcc::Sema::Type adjustParameterType(lcc::Sema::Type type){
         return value.isRestricted();
       }
       LCC_UNREACHABLE;
-    },type.getVariant());
+    });
     return PointerType::create(type.isConst(), type.isVolatile(), restrict, std::move(elementType));
   }
   return type;

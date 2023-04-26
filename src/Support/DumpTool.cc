@@ -453,7 +453,7 @@ void visitor(const Syntax::ParamList &paramList) {
   llvm::outs() << &paramList << "\n";
   ValueReset v(LeftAlign, LeftAlign+1);
   for (const auto &paramDecl : paramList.getParameterDeclarations()) {
-    visitor(paramDecl.declarationSpecifiers_);
+    visitor(paramDecl.declSpec_);
     std::visit(overload{
         [](const Syntax::Declarator &declarator) {
            visitor(declarator);

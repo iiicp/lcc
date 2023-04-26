@@ -14,18 +14,19 @@
 
 #include <memory>
 namespace lcc {
+#define MV_(obj) std::move(obj)
 template <typename T> class box {
   std::unique_ptr<T> impl_;
 
 public:
   // Automatic construction from a `T`, not a `T*`
   box(T &&obj) : impl_(new T(std::move(obj))) {}
-  box(const T &obj) : impl_(new T(obj)) {}
 
-  // Copy constructor copies `T`
-  box(const box &other) : box(*other.impl_) {}
-  box &operator=(const box &other) {
-    *impl_ = *other.impl_;
+  box(box &&other) : impl_(std::move(other.impl_)) {}
+
+  box &operator=(box &&other) {
+    if (this != &other)
+      impl_ = std::move(other.impl_);
     return *this;
   }
 

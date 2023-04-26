@@ -112,6 +112,10 @@ private:
 public:
   Node(TokIter beginTokLoc) : beginTokLoc_(beginTokLoc) {}
   virtual ~Node() = default;
+  Node(const Node &) = delete;
+  Node &operator=(const Node &) = delete;
+  Node(Node &&) = default;
+  Node &operator=(Node &&) = default;
   TokIter getBeginLoc() const { return beginTokLoc_; }
 };
 
@@ -135,16 +139,16 @@ public:
  */
 class PrimaryExprConstant final : public Node {
 public:
-  using Value = std::variant<int32_t, uint32_t, int64_t, uint64_t, float,
-                             double, std::string>;
+  using Variant = std::variant<int32_t, uint32_t, int64_t, uint64_t, float,
+                               double, std::string>;
 
 private:
-  Value value_;
+  Variant value_;
 
 public:
-  PrimaryExprConstant(TokIter begin, Value value)
+  PrimaryExprConstant(TokIter begin, Variant &&value)
       : Node(begin), value_(value) {}
-  [[nodiscard]] const Value &getValue() const { return value_; }
+  [[nodiscard]] const Variant &getValue() const { return value_; }
 };
 
 /*
@@ -157,7 +161,7 @@ private:
 
 public:
   PrimaryExprParentheses(TokIter begin, ExprBox expr)
-      : Node(begin), expr_(expr) {}
+      : Node(begin), expr_(MV_(expr)) {}
   [[nodiscard]] const Expr &getExpr() const { return *expr_; }
 };
 
@@ -199,8 +203,8 @@ private:
   ExprBox expr_;
 
 public:
-  PostFixExprSubscript(TokIter begin, PostFixExpr postFixExpr, ExprBox expr)
-      : Node(begin), postFixExpr_(postFixExpr), expr_(expr) {}
+  PostFixExprSubscript(TokIter begin, PostFixExpr &&postFixExpr, ExprBox expr)
+      : Node(begin), postFixExpr_(MV_(postFixExpr)), expr_(MV_(expr)) {}
   [[nodiscard]] const PostFixExpr &getPostFixExpr() const {
     return postFixExpr_;
   }
@@ -221,9 +225,9 @@ private:
   std::vector<AssignExprBox> params_;
 
 public:
-  PostFixExprFuncCall(TokIter begin, PostFixExpr postFixExpr,
-                      std::vector<AssignExprBox> params)
-      : Node(begin), postFixExpr_(postFixExpr), params_(params) {}
+  PostFixExprFuncCall(TokIter begin, PostFixExpr &&postFixExpr,
+                      std::vector<AssignExprBox> &&params)
+      : Node(begin), postFixExpr_(MV_(postFixExpr)), params_(MV_(params)) {}
 
   [[nodiscard]] const PostFixExpr &getPostFixExpr() const {
     return postFixExpr_;
@@ -244,9 +248,9 @@ private:
   std::string_view identifier_;
 
 public:
-  PostFixExprDot(TokIter begin, PostFixExpr postFixExpr,
+  PostFixExprDot(TokIter begin, PostFixExpr &&postFixExpr,
                  std::string_view identifier)
-      : Node(begin), postFixExpr_(postFixExpr), identifier_(identifier) {}
+      : Node(begin), postFixExpr_(MV_(postFixExpr)), identifier_(identifier) {}
 
   [[nodiscard]] const PostFixExpr &getPostFixExpr() const {
     return postFixExpr_;
@@ -264,9 +268,9 @@ private:
   std::string_view identifier_;
 
 public:
-  PostFixExprArrow(TokIter begin, PostFixExpr postFixExpr,
+  PostFixExprArrow(TokIter begin, PostFixExpr &&postFixExpr,
                    std::string_view identifier)
-      : Node(begin), postFixExpr_(postFixExpr), identifier_(identifier) {}
+      : Node(begin), postFixExpr_(MV_(postFixExpr)), identifier_(identifier) {}
   [[nodiscard]] const PostFixExpr &getPostFixExpr() const {
     return postFixExpr_;
   }
@@ -282,8 +286,8 @@ private:
   PostFixExpr postFixExpr_;
 
 public:
-  PostFixExprIncrement(TokIter begin, PostFixExpr postFixExpr)
-      : Node(begin), postFixExpr_(postFixExpr) {}
+  PostFixExprIncrement(TokIter begin, PostFixExpr &&postFixExpr)
+      : Node(begin), postFixExpr_(MV_(postFixExpr)) {}
   [[nodiscard]] const PostFixExpr &getPostFixExpr() const {
     return postFixExpr_;
   }
@@ -298,8 +302,8 @@ private:
   PostFixExpr postFixExpr_;
 
 public:
-  PostFixExprDecrement(TokIter begin, PostFixExpr postFixExpr)
-      : Node(begin), postFixExpr_(postFixExpr) {}
+  PostFixExprDecrement(TokIter begin, PostFixExpr &&postFixExpr)
+      : Node(begin), postFixExpr_(MV_(postFixExpr)) {}
   [[nodiscard]] const PostFixExpr &getPostFixExpr() const {
     return postFixExpr_;
   }
@@ -318,7 +322,8 @@ private:
 public:
   PostFixExprTypeInitializer(TokIter begin, TypeNameBox typeName,
                              InitializerListBox initializerList)
-      : Node(begin), typeName_(typeName), initializerList_(initializerList) {}
+      : Node(begin), typeName_(MV_(typeName)),
+        initializerList_(MV_(initializerList)) {}
 
   [[nodiscard]] const InitializerList &getInitializerList() const {
     return *initializerList_;
@@ -369,8 +374,8 @@ private:
   Variant value_;
 
 public:
-  UnaryExprUnaryOperator(TokIter begin, Op anOperator, Variant value)
-      : Node(begin), operator_(anOperator), value_(value) {}
+  UnaryExprUnaryOperator(TokIter begin, Op anOperator, Variant &&value)
+      : Node(begin), operator_(anOperator), value_(MV_(value)) {}
 
   [[nodiscard]] Op getOperator() const { return operator_; }
   [[nodiscard]] const CastExpr *getCastExpr() const {
@@ -388,13 +393,13 @@ public:
  */
 class UnaryExprSizeOf final : public Node {
   using Variant = std::variant<UnaryExpr, TypeNameBox>;
-  Variant mValue;
+  Variant value_;
 
 public:
-  UnaryExprSizeOf(TokIter begin, Variant variant)
-      : Node(begin), mValue(variant) {}
+  UnaryExprSizeOf(TokIter begin, Variant &&variant)
+      : Node(begin), value_(MV_(variant)) {}
 
-  [[nodiscard]] const Variant &getVariant() const { return mValue; }
+  [[nodiscard]] const Variant &getVariant() const { return value_; }
 };
 
 /**
@@ -421,15 +426,16 @@ public:
   using TypedefName = std::string_view;
 
 private:
-  using variant = std::variant<PrimTypeKind, box<StructOrUnionSpec>,
+  using Variant = std::variant<PrimTypeKind, box<StructOrUnionSpec>,
                                box<EnumSpecifier>, TypedefName>;
 
-  variant mVariant;
+  Variant variant_;
 
 public:
-  TypeSpec(TokIter begin, variant variant) : Node(begin), mVariant(variant) {}
+  TypeSpec(TokIter begin, Variant &&variant)
+      : Node(begin), variant_(MV_(variant)) {}
 
-  [[nodiscard]] const variant &getVariant() const { return mVariant; }
+  [[nodiscard]] const Variant &getVariant() const { return variant_; }
 };
 
 /**
@@ -497,15 +503,17 @@ private:
 
 public:
   DeclSpec(TokIter begin) : Node(begin) {}
-  void addStorageClassSpecifiers(StorageClsSpec specifier) {
-    storageClassSpecifiers_.push_back(specifier);
+  void addStorageClassSpecifiers(StorageClsSpec &&specifier) {
+    storageClassSpecifiers_.push_back(MV_(specifier));
   }
-  void addTypeSpec(TypeSpec specifier) { typeSpecifiers_.push_back(specifier); }
-  void addTypeQualifiers(TypeQualifier qualifier) {
-    typeQualifiers_.push_back(qualifier);
+  void addTypeSpec(TypeSpec &&specifier) {
+    typeSpecifiers_.push_back(MV_(specifier));
   }
-  void addFunctionSpecifier(FunctionSpecifier specifier) {
-    functionSpecifiers_.push_back(specifier);
+  void addTypeQualifiers(TypeQualifier &&qualifier) {
+    typeQualifiers_.push_back(MV_(qualifier));
+  }
+  void addFunctionSpecifier(FunctionSpecifier &&specifier) {
+    functionSpecifiers_.push_back(MV_(specifier));
   }
 
   [[nodiscard]] const std::vector<StorageClsSpec> &
@@ -547,8 +555,8 @@ public:
   TypeName(
       TokIter begin, DeclSpec specifierQualifiers,
       std::optional<AbstractDeclaratorBox> abstractDeclarator = {std::nullopt})
-      : Node(begin), mSpecifierQualifiers(specifierQualifiers),
-        mAbstractDeclarator(abstractDeclarator) {}
+      : Node(begin), mSpecifierQualifiers(MV_(specifierQualifiers)),
+        mAbstractDeclarator(MV_(abstractDeclarator)) {}
   [[nodiscard]] const DeclSpec &getSpecifierQualifiers() const {
     return mSpecifierQualifiers;
   }
@@ -571,12 +579,12 @@ public:
   using Variant = std::variant<UnaryExpr, TypeNameCast>;
 
 public:
-  Variant mVariant;
+  Variant variant_;
 
 public:
-  CastExpr(TokIter begin, Variant unaryOrCast)
-      : Node(begin), mVariant(unaryOrCast) {}
-  [[nodiscard]] const Variant &getVariant() const { return mVariant; }
+  CastExpr(TokIter begin, Variant &&unaryOrCast)
+      : Node(begin), variant_(MV_(unaryOrCast)) {}
+  [[nodiscard]] const Variant &getVariant() const { return variant_; }
 };
 
 /**
@@ -595,9 +603,10 @@ private:
   std::vector<std::pair<Op, CastExpr>> optionalCastExps_;
 
 public:
-  explicit MultiExpr(TokIter begin, CastExpr castExpr,
-                     std::vector<std::pair<Op, CastExpr>> optionalCastExps)
-      : Node(begin), castExpr_(castExpr), optionalCastExps_(optionalCastExps) {}
+  explicit MultiExpr(TokIter begin, CastExpr &&castExpr,
+                     std::vector<std::pair<Op, CastExpr>> &&optionalCastExps)
+      : Node(begin), castExpr_(MV_(castExpr)),
+        optionalCastExps_(MV_(optionalCastExps)) {}
   [[nodiscard]] const CastExpr &getCastExpr() const { return castExpr_; }
   [[nodiscard]] const std::vector<std::pair<Op, CastExpr>> &
   getOptionalCastExps() const {
@@ -620,10 +629,10 @@ private:
   std::vector<std::pair<Op, MultiExpr>> optionalMultiExps_;
 
 public:
-  AdditiveExpr(TokIter begin, MultiExpr multiExpr,
-               std::vector<std::pair<Op, MultiExpr>> optionalMultiExps)
-      : Node(begin), multiExpr_(multiExpr),
-        optionalMultiExps_(optionalMultiExps) {}
+  AdditiveExpr(TokIter begin, MultiExpr &&multiExpr,
+               std::vector<std::pair<Op, MultiExpr>> &&optionalMultiExps)
+      : Node(begin), multiExpr_(MV_(multiExpr)),
+        optionalMultiExps_(MV_(optionalMultiExps)) {}
   [[nodiscard]] const MultiExpr &getMultiExpr() const { return multiExpr_; }
   [[nodiscard]] const std::vector<std::pair<Op, MultiExpr>> &
   getOptionalMultiExps() const {
@@ -646,10 +655,10 @@ private:
   std::vector<std::pair<Op, AdditiveExpr>> optionalAdditiveExps_;
 
 public:
-  ShiftExpr(TokIter begin, AdditiveExpr additiveExpr,
-            std::vector<std::pair<Op, AdditiveExpr>> optionalAdditiveExps)
-      : Node(begin), additiveExpr_(additiveExpr),
-        optionalAdditiveExps_(optionalAdditiveExps) {}
+  ShiftExpr(TokIter begin, AdditiveExpr &&additiveExpr,
+            std::vector<std::pair<Op, AdditiveExpr>> &&optionalAdditiveExps)
+      : Node(begin), additiveExpr_(MV_(additiveExpr)),
+        optionalAdditiveExps_(MV_(optionalAdditiveExps)) {}
   [[nodiscard]] const AdditiveExpr &getAdditiveExpr() const {
     return additiveExpr_;
   }
@@ -676,10 +685,10 @@ private:
   std::vector<std::pair<Op, ShiftExpr>> optionalShiftExps_;
 
 public:
-  RelationalExpr(TokIter begin, ShiftExpr shiftExpr,
-                 std::vector<std::pair<Op, ShiftExpr>> optionalShiftExps)
-      : Node(begin), shiftExpr_(shiftExpr),
-        optionalShiftExps_(optionalShiftExps) {}
+  RelationalExpr(TokIter begin, ShiftExpr &&shiftExpr,
+                 std::vector<std::pair<Op, ShiftExpr>> &&optionalShiftExps)
+      : Node(begin), shiftExpr_(MV_(shiftExpr)),
+        optionalShiftExps_(MV_(optionalShiftExps)) {}
   [[nodiscard]] const ShiftExpr &getShiftExpr() const { return shiftExpr_; }
   [[nodiscard]] const std::vector<std::pair<Op, ShiftExpr>> &
   getOptionalShiftExpressions() const {
@@ -702,10 +711,10 @@ private:
   std::vector<std::pair<Op, RelationalExpr>> optionalRelationalExps_;
 
 public:
-  EqualExpr(TokIter begin, RelationalExpr relationalExpr,
-            std::vector<std::pair<Op, RelationalExpr>> optionalRelationalExps)
-      : Node(begin), relationalExpr_(relationalExpr),
-        optionalRelationalExps_(optionalRelationalExps) {}
+  EqualExpr(TokIter begin, RelationalExpr &&relationalExpr,
+            std::vector<std::pair<Op, RelationalExpr>> &&optionalRelationalExps)
+      : Node(begin), relationalExpr_(MV_(relationalExpr)),
+        optionalRelationalExps_(MV_(optionalRelationalExps)) {}
   [[nodiscard]] const RelationalExpr &getRelationalExpr() const {
     return relationalExpr_;
   }
@@ -726,8 +735,8 @@ private:
   std::vector<EqualExpr> equalExps_;
 
 public:
-  BitAndExpr(TokIter begin, std::vector<EqualExpr> equalExps)
-      : Node(begin), equalExps_(equalExps) {}
+  BitAndExpr(TokIter begin, std::vector<EqualExpr> &&equalExps)
+      : Node(begin), equalExps_(MV_(equalExps)) {}
   [[nodiscard]] const std::vector<EqualExpr> &getEqualExpr() const {
     return equalExps_;
   }
@@ -743,8 +752,8 @@ private:
   std::vector<BitAndExpr> bitAndExps_;
 
 public:
-  BitXorExpr(TokIter begin, std::vector<BitAndExpr> bitAndExps)
-      : Node(begin), bitAndExps_(bitAndExps) {}
+  BitXorExpr(TokIter begin, std::vector<BitAndExpr> &&bitAndExps)
+      : Node(begin), bitAndExps_(MV_(bitAndExps)) {}
   [[nodiscard]] const std::vector<BitAndExpr> &getBitAndExprs() const {
     return bitAndExps_;
   }
@@ -760,8 +769,8 @@ private:
   std::vector<BitXorExpr> bitXorExps_;
 
 public:
-  BitOrExpr(TokIter begin, std::vector<BitXorExpr> bitXorExps)
-      : Node(begin), bitXorExps_(bitXorExps) {}
+  BitOrExpr(TokIter begin, std::vector<BitXorExpr> &&bitXorExps)
+      : Node(begin), bitXorExps_(MV_(bitXorExps)) {}
 
   [[nodiscard]] const std::vector<BitXorExpr> &getBitXorExprs() const {
     return bitXorExps_;
@@ -778,8 +787,8 @@ private:
   std::vector<BitOrExpr> bitOrExps_;
 
 public:
-  LogAndExpr(TokIter begin, std::vector<BitOrExpr> bitOrExps)
-      : Node(begin), bitOrExps_(bitOrExps) {}
+  LogAndExpr(TokIter begin, std::vector<BitOrExpr> &&bitOrExps)
+      : Node(begin), bitOrExps_(MV_(bitOrExps)) {}
   [[nodiscard]] const std::vector<BitOrExpr> &getBitOrExprs() const {
     return bitOrExps_;
   }
@@ -795,8 +804,8 @@ private:
   std::vector<LogAndExpr> logAndExps_;
 
 public:
-  LogOrExpr(TokIter begin, std::vector<LogAndExpr> logAndExps)
-      : Node(begin), logAndExps_(logAndExps) {}
+  LogOrExpr(TokIter begin, std::vector<LogAndExpr> &&logAndExps)
+      : Node(begin), logAndExps_(MV_(logAndExps)) {}
   [[nodiscard]] const std::vector<LogAndExpr> &getLogAndExprs() const {
     return logAndExps_;
   }
@@ -815,11 +824,12 @@ private:
 
 public:
   explicit CondExpr(
-      TokIter begin, LogOrExpr logOrExpr,
-      std::optional<box<Expr>> optionalExpr = {std::nullopt},
-      std::optional<box<CondExpr>> optionalCondExpr = {std::nullopt})
-      : Node(begin), logOrExpr_(logOrExpr), optionalExpr_(optionalExpr),
-        optionalCondExpr_(optionalCondExpr) {}
+      TokIter begin, LogOrExpr &&logOrExpr,
+      std::optional<box<Expr>> &&optionalExpr = {std::nullopt},
+      std::optional<box<CondExpr>> &&optionalCondExpr = {std::nullopt})
+      : Node(begin), logOrExpr_(MV_(logOrExpr)),
+        optionalExpr_(MV_(optionalExpr)),
+        optionalCondExpr_(MV_(optionalCondExpr)) {}
   [[nodiscard]] const LogOrExpr &getLogicalOrExpression() const {
     return logOrExpr_;
   }
@@ -873,10 +883,10 @@ private:
   std::vector<std::pair<AssignOp, CondExpr>> optionalConditionExpr_;
 
 public:
-  AssignExpr(TokIter begin, CondExpr conditionalExpression,
-             std::vector<std::pair<AssignOp, CondExpr>> optionalConditionExpr)
-      : Node(begin), condExpr_(conditionalExpression),
-        optionalConditionExpr_(optionalConditionExpr) {}
+  AssignExpr(TokIter begin, CondExpr &&conditionalExpression,
+             std::vector<std::pair<AssignOp, CondExpr>> &&optionalConditionExpr)
+      : Node(begin), condExpr_(MV_(conditionalExpression)),
+        optionalConditionExpr_(MV_(optionalConditionExpr)) {}
 
   [[nodiscard]] const CondExpr &getConditionalExpr() const { return condExpr_; }
   [[nodiscard]] const std::vector<std::pair<AssignOp, CondExpr>> &
@@ -895,8 +905,8 @@ private:
   std::vector<AssignExpr> assignExpressions_;
 
 public:
-  Expr(TokIter begin, std::vector<AssignExpr> assignExpressions)
-      : Node(begin), assignExpressions_(assignExpressions) {}
+  Expr(TokIter begin, std::vector<AssignExpr> &&assignExpressions)
+      : Node(begin), assignExpressions_(MV_(assignExpressions)) {}
 
   const std::vector<AssignExpr> &getAssignExpressions() const {
     return assignExpressions_;
@@ -915,17 +925,22 @@ using Stmt =
  */
 class ExprStmt final : public Node {
 private:
-  std::optional<box<Expr>> optionalExpr_;
+  std::optional<ExprBox> optionalExpr_;
 
 public:
   ExprStmt(TokIter begin,
-           std::optional<box<Expr>> optionalExpr = {std::nullopt})
-      : Node(begin), optionalExpr_(optionalExpr) {}
+           std::optional<ExprBox> &&optionalExpr = {std::nullopt})
+      : Node(begin), optionalExpr_(MV_(optionalExpr)) {}
   [[nodiscard]] const Expr *getOptionalExpression() const {
     if (optionalExpr_.has_value()) {
       return optionalExpr_.value().get();
     }
     return nullptr;
+  }
+
+  [[nodiscard]] ExprBox moveOptionalExpression() {
+    assert(optionalExpr_);
+    return MV_(*optionalExpr_);
   }
 };
 
@@ -941,10 +956,10 @@ private:
   std::optional<Stmt> optionalElseStmt_;
 
 public:
-  IfStmt(TokIter begin, Expr expr, Stmt thenStmt,
-         std::optional<Stmt> optionalElseStmt = {std::nullopt})
-      : Node(begin), expr_(expr), thenStmt_(thenStmt),
-        optionalElseStmt_(optionalElseStmt) {}
+  IfStmt(TokIter begin, Expr &&expr, Stmt &&thenStmt,
+         std::optional<Stmt> &&optionalElseStmt = {std::nullopt})
+      : Node(begin), expr_(MV_(expr)), thenStmt_(MV_(thenStmt)),
+        optionalElseStmt_(MV_(optionalElseStmt)) {}
 
   [[nodiscard]] const Expr &getExpression() const { return expr_; }
 
@@ -968,8 +983,8 @@ private:
   Stmt stmt_;
 
 public:
-  SwitchStmt(TokIter begin, Expr expression, Stmt statement)
-      : Node(begin), expr_(expression), stmt_(statement) {}
+  SwitchStmt(TokIter begin, Expr &&expression, Stmt &&statement)
+      : Node(begin), expr_(MV_(expression)), stmt_(MV_(statement)) {}
 
   [[nodiscard]] const Expr &getExpression() const { return expr_; }
 
@@ -985,7 +1000,8 @@ private:
   Stmt stmt_;
 
 public:
-  DefaultStmt(TokIter begin, Stmt statement) : Node(begin), stmt_(statement) {}
+  DefaultStmt(TokIter begin, Stmt &&statement)
+      : Node(begin), stmt_(MV_(statement)) {}
   [[nodiscard]] const Stmt &getStatement() const { return stmt_; }
 };
 
@@ -999,8 +1015,8 @@ private:
   Stmt stmt_;
 
 public:
-  CaseStmt(TokIter begin, ConstantExpr constantExpr, Stmt stmt)
-      : Node(begin), constantExpr_(constantExpr), stmt_(stmt) {}
+  CaseStmt(TokIter begin, ConstantExpr &&constantExpr, Stmt &&stmt)
+      : Node(begin), constantExpr_(MV_(constantExpr)), stmt_(MV_(stmt)) {}
 
   [[nodiscard]] const ConstantExpr &getConstantExpr() const {
     return constantExpr_;
@@ -1046,8 +1062,8 @@ private:
   Expr expr_;
 
 public:
-  DoWhileStmt(TokIter begin, Stmt stmt, Expr expr)
-      : Node(begin), stmt_(stmt), expr_(expr) {}
+  DoWhileStmt(TokIter begin, Stmt &&stmt, Expr &&expr)
+      : Node(begin), stmt_(MV_(stmt)), expr_(MV_(expr)) {}
   [[nodiscard]] const Stmt &getStatement() const { return stmt_; }
   [[nodiscard]] const Expr &getExpression() const { return expr_; }
 };
@@ -1062,8 +1078,8 @@ private:
   Stmt stmt_;
 
 public:
-  WhileStmt(TokIter begin, Expr expr, Stmt stmt)
-      : Node(begin), expr_(expr), stmt_(stmt) {}
+  WhileStmt(TokIter begin, Expr &&expr, Stmt &&stmt)
+      : Node(begin), expr_(MV_(expr)), stmt_(MV_(stmt)) {}
   [[nodiscard]] const Expr &getExpression() const { return expr_; }
   [[nodiscard]] const Stmt &getStatement() const { return stmt_; }
 };
@@ -1082,11 +1098,11 @@ private:
 
 public:
   ForStmt(TokIter begin, Stmt stmt,
-          std::variant<box<Declaration>, std::optional<Expr>> initial,
-          std::optional<Expr> controlExpr = {std::nullopt},
-          std::optional<Expr> postExpr = {std::nullopt})
-      : Node(begin), stmt_(stmt), initial_(initial), controlExpr_(controlExpr),
-        postExpr_(postExpr) {}
+          std::variant<box<Declaration>, std::optional<Expr>> &&initial,
+          std::optional<Expr> &&controlExpr = {std::nullopt},
+          std::optional<Expr> &&postExpr = {std::nullopt})
+      : Node(begin), stmt_(MV_(stmt)), initial_(MV_(initial)),
+        controlExpr_(MV_(controlExpr)), postExpr_(MV_(postExpr)) {}
   [[nodiscard]] const Stmt &getStatement() const { return stmt_; }
 
   [[nodiscard]] const std::variant<box<Declaration>, std::optional<Expr>> &
@@ -1134,8 +1150,8 @@ private:
   std::optional<Expr> optionalExpr_;
 
 public:
-  ReturnStmt(TokIter begin, std::optional<Expr> optionalExpr = {std::nullopt})
-      : Node(begin), optionalExpr_(optionalExpr) {}
+  ReturnStmt(TokIter begin, std::optional<Expr> &&optionalExpr = {std::nullopt})
+      : Node(begin), optionalExpr_(MV_(optionalExpr)) {}
   [[nodiscard]] const Expr *getExpression() const {
     if (optionalExpr_) {
       return &optionalExpr_.value();
@@ -1151,14 +1167,14 @@ public:
  *  { initializer-list , }
  */
 class Initializer final : public Node {
-  using variant = std::variant<AssignExpr, box<InitializerList>>;
-  variant variant_;
+  using Variant = std::variant<AssignExpr, box<InitializerList>>;
+  Variant variant_;
 
 public:
-  Initializer(TokIter begin, variant variant)
-      : Node(begin), variant_(variant) {}
+  Initializer(TokIter begin, Variant &&variant)
+      : Node(begin), variant_(MV_(variant)) {}
 
-  [[nodiscard]] const variant &getVariant() const { return variant_; }
+  [[nodiscard]] const Variant &getVariant() const { return variant_; }
 };
 
 /**
@@ -1193,8 +1209,9 @@ private:
   std::vector<InitializerPair> initializerPairs_;
 
 public:
-  InitializerList(TokIter begin, std::vector<InitializerPair> initializerPairs)
-      : Node(begin), initializerPairs_(initializerPairs) {}
+  InitializerList(TokIter begin,
+                  std::vector<InitializerPair> &&initializerPairs)
+      : Node(begin), initializerPairs_(MV_(initializerPairs)) {}
 
   const std::vector<InitializerPair> &getInitializerList() const {
     return initializerPairs_;
@@ -1226,10 +1243,10 @@ private:
   std::vector<InitDeclarator> initDeclarators_;
 
 public:
-  Declaration(TokIter begin, DeclSpec declarationSpecifiers,
-              std::vector<InitDeclarator> initDeclarators)
-      : Node(begin), declarationSpecifiers_(declarationSpecifiers),
-        initDeclarators_(initDeclarators) {}
+  Declaration(TokIter begin, DeclSpec &&declarationSpecifiers,
+              std::vector<InitDeclarator> &&initDeclarators)
+      : Node(begin), declarationSpecifiers_(MV_(declarationSpecifiers)),
+        initDeclarators_(MV_(initDeclarators)) {}
   [[nodiscard]] const DeclSpec &getDeclarationSpecifiers() const {
     return declarationSpecifiers_;
   }
@@ -1255,8 +1272,8 @@ private:
   std::vector<BlockItem> blockItems_;
 
 public:
-  BlockStmt(TokIter begin, std::vector<BlockItem> blockItems)
-      : Node(begin), blockItems_(blockItems) {}
+  BlockStmt(TokIter begin, std::vector<BlockItem> &&blockItems)
+      : Node(begin), blockItems_(MV_(blockItems)) {}
   [[nodiscard]] const std::vector<BlockItem> &getBlockItems() const {
     return blockItems_;
   }
@@ -1303,8 +1320,8 @@ class Pointer final : public Node {
   std::vector<TypeQualifier> typeQualifiers_;
 
 public:
-  Pointer(TokIter begin, std::vector<TypeQualifier> typeQualifiers)
-      : Node(begin), typeQualifiers_(typeQualifiers) {}
+  Pointer(TokIter begin, std::vector<TypeQualifier> &&typeQualifiers)
+      : Node(begin), typeQualifiers_(MV_(typeQualifiers)) {}
 
   [[nodiscard]] const std::vector<TypeQualifier> &getTypeQualifiers() const {
     return typeQualifiers_;
@@ -1321,11 +1338,11 @@ class AbstractDeclarator final : public Node {
   std::optional<DirectAbstractDeclarator> directAbstractDeclarator_;
 
 public:
-  AbstractDeclarator(TokIter begin, std::vector<Pointer> pointers,
+  AbstractDeclarator(TokIter begin, std::vector<Pointer> &&pointers,
                      std::optional<DirectAbstractDeclarator>
-                         directAbstractDeclarator = {std::nullopt})
-      : Node(begin), pointers_(pointers),
-        directAbstractDeclarator_(directAbstractDeclarator) {}
+                         &&directAbstractDeclarator = {std::nullopt})
+      : Node(begin), pointers_(MV_(pointers)),
+        directAbstractDeclarator_(MV_(directAbstractDeclarator)) {}
 
   [[nodiscard]] const std::vector<Pointer> &getPointers() const {
     return pointers_;
@@ -1349,9 +1366,10 @@ class Declarator final : public Node {
   DirectDeclarator directDeclarator_;
 
 public:
-  Declarator(TokIter begin, std::vector<Pointer> pointers,
-             DirectDeclarator directDeclarator)
-      : Node(begin), pointers_(pointers), directDeclarator_(directDeclarator) {}
+  Declarator(TokIter begin, std::vector<Pointer> &&pointers,
+             DirectDeclarator &&directDeclarator)
+      : Node(begin), pointers_(MV_(pointers)),
+        directDeclarator_(MV_(directDeclarator)) {}
 
   [[nodiscard]] const std::vector<Pointer> &getPointers() const {
     return pointers_;
@@ -1369,21 +1387,15 @@ public:
  */
 struct ParameterDeclaration final : public Node {
 public:
-  DeclSpec declarationSpecifiers_;
-  using DeclaratorKind =
-      std::variant<Declarator, std::optional<AbstractDeclarator>>;
-  DeclaratorKind declaratorKind_;
+  DeclSpec declSpec_;
+  using Variant = std::variant<Declarator, std::optional<AbstractDeclarator>>;
+  Variant declaratorKind_;
 
 public:
-  ParameterDeclaration(
-      TokIter begin, DeclSpec declarationSpecifiers,
-      std::variant<Declarator, std::optional<AbstractDeclarator>> variant =
-          {std::nullopt})
-      : Node(begin), declarationSpecifiers_(declarationSpecifiers),
-        declaratorKind_(variant) {}
-  [[nodiscard]] const DeclSpec &getDeclarationSpecifiers() const {
-    return declarationSpecifiers_;
-  }
+  ParameterDeclaration(TokIter begin, DeclSpec &&declSpec,
+                       Variant &&variant = {std::nullopt})
+      : Node(begin), declSpec_(MV_(declSpec)), declaratorKind_(MV_(variant)) {}
+  [[nodiscard]] const DeclSpec &getDeclSpec() const { return declSpec_; }
 };
 
 /**
@@ -1396,8 +1408,8 @@ private:
   std::vector<ParameterDeclaration> parameterList_;
 
 public:
-  ParamList(TokIter begin, std::vector<ParameterDeclaration> parameterList)
-      : Node(begin), parameterList_(parameterList) {}
+  ParamList(TokIter begin, std::vector<ParameterDeclaration> &&parameterList)
+      : Node(begin), parameterList_(MV_(parameterList)) {}
 
   [[nodiscard]] const std::vector<ParameterDeclaration> &
   getParameterDeclarations() const {
@@ -1415,8 +1427,9 @@ class ParamTypeList final : public Node {
   bool hasEllipse_;
 
 public:
-  ParamTypeList(TokIter begin, ParamList parameterList, bool hasEllipse)
-      : Node(begin), parameterList_(parameterList), hasEllipse_(hasEllipse) {}
+  ParamTypeList(TokIter begin, ParamList &&parameterList, bool hasEllipse)
+      : Node(begin), parameterList_(MV_(parameterList)),
+        hasEllipse_(hasEllipse) {}
 
   [[nodiscard]] const ParamList &getParameterList() const {
     return parameterList_;
@@ -1434,8 +1447,8 @@ class DirectAbstractDeclaratorParentheses final : public Node {
 
 public:
   DirectAbstractDeclaratorParentheses(TokIter begin,
-                                      AbstractDeclarator abstractDeclarator)
-      : Node(begin), abstractDeclarator_(abstractDeclarator) {}
+                                      AbstractDeclarator &&abstractDeclarator)
+      : Node(begin), abstractDeclarator_(MV_(abstractDeclarator)) {}
 
   [[nodiscard]] const AbstractDeclarator &getAbstractDeclarator() const {
     return abstractDeclarator_;
@@ -1459,12 +1472,14 @@ class DirectAbstractDeclaratorAssignExpr final : public Node {
 
 public:
   DirectAbstractDeclaratorAssignExpr(
-      TokIter begin, std::optional<DirectAbstractDeclarator> directAbstractDeclarator,
-      std::vector<TypeQualifier> typeQualifiers, std::optional<AssignExpr> assignExpr,
-      bool hasStatic)
-      : Node(begin), optionalDirectAbstractDeclarator_(directAbstractDeclarator),
-        typeQualifiers_(typeQualifiers), optionalAssignExpr_(assignExpr),
-        hasStatic_(hasStatic) {}
+      TokIter begin,
+      std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator,
+      std::vector<TypeQualifier> &&typeQualifiers,
+      std::optional<AssignExpr> &&assignExpr, bool hasStatic)
+      : Node(begin),
+        optionalDirectAbstractDeclarator_(MV_(directAbstractDeclarator)),
+        typeQualifiers_(MV_(typeQualifiers)),
+        optionalAssignExpr_(MV_(assignExpr)), hasStatic_(hasStatic) {}
 
   [[nodiscard]] const DirectAbstractDeclarator *
   getDirectAbstractDeclarator() const {
@@ -1494,8 +1509,10 @@ class DirectAbstractDeclaratorAsterisk final : public Node {
 
 public:
   DirectAbstractDeclaratorAsterisk(
-      TokIter begin, std::optional<DirectAbstractDeclarator> directAbstractDeclarator)
-      : Node(begin), optionalDirectAbstractDeclarator_(directAbstractDeclarator) {}
+      TokIter begin,
+      std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator)
+      : Node(begin),
+        optionalDirectAbstractDeclarator_(MV_(directAbstractDeclarator)) {}
 
   [[nodiscard]] const DirectAbstractDeclarator * getDirectAbstractDeclarator() const {
     if (optionalDirectAbstractDeclarator_) {
@@ -1515,10 +1532,12 @@ class DirectAbstractDeclaratorParamTypeList final : public Node {
 
 public:
   DirectAbstractDeclaratorParamTypeList(
-      TokIter begin, std::optional<DirectAbstractDeclarator> directAbstractDeclarator,
-      std::optional<ParamTypeList> paramTypeList)
-      : Node(begin), optionalDirectAbstractDeclarator_(directAbstractDeclarator),
-        optionalParamTypeList_(paramTypeList) {}
+      TokIter begin,
+      std::optional<DirectAbstractDeclarator> &&directAbstractDeclarator,
+      std::optional<ParamTypeList> &&paramTypeList)
+      : Node(begin),
+        optionalDirectAbstractDeclarator_(MV_(directAbstractDeclarator)),
+        optionalParamTypeList_(MV_(paramTypeList)) {}
 
   [[nodiscard]] const DirectAbstractDeclarator *
   getDirectAbstractDeclarator() const {
@@ -1558,8 +1577,8 @@ class DirectDeclaratorParentheses final : public Node {
   Declarator declarator_;
 
 public:
-  DirectDeclaratorParentheses(TokIter begin, Declarator declarator)
-      : Node(begin), declarator_(declarator) {}
+  DirectDeclaratorParentheses(TokIter begin, Declarator &&declarator)
+      : Node(begin), declarator_(MV_(declarator)) {}
 
   [[nodiscard]] const Declarator &getDeclarator() const { return declarator_; }
 };
@@ -1574,10 +1593,10 @@ class DirectDeclaratorParamTypeList final : public Node {
 
 public:
   DirectDeclaratorParamTypeList(TokIter begin,
-                                DirectDeclarator directDeclarator,
-                                ParamTypeList paramTypeList)
-      : Node(begin), directDeclarator_(directDeclarator),
-        paramTypeList_(paramTypeList) {}
+                                DirectDeclarator &&directDeclarator,
+                                ParamTypeList &&paramTypeList)
+      : Node(begin), directDeclarator_(MV_(directDeclarator)),
+        paramTypeList_(MV_(paramTypeList)) {}
 
   [[nodiscard]] const DirectDeclarator &getDirectDeclarator() const {
     return directDeclarator_;
@@ -1602,13 +1621,13 @@ class DirectDeclaratorAssignExpr final : public Node {
 
 public:
   DirectDeclaratorAssignExpr(
-      TokIter begin, DirectDeclarator directDeclarator,
-      std::vector<TypeQualifier> typeQualifierList,
-      std::optional<AssignExpr> assignExpr = {std::nullopt},
+      TokIter begin, DirectDeclarator &&directDeclarator,
+      std::vector<TypeQualifier> &&typeQualifierList,
+      std::optional<AssignExpr> &&assignExpr = {std::nullopt},
       bool hasStatic = false)
-      : Node(begin), directDeclarator_(directDeclarator),
-        optionalAssignExpr_(assignExpr), typeQualifierList_(typeQualifierList),
-        hasStatic_(hasStatic) {}
+      : Node(begin), directDeclarator_(MV_(directDeclarator)),
+        optionalAssignExpr_(MV_(assignExpr)),
+        typeQualifierList_(MV_(typeQualifierList)), hasStatic_(hasStatic) {}
 
   [[nodiscard]] const DirectDeclarator &getDirectDeclarator() const {
     return directDeclarator_;
@@ -1637,10 +1656,10 @@ class DirectDeclaratorAsterisk final : public Node {
   std::vector<TypeQualifier> typeQualifierList_;
 
 public:
-  DirectDeclaratorAsterisk(TokIter begin, DirectDeclarator directDeclarator,
-                           std::vector<TypeQualifier> typeQualifierList)
-      : Node(begin), directDeclarator_(directDeclarator),
-        typeQualifierList_(typeQualifierList) {}
+  DirectDeclaratorAsterisk(TokIter begin, DirectDeclarator &&directDeclarator,
+                           std::vector<TypeQualifier> &&typeQualifierList)
+      : Node(begin), directDeclarator_(MV_(directDeclarator)),
+        typeQualifierList_(MV_(typeQualifierList)) {}
 
   [[nodiscard]] const DirectDeclarator &getDirectDeclarator() const {
     return directDeclarator_;
@@ -1691,9 +1710,9 @@ private:
 
 public:
   StructOrUnionSpec(TokIter begin, bool isUnion, std::string_view identifier,
-                    std::vector<StructDeclaration> structDeclarations)
+                    std::vector<StructDeclaration> &&structDeclarations)
       : Node(begin), isUnion_(isUnion), name_(identifier),
-        structDeclarations_(structDeclarations) {}
+        structDeclarations_(MV_(structDeclarations)) {}
 
   [[nodiscard]] bool isUnion() const { return isUnion_; }
 
@@ -1736,8 +1755,8 @@ private:
 
 public:
   EnumSpecifier(TokIter begin, std::string_view tagName,
-                std::vector<Enumerator> enumerators)
-      : Node(begin), tagName_(tagName), enumerators_(enumerators) {}
+                std::vector<Enumerator> &&enumerators)
+      : Node(begin), tagName_(tagName), enumerators_(MV_(enumerators)) {}
 
   [[nodiscard]] std::string_view getName() const { return tagName_; }
   [[nodiscard]] const std::vector<Enumerator> &getEnumerators() const {
@@ -1755,10 +1774,10 @@ class FunctionDefinition final : public Node {
   BlockStmt compoundStmt_;
 
 public:
-  FunctionDefinition(TokIter begin, DeclSpec declarationSpecifiers,
-                     Declarator declarator, BlockStmt compoundStmt)
-      : Node(begin), declarationSpecifiers_(declarationSpecifiers),
-        declarator_(declarator), compoundStmt_(compoundStmt) {}
+  FunctionDefinition(TokIter begin, DeclSpec &&declarationSpecifiers,
+                     Declarator &&declarator, BlockStmt &&compoundStmt)
+      : Node(begin), declarationSpecifiers_(MV_(declarationSpecifiers)),
+        declarator_(MV_(declarator)), compoundStmt_(MV_(compoundStmt)) {}
 
   [[nodiscard]] const DeclSpec &getDeclarationSpecifiers() const {
     return declarationSpecifiers_;
@@ -1788,8 +1807,8 @@ class TranslationUnit final {
 
 public:
   explicit TranslationUnit(TokIter begin,
-                           std::vector<ExternalDeclaration> globals) noexcept
-      : mGlobals(globals) {}
+                           std::vector<ExternalDeclaration> &&globals) noexcept
+      : mGlobals(MV_(globals)) {}
 
   [[nodiscard]] const std::vector<ExternalDeclaration> &getGlobals() const {
     return mGlobals;

@@ -58,15 +58,15 @@ public:
 private:
   std::optional<Syntax::ExternalDeclaration> ParseExternalDeclaration();
   std::optional<Syntax::Declaration> ParseDeclarationSuffix(
-      Syntax::DeclSpec declSpec,
-      std::optional<Syntax::Declarator> alreadyParsedDeclarator = {});
+      Syntax::DeclSpec &&declSpec,
+      std::optional<Syntax::Declarator> &&alreadyParsedDeclarator = {});
   std::optional<Syntax::Declaration> ParseDeclaration();
   Syntax::DeclSpec ParseDeclarationSpecifiers();
   std::optional<Syntax::Declarator> ParseDeclarator();
   std::optional<Syntax::DirectDeclarator> ParseDirectDeclarator();
   void ParseDirectDeclaratorSuffix(TokIter beginTokLoc, Syntax::DirectDeclarator &directDeclarator);
   std::optional<Syntax::AbstractDeclarator> ParseAbstractDeclarator();
-  std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDeclarator();
+  std::optional<Syntax::DirectAbstractDeclarator> ParseDirectAbstractDec();
   std::optional<Syntax::DirectAbstractDeclarator>
   ParseDirectAbstractDeclaratorSuffix();
   std::optional<Syntax::ParamTypeList> ParseParameterTypeList();

@@ -32,7 +32,7 @@ public:
   Iterator(const Element *curr, const Callable *func)
       : curr_(curr), func_(func) {}
 
-  bool operator=(const Iterator &rhs) const { return curr_ == rhs.curr_; }
+  bool operator==(const Iterator &rhs) const { return curr_ == rhs.curr_; }
 
   bool operator!=(const Iterator &rhs) const { return !(*this == rhs); }
 

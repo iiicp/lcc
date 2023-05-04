@@ -14,7 +14,7 @@
 
 #include <memory>
 namespace lcc {
-#define MV_(obj) std::move(obj)
+
 template <typename T> class box {
   std::unique_ptr<T> impl_;
 

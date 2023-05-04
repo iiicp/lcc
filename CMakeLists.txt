@@ -25,7 +25,7 @@ add_executable(${PROJECT_NAME} main.cpp ${lcc_src})
 target_include_directories(${PROJECT_NAME}
         PRIVATE
         src
-        ${CMAKE_CURRENT_BINARY_DIR}/src
+        ${CMAKE_CURRENT_BINARY_DIR}/src/Support
         ${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_all})
 

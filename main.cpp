@@ -2,7 +2,6 @@
 #include "DumpTool.h"
 #include "Lexer.h"
 #include "Parser.h"
-#include "SemaAnalysis.h"
 #include "Version.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
@@ -75,8 +74,8 @@ int main(int argc, char *argv[]) {
       if (DumpAST) {
         lcc::dump::dumpAst(translationUnit);
       }
-      lcc::SemaAnalysis sema(tokens, diag);
-      sema.Analyse(translationUnit);
+//      lcc::SemaAnalysis sema(tokens, diag);
+//      sema.Analyse(translationUnit);
     }
 
 #if 0

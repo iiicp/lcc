@@ -1,32 +1,12 @@
 /***********************************
- * File:     SemaSyntax.cc
+ * File:     SemaNode.cc
  *
  * Author:   caipeng
  *
  * Email:    iiicp@outlook.com
  *
- * Date:     2023/3/6
+ * Date:     2023/5/4
  *
  * Sign:     enjoy life
  ***********************************/
 #include "SemaNode.h"
-#include "Util.h"
-
-namespace lcc::Sema {
-BlockStmt::BlockStmt(
-    std::vector<std::variant<Statement, Declaration>> blockItems)
-    : blockItems_(std::move(blockItems)) {}
-
-Declaration::Declaration(Type type, Linkage linkage,
-                     Lifetime lifetime, std::string name)
-    : type_(std::move(type)), linkage_(linkage), lifetime_(lifetime), name_(std::move(name)){}
-
-FunctionDefinition::FunctionDefinition(
-    FunctionType type, std::string name,Linkage linkage,
-    BlockStmt &&blockStmt)
-    : type_(std::move(type)), name_(std::move(name)),
-      linkage_(linkage), blockStmt_(std::move(blockStmt)) {}
-
-TranslationUnit::TranslationUnit(std::vector<Variant> globals)
-    : globals_(std::move(globals)) {}
-}

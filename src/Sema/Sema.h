@@ -1,5 +1,5 @@
 /***********************************
- * File:     Type.h
+ * File:     Sema.h
  *
  * Author:   caipeng
  *
@@ -9,11 +9,11 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_TYPE_H
-#define LCC_TYPE_H
+#ifndef LCC_SEMA_H
+#define LCC_SEMA_H
 
 namespace lcc {
-class Type {};
+class Sema {};
 }
 
-#endif // LCC_TYPE_H
+#endif // LCC_SEMA_H

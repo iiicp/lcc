@@ -13,6 +13,7 @@
 #define LCC_SYNTAX_H
 #include "Token.h"
 #include "Box.h"
+#include "Util.h"
 #include <memory>
 #include <optional>
 #include <string>

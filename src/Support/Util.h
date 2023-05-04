@@ -12,11 +12,12 @@
 #ifndef LCC_UTIL_H
 #define LCC_UTIL_H
 
-#include "Syntax.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+
+#define MV_(obj) std::move(obj)
 
 #define LCC_ASSERT(...)                                                        \
   do {                                                                         \

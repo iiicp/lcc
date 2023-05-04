@@ -1,5 +1,5 @@
 /***********************************
- * File:     Type.h
+ * File:     SymbolTable.cc
  *
  * Author:   caipeng
  *
@@ -9,11 +9,4 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_TYPE_H
-#define LCC_TYPE_H
-
-namespace lcc {
-class Type {};
-}
-
-#endif // LCC_TYPE_H
+#include "SymbolTable.h"

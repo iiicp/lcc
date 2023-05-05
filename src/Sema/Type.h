@@ -11,9 +11,133 @@
  ***********************************/
 #ifndef LCC_TYPE_H
 #define LCC_TYPE_H
+#include "Util.h"
+#include <cstdint>
+#include <memory>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 namespace lcc {
-class Type {};
-}
+
+class Type;
+
+class PrimitiveType final {
+private:
+  std::uint8_t sizeOf_;
+  std::uint8_t alignOf_;
+  bool isFloatingPoint_;
+  bool isSigned_;
+
+public:
+  enum Kind : std::uint8_t {
+    Char,
+    UnSignedChar,
+    Bool,
+    Short,
+    UnSignedShort,
+    Int,
+    UnSignedInt,
+    Long,
+    UnSignedLong,
+    LongLong,
+    UnSignedLongLong,
+    Float,
+    Double,
+    LongDouble,
+    Void
+  };
+
+private:
+  Kind kind_;
+
+  PrimitiveType(Kind kind);
+
+public:
+  static Type create(bool isConst, bool isVolatile, Kind kind);
+  DECL_GETTER(Kind, kind);
+  DECL_GETTER(uint64_t, sizeOf);
+  DECL_GETTER(uint64_t, alignOf);
+  DECL_GETTER(bool, isFloatingPoint);
+  DECL_GETTER(bool, isSigned);
+
+  bool operator==(const PrimitiveType &rhs) const;
+  bool operator!=(const PrimitiveType &rhs) const;
+};
+
+class PointerType final {
+private:
+  std::shared_ptr<Type> elementType_;
+  bool restricted_{false};
+  uint64_t sizeOf_{8};
+  uint64_t alignOf_{8};
+  PointerType(bool isRestricted, std::shared_ptr<Type> elementType);
+
+public:
+  static Type create(bool isConst, bool isVolatile, bool restricted, Type elementType);
+  DECL_GETTER(std::shared_ptr<Type>, elementType);
+  DECL_GETTER(uint64_t, sizeOf);
+  DECL_GETTER(uint64_t, alignOf);
+  DECL_GETTER(bool, restricted);
+
+  bool operator==(const PointerType &rhs) const;
+  bool operator!=(const PointerType &rhs) const;
+};
+
+class FunctionType final {
+private:
+  std::shared_ptr<Type> returnType_;
+  std::vector<std::pair<std::shared_ptr<Type>, std::string_view>> arguments_;
+  bool lastIsVararg_;
+public:
+  using Argument = std::pair<std::shared_ptr<Type>, std::string_view>;
+private:
+  FunctionType(std::shared_ptr<Type> returnType,
+               std::vector<Argument> arguments, bool lastIsVararg)
+      : returnType_(returnType), arguments_(std::move(arguments)),
+        lastIsVararg_(lastIsVararg) {}
+
+public:
+  static Type create(Type returnType,
+                     std::vector<Argument>&& arguments, bool lastIsVararg);
+
+  DECL_GETTER(std::shared_ptr<Type>, returnType);
+  DECL_GETTER(bool, lastIsVararg);
+  DECL_GETTER(const std::vector<Argument> &, arguments);
+
+  uint64_t sizeOf() const { LCC_UNREACHABLE; }
+  uint64_t alignOf() const { LCC_UNREACHABLE; }
+
+  [[nodiscard]] bool operator==(const FunctionType &rhs) const;
+  [[nodiscard]] bool operator!=(const FunctionType &rhs) const;
+};
+
+class Type final {
+public:
+  using Variant =
+      std::variant<std::monostate, PrimitiveType, PointerType, FunctionType>;
+
+private:
+  Variant type_;
+  std::string_view name_;
+  bool isConst_;
+  bool isVolatile_;
+
+public:
+  explicit Type(bool isConst = false, bool isVolatile = false,
+                Variant type = std::monostate{})
+      : type_(std::move(type)), isConst_(isConst), isVolatile_(isVolatile) {}
+
+  [[nodiscard]] bool isUndefined() const {
+    return std::holds_alternative<std::monostate>(type_);
+  }
+
+  [[nodiscard]] std::uint64_t sizeOf() const;
+  [[nodiscard]] std::uint64_t alignOf() const;
+
+  [[nodiscard]] bool operator==(const Type &rhs) const;
+  [[nodiscard]] bool operator!=(const Type &rhs) const;
+};
+} // namespace lcc
 
 #endif // LCC_TYPE_H

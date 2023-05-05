@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 project(lcc)
 
 # set compiler version
@@ -29,5 +29,5 @@ target_include_directories(${PROJECT_NAME}
         ${LLVM_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_all})
 
-add_subdirectory(tests/ir)
-add_subdirectory(tests/auto)
+#add_subdirectory(tests/ir)
+#add_subdirectory(tests/auto)

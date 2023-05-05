@@ -27,9 +27,28 @@
     }                                                                          \
   } while (0)
 
+// Uses compiler specific extensions if possible.
+#ifdef __GNUC__ // GCC, Clang, ICC
+
+#define unreachable() (__builtin_unreachable())
+
+#elifdef _MSC_VER // MSVC
+
+#define unreachable() (__assume(false))
+
+#else
+// Even if no extension is used, undefined behavior is still raised by
+// the empty function body and the noreturn attribute.
+// The external definition of unreachable_impl must be emitted in a separated TU
+// due to the rule for inline functions in C.
+
+[[noreturn]] inline void unreachable_impl() {}
+#define unreachable() (unreachable_impl())
+#endif
+
 #define LCC_UNREACHABLE                                                        \
   do {                                                                         \
-    std::abort();                                                              \
+    unreachable();                                                             \
   } while (0)
 
 #ifdef __clang__
@@ -39,5 +58,8 @@
 #define LCC_NON_NULL
 #define LCC_NULLABLE
 #endif
+
+#define DECL_GETTER(type, name)                                                \
+  type name() const { return this->name##_; }
 
 #endif // LCC_UTIL_H

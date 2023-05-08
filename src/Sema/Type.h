@@ -234,6 +234,70 @@ struct Field {
   bool operator!=(const Field &rhs) const { return !(rhs == *this); }
 };
 
+class StructDefinition {
+private:
+  std::string_view name_;
+  std::vector<Field> fields_;
+  std::vector<std::shared_ptr<Type>> layout_;
+  std::uint64_t sizeOf_;
+  std::uint64_t alignOf_;
+
+public:
+  StructDefinition(std::string_view name, std::vector<Field> fields,
+                   std::vector<std::shared_ptr<Type>> layout,
+                   std::uint64_t sizeOf, std::uint64_t alignOf)
+      : name_(name), fields_(std::move(fields)), layout_(std::move(layout)),
+        sizeOf_(sizeOf), alignOf_(alignOf) {}
+
+  DECL_GETTER(std::string_view, name);
+  DECL_GETTER(const std::vector<Field> &, fields);
+  DECL_GETTER(const std::vector<std::shared_ptr<Type>> &, layout);
+  DECL_GETTER(uint64_t, sizeOf);
+  DECL_GETTER(uint64_t, alignOf);
+
+  bool operator==(const StructDefinition &rhs) const {
+    return std::tie(name_, fields_) == std::tie(rhs.name_, rhs.fields_);
+  }
+  bool operator!=(const StructDefinition &rhs) const { return !(rhs == *this); }
+};
+
+class UnionDefinition {
+  std::string_view name_;
+  std::vector<Field> fields_;
+  std::uint64_t sizeOf_;
+  std::uint64_t alignOf_;
+
+public:
+  UnionDefinition(std::string_view name, std::vector<Field> &&fields,
+                  std::uint64_t sizeOf, std::uint64_t alignOf)
+      : name_(name), fields_(std::move(fields)), sizeOf_(sizeOf),
+        alignOf_(alignOf) {}
+
+  DECL_GETTER(std::string_view, name);
+  DECL_GETTER(const std::vector<Field> &, fields);
+  DECL_GETTER(uint64_t, sizeOf);
+  DECL_GETTER(uint64_t, alignOf);
+
+  bool operator==(const UnionDefinition &rhs) const {
+    return std::tie(name_, fields_) == std::tie(rhs.name_, rhs.fields_);
+  }
+
+  bool operator!=(const UnionDefinition &rhs) const { return !(rhs == *this); }
+};
+
+class EnumDefinition {
+private:
+  std::string_view name_;
+  std::shared_ptr<Type> type_;
+
+public:
+  EnumDefinition(std::string_view name, std::shared_ptr<Type> type)
+      : name_(name), type_(type) {}
+
+  DECL_GETTER(std::string_view, name);
+  DECL_GETTER(std::shared_ptr<Type>, type);
+};
+
 class AnonymousStructType final {
 private:
   uint32_t id_;
@@ -343,7 +407,7 @@ public:
     return std::holds_alternative<std::monostate>(type_);
   }
 
-  DECL_GETTER(Variant, type);
+  DECL_GETTER(const Variant &, type);
   DECL_GETTER(std::string_view, name);
   DECL_GETTER(bool, isConst);
   DECL_GETTER(bool, isVolatile);

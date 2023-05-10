@@ -12,114 +12,51 @@
 #ifndef LCC_SYMBOLTABLE_H
 #define LCC_SYMBOLTABLE_H
 
-#include "SemaNode.h"
+#include "SemaSyntax.h"
 #include "Type.h"
+#include "llvm/ADT/ScopeExit.h"
+#include <string_view>
 #include <unordered_map>
 
-namespace lcc::Sema {
+namespace lcc {
+
+/// 聚合记录所有的tag类型信息
+/// 1. 添加debug信息
+/// 2.
+/// 可以通过id绑定到某一个类型上，这样可以和添加debug信息复用。就是为了添加debug信息
+///    导致的复用
+
 class SymbolTable {
 public:
-  enum class StructDefTag : size_t {
+  using DeclarationSymbol =
+      std::variant<SemaSyntax::Declaration *, SemaSyntax::FunctionDefinition *>;
 
+private:
+  struct Env {
+    std::vector<std::pair<std::string_view, DeclarationSymbol>>
+        declarationSymbols_;
   };
+  /// 记录当前的环境id
+  size_t currentEnvId_{0};
+  /// 默认添加一个全局的环境
+  std::vector<Env> scopes_ = {{}};
 
-  enum class UnionDefTag : size_t {
-
-  };
-
-  enum class EnumDefTag : size_t {
-
-  };
-
-  struct DeclarationInScope {
-    std::string_view name;
-    using Variant = std::variant<Declaration *, FunctionDefinition *>;
-    Variant declared;
-  };
-
-  struct TagTypeInScope {
-    struct StructDecl {};
-    struct UnionDecl {};
-    using Variant = std::variant<StructDecl, UnionDecl, StructDefTag,
-                                 UnionDefTag, EnumDefTag>;
-    Variant tagType;
-  };
-
-  struct Scope {
-    int64_t previousScope;
-    std::vector<DeclarationInScope> declarations;
-    std::unordered_map<std::string_view, TagTypeInScope> tagTypes;
-  };
-
-  std::vector<Scope> scopes_ = {Scope{-1, {}, {}}};
-  std::vector<StructDefinition> structDefinitions_;
-  std::vector<UnionDefinition> unionDefinitions_;
-  std::vector<EnumDefinition> enumDefinitions_;
-
-  bool isCompleteType(const Type &type);
-
-  constexpr static std::uint64_t IS_SCOPE = 1ull << 63;
-  constexpr static std::uint64_t SCOPE_OR_ID_MASK = ~(1ull << 63);
-
-  template <class T>
-  const T *lookupType(std::string_view name, std::int64_t scope) const {
-    auto curr = scope;
-    while (curr >= 0) {
-      auto result = scopes_[curr].tagTypes.find(name);
-      if (result != scopes_[curr].tagTypes.end()) {
-        if (auto *ptr = std::get_if<T>(&result->second.tagType)) {
-          return ptr;
-        }
-      }
-      curr = scopes_[curr].previousScope;
-    }
-    return nullptr;
+public:
+  auto EnterScope() {
+    scopes_.push_back({});
+    currentEnvId_++;
+    return llvm::make_scope_exit([&] {
+      scopes_.pop_back();
+      currentEnvId_--;
+    });
   }
 
-  StructDefinition *getStructDefinition(std::string_view name,
-                                        std::uint64_t scopeOrId,
-                                        std::uint64_t *idOut = nullptr);
-  const StructDefinition *
-  getStructDefinition(std::string_view name, std::uint64_t scopeOrId,
-                      std::uint64_t *idOut = nullptr) const;
+  const DeclarationSymbol *FindDeclSymbol(std::string_view name) {
+    return FindDeclSymbol(name, currentEnvId_);
+  }
 
-  EnumDefinition *getEnumDefinition(std::string_view name,
-                                    std::uint64_t scopeOrId,
-                                    std::uint64_t *idOut = nullptr);
-  const EnumDefinition *getEnumDefinition(std::string_view name,
-                                          std::uint64_t scopeOrId,
-                                          std::uint64_t *idOut = nullptr) const;
-
-  UnionDefinition *getUnionDefinition(std::string_view name,
-                                      std::uint64_t scopeOrId,
-                                      std::uint64_t *idOut = nullptr);
-  const UnionDefinition *
-  getUnionDefinition(std::string_view name, std::uint64_t scopeOrId,
-                     std::uint64_t *idOut = nullptr) const;
-
-  const std::vector<Scope> &getScopes() const { return scopes_; }
-
-  bool isVoid(const Type &type);
-
-  bool isArray(const Type &type);
-
-  const Type &getArrayElementType(const Type &type);
-
-  Type adjustParameterType(const Type &type);
-
-  bool isInteger(const Type &type);
-
-  bool isArithmetic(const Type &type);
-
-  bool isScalar(const Type &type);
-
-  bool isRecord(const Type &type);
-
-  bool isBool(const Type &type);
-
-  bool isCharType(const Type &type);
-
-  bool isAggregate(const Type &type);
+private:
+  const DeclarationSymbol *FindDeclSymbol(std::string_view name, size_t envId);
 };
-} // namespace lcc::Sema
+} // namespace lcc
 #endif // LCC_SYMBOLTABLE_H

@@ -1,5 +1,5 @@
 /***********************************
- * File:     Sema.h
+ * File:     SemaNode.cc
  *
  * Author:   caipeng
  *
@@ -9,11 +9,4 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_SEMA_H
-#define LCC_SEMA_H
-
-namespace lcc {
-class Sema {};
-}
-
-#endif // LCC_SEMA_H
+#include "SemaSyntax.h"

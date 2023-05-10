@@ -9,13 +9,13 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_SEMANODE_H
-#define LCC_SEMANODE_H
+#ifndef LCC_SEMASYNTAX_H
+#define LCC_SEMASYNTAX_H
 #include "Box.h"
 #include "Type.h"
 #include <string>
 
-namespace lcc::Sema {
+namespace lcc::SemaSyntax {
 
 class Expression;
 
@@ -31,22 +31,6 @@ public:
   Constant(Variant value) : value_(value) {}
 
   DECL_GETTER(Variant, value);
-};
-
-class FunctionDefinition;
-class Declaration;
-
-class DeclarationRead final {
-public:
-  using Variant = std::variant<Declaration *, FunctionDefinition *>;
-
-private:
-  Variant declRead_;
-
-public:
-  DeclarationRead(Variant declRead) : declRead_(declRead) {}
-
-  DECL_GETTER(Variant, declRead);
 };
 
 class Conversion final {
@@ -270,7 +254,7 @@ private:
 
 public:
   using Variant =
-      std::variant<std::monostate, Constant, DeclarationRead, Conversion,
+      std::variant<std::monostate, Constant, Conversion,
                    MemberAccess, SubscriptOperator, CallExpression,
                    BinaryOperator, UnaryOperator, Cast, SizeOfOperator,
                    Assignment, CommaExpression, Conditional>;
@@ -365,35 +349,36 @@ public:
 class FunctionDefinition final {
 private:
   std::shared_ptr<Type> type_;
-  std::vector<box<Declaration>> paramDecls_;
+  std::vector<Declaration> paramDecls_;
   Linkage linkage_;
   CompoundStatement compoundStatement_;
 
 public:
   FunctionDefinition(std::shared_ptr<Type> type,
-                     std::vector<box<Declaration>> &&paramDecls,
+                     std::vector<Declaration> &&paramDecls,
                      Linkage linkage, CompoundStatement &&compoundStatement)
-      : type_(type), paramDecls_(std::move(paramDecls)), linkage_(linkage),
-        compoundStatement_(std::move(compoundStatement)) {}
+      : type_(type), paramDecls_(MV_(paramDecls)), linkage_(linkage),
+        compoundStatement_(MV_(compoundStatement)) {}
 
   DECL_GETTER(std::shared_ptr<Type>, type);
-  DECL_GETTER(const std::vector<box<Declaration>> &, paramDecls);
+  DECL_GETTER(const std::vector<Declaration> &, paramDecls);
   DECL_GETTER(Linkage, linkage);
   DECL_GETTER(const CompoundStatement &, compoundStatement);
 };
 
 class TranslationUnit final {
 public:
-  using Variant = std::variant<box<FunctionDefinition>, box<Declaration>>;
+  using Variant = std::variant<FunctionDefinition, Declaration>;
 
 private:
   std::vector<Variant> globals_;
 
 public:
-  explicit TranslationUnit(std::vector<Variant> globals);
+  explicit TranslationUnit(std::vector<Variant> &&globals)
+      : globals_(MV_(globals)) {}
 
   const std::vector<Variant> &getGlobals() const { return globals_; }
 };
 
-} // namespace lcc::Sema
-#endif // LCC_SEMANODE_H
+} // namespace lcc::SemaAnalyse
+#endif // LCC_SEMASYNTAX_H

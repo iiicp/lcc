@@ -72,8 +72,8 @@ cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../llvm_install_di
 lcc support --dumpTokens and --dumpAst command line options
 ```  
 ./lcc --help
-./lcc --dumpTokens ../tests/c/stmt.c
-./lcc --dumpAst ../tests/c/stmt.c 
+./lcc -emit-tokens ../tests/c/stmt.c
+./lcc -emit-ast ../tests/c/stmt.c 
 ```
 
 ## lcc unsupported c99 language features
@@ -82,12 +82,6 @@ lcc support --dumpTokens and --dumpAst command line options
 2. _Complex      
 3. direct-declarator ( identifier-list{opt} )     
 eg: int f(a, b) int a,b {return a+b;}
-
-
-## lcc develop history
-
-- 2022.11.03  [v0.1 history](https://github.com/iiicp/lcc/wiki/lcc-v0.1)
-- 2023.01.29  [v0.2 history](https://github.com/iiicp/lcc/wiki/lcc-v0.2)
 
 
 ## Reference   

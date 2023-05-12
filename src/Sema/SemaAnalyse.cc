@@ -15,33 +15,31 @@
 namespace lcc {
 SemaSyntax::TranslationUnit
 SemaAnalyse::Analyse(const Syntax::TranslationUnit &translationUnit) {
-  return visitor(translationUnit);
+  return visit(translationUnit);
 }
 
 SemaSyntax::TranslationUnit
-SemaAnalyse::visitor(const Syntax::TranslationUnit &translationUnit) {
+SemaAnalyse::visit(const Syntax::TranslationUnit &translationUnit) {
   std::vector<SemaSyntax::TranslationUnit::Variant> globals;
   for (const auto &iter : translationUnit.getGlobals()) {
     match(
         iter,
         [this, &globals](const Syntax::Declaration &declaration) {
-          globals.emplace_back(visitor(declaration));
+          //          globals.emplace_back(visit(declaration));
         },
         [this, &globals](const Syntax::FunctionDefinition &functionDefinition) {
-          globals.emplace_back(visitor(functionDefinition));
+          //          globals.emplace_back(visit(functionDefinition));
         });
   }
   return SemaSyntax::TranslationUnit(std::move(globals));
 }
 
 SemaSyntax::FunctionDefinition
-SemaAnalyse::visitor(const Syntax::FunctionDefinition &functionDefinition) {
-/// 1, 新作用域
-/// 2, 确定函数的类型
+SemaAnalyse::visit(const Syntax::FunctionDefinition &functionDefinition) {
+  /// 1, 新作用域
+  /// 2, 确定函数的类型
 }
 
 SemaSyntax::Declaration
-SemaAnalyse::visitor(const Syntax::Declaration &declaration) {
-
-}
+SemaAnalyse::visit(const Syntax::Declaration &declaration) {}
 } // namespace lcc

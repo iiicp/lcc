@@ -20,9 +20,11 @@ public:
   SemaAnalyse(){}
   SemaSyntax::TranslationUnit Analyse(const Syntax::TranslationUnit &translationUnit);
 private:
-  SemaSyntax::TranslationUnit visitor(const Syntax::TranslationUnit &translationUnit);
-  SemaSyntax::FunctionDefinition visitor(const Syntax::FunctionDefinition &functionDefinition);
-  SemaSyntax::Declaration visitor(const Syntax::Declaration &declaration);
+  SemaSyntax::TranslationUnit
+  visit(const Syntax::TranslationUnit &translationUnit);
+  SemaSyntax::FunctionDefinition
+  visit(const Syntax::FunctionDefinition &functionDefinition);
+  SemaSyntax::Declaration visit(const Syntax::Declaration &declaration);
 };
 } // namespace lcc
 

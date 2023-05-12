@@ -1,10 +1,14 @@
+#include "CodeGen.h"
 #include "Diagnostic.h"
 #include "DumpTool.h"
 #include "Lexer.h"
 #include "Parser.h"
+#include "SemaAnalyse.h"
 #include "Version.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -12,9 +16,12 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/WithColor.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <filesystem>
+#include <llvm/Support/FileSystem.h>
 #include <optional>
 
 static const char *Head = "lcc - based llvm c compiler";
@@ -48,8 +55,8 @@ static llvm::cl::opt<bool>
 static llvm::cl::opt<bool>
     EmitAst("emit-ast", llvm::cl::desc("Emit AST files for source inputs"));
 
-static llvm::cl::opt<bool>
-    TimeOpt("time", llvm::cl::desc("Time individual commands"));
+static llvm::cl::opt<bool> TimeOpt("time",
+                                   llvm::cl::desc("Time individual commands"));
 
 void printVersion(llvm::raw_ostream &OS) {
   OS << Head << " " << lcc::getLccVersion() << "\n";
@@ -57,17 +64,13 @@ void printVersion(llvm::raw_ostream &OS) {
   exit(EXIT_SUCCESS);
 }
 
-enum class Action {
-  Preprocess,
-  Compile,
-  AssemblyOutput,
-  Link
-};
+enum class Action { Preprocess, Compile, AssemblyOutput, Link };
 
 bool compileCFile(Action action, std::filesystem::path sourceFile) {
   std::optional<llvm::TimerGroup> timer;
   if (TimeOpt) {
-    timer.emplace("Compilation", "Time it took for the whole compilation of " + sourceFile.string());
+    timer.emplace("Compilation", "Time it took for the whole compilation of " +
+                                     sourceFile.string());
   }
 
   /// file read to memory
@@ -75,15 +78,17 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
       llvm::MemoryBuffer::getFile(sourceFile.string());
   if (std::error_code BufferError = FileOrErr.getError()) {
     llvm::WithColor::error(llvm::errs(), "lcc")
-        << "Error reading " << sourceFile.string() << ": " << BufferError.message() << "\n";
+        << "Error reading " << sourceFile.string() << ": "
+        << BufferError.message() << "\n";
     return false;
   }
 
-  /// lexer
+  /// lexer begin
   std::optional<llvm::Timer> lexerTimer;
   std::optional<llvm::TimeRegion> lexerTimeRegion;
   if (timer) {
-    lexerTimer.emplace("lexer", "Time it took to lexer " + sourceFile.string(), *timer);
+    lexerTimer.emplace("lexer", "Time it took to lexer " + sourceFile.string(),
+                       *timer);
     lexerTimeRegion.emplace(*lexerTimer);
   }
   llvm::SourceMgr mgr;
@@ -98,13 +103,14 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
   if (diag.numErrors())
     return false;
   lexerTimeRegion.reset();
+  /// lexer end
 
-  /// parser
+  /// parser begin
   std::optional<llvm::Timer> parserTimer;
   std::optional<llvm::TimeRegion> parserTimeRegion;
-  if (timer)
-  {
-    parserTimer.emplace("Parser", "Time it took to parse " + sourceFile.string(), *timer);
+  if (timer) {
+    parserTimer.emplace("Parser",
+                        "Time it took to parse " + sourceFile.string(), *timer);
     parserTimeRegion.emplace(*parserTimer);
   }
   lcc::Parser parser(tokens, diag);
@@ -113,12 +119,104 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
     lcc::dump::dumpAst(translationUnit);
   }
   parserTimeRegion.reset();
+  /// parser end
 
-  /// semantics
+  /// semantics begin
+  std::optional<llvm::Timer> semanticsTimer;
+  std::optional<llvm::TimeRegion> semanticsTimeRegion;
+  if (timer) {
+    semanticsTimer.emplace("Semantics",
+                           "Time it took to semantics " + sourceFile.string(),
+                           *timer);
+    semanticsTimeRegion.emplace(*semanticsTimer);
+  }
+  lcc::SemaAnalyse semaAnalyse;
+  auto semaTranslationUnit = semaAnalyse.Analyse(translationUnit);
+  semanticsTimeRegion.reset();
+  /// semantics end
 
+  /// codegen begin
+  std::optional<llvm::Timer> codeGenTimer;
+  std::optional<llvm::TimeRegion> codeGenTimeRegion;
+  if (timer) {
+    codeGenTimer.emplace(
+        "CodeGen", "Time it took to codegen " + sourceFile.string(), *timer);
+    codeGenTimeRegion.emplace(*codeGenTimer);
+  }
+  llvm::LLVMContext context;
+  llvm::Module module("", context);
+  lcc::CodeGen codeGen(semaTranslationUnit, module);
+  auto targetMachine = codeGen.Run();
+  if (llvm::verifyModule(module, &llvm::errs())) {
+    llvm::errs().flush();
+    module.print(llvm::outs(), nullptr);
+    std::terminate();
+  }
+  codeGenTimeRegion.reset();
+  /// codegen end
 
-  /// codegen
+  /// compile to native object code begin
+  std::string outputFile;
+  if (!OutputFileName.empty()) {
+    outputFile = OutputFileName;
+  } else {
+    auto path = sourceFile;
+    if (action == Action::AssemblyOutput) {
+      if (EmitLLVM) {
+        path.replace_extension("ll");
+      } else {
+        path.replace_extension("s");
+      }
+    } else {
+      if (EmitLLVM) {
+        path.replace_extension("bc");
+      } else {
+        path.replace_extension("o");
+      }
+    }
+    outputFile = path.string();
+  }
 
+  std::error_code ec;
+  llvm::raw_fd_ostream os(outputFile, ec, llvm::sys::fs::OpenFlags::OF_None);
+  if (ec) {
+    llvm::errs() << "failed to open output file";
+    return false;
+  }
+
+  std::optional<llvm::Timer> compileTimer;
+  std::optional<llvm::TimeRegion> compileTimeRegion;
+  if (timer) {
+    compileTimer.emplace(
+        "Compile",
+        "Time it took for LLVM to generate native object code " +
+            sourceFile.string(),
+        *timer);
+    compileTimeRegion.emplace(*compileTimer);
+  }
+  llvm::PassManagerBuilder builder;
+  targetMachine->adjustPassManager(builder);
+  llvm::legacy::PassManager pass;
+  builder.populateModulePassManager(pass);
+  if (EmitLLVM) {
+    if (action == Action::AssemblyOutput) {
+      pass.add(llvm::createPrintModulePass(os));
+    } else {
+      pass.add(llvm::createBitcodeWriterPass(os));
+    }
+  } else {
+    if (targetMachine->addPassesToEmitFile(
+            pass, os, nullptr,
+            action == Action::AssemblyOutput
+                ? llvm::CodeGenFileType::CGFT_AssemblyFile
+                : llvm::CodeGenFileType::CGFT_ObjectFile)) {
+      return false;
+    }
+  }
+  pass.run(module);
+  compileTimeRegion.reset();
+  os.flush();
+  /// compile to native object code end
   return true;
 }
 
@@ -153,11 +251,13 @@ int main(int argc, char *argv[]) {
 
   if (CompileOnly) {
     if (AssemblyOnly) {
-      llvm::errs() << "cannot compile to object file and assembly at the same time";
+      llvm::errs()
+          << "cannot compile to object file and assembly at the same time";
       return -1;
     }
     if (PreprocessOnly) {
-      llvm::errs() << "cannot compile to object file add preprocess at the same time";
+      llvm::errs()
+          << "cannot compile to object file add preprocess at the same time";
       return -1;
     }
     return doActionOnAllFiles(Action::Compile);

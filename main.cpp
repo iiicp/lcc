@@ -5,13 +5,13 @@
 #include "Parser.h"
 #include "SemaAnalyse.h"
 #include "Version.h"
+#include "llvm/Pass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -19,8 +19,6 @@
 #include "llvm/Support/WithColor.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <llvm/Support/FileSystem.h>
 #include <optional>
 

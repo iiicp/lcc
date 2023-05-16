@@ -1,33 +1,45 @@
 cmake_minimum_required(VERSION 3.18)
-project(lcc)
 
 # set compiler version
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 
-# find llvm lib
-set(LLVM_DIR "" CACHE PATH "path to llvm cmake dir")
-find_package(LLVM REQUIRED 14)
-llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes ExecutionEngine MCJIT)
+set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
-include_directories(src/Lex src/Parse src/Sema src/CodeGen src/Support)
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(lcc)
 
-# find source file
-file(GLOB lcc_src "src/Lex/*.cc" "src/Parse/*.cc" "src/Sema/*.cc" "src/CodeGen/*.cc" "src/Support/*.cc")
+    # find llvm lib
+#    set(LLVM_DIR "" CACHE PATH "path to llvm cmake dir")
+    find_package(LLVM REQUIRED HINTS "${LLVM_CMAKE_PATH}")
+    list(APPEND CMAKE_MODULE_PATH ${LLVM_DIR})
+    include(ChooseMSVCCRT)
 
-set(LCC_VERSION_STRING "0.3")
+    include(AddLLVM)
+    include(HandleLLVMOptions)
+
+    include_directories("${LLVM_BINARY_DIR}/include" "${LLVM_INCLUDE_DIR}")
+    link_directories("${LLVM_LIBRARY_DIR}")
+
+    set(LCC_BUILT_STANDALONE 1)
+endif ()
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR AND NOT MSVC_IDE)
+    message(FATAL_ERROR "In-source builds are not allowed.")
+endif ()
+
+set(LCC_VERSION_STRING "0.4")
 configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/Support/Version.inc.in
-        ${CMAKE_CURRENT_BINARY_DIR}/src/Support/Version.inc)
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/lcc/Basic/Version.inc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/include/lcc/Basic/Version.inc)
 
-# compiler and set search include and link llvm lib
-add_executable(${PROJECT_NAME} main.cpp ${lcc_src})
-target_include_directories(${PROJECT_NAME}
-        PRIVATE
-        src
-        ${CMAKE_CURRENT_BINARY_DIR}/src/Support
-        ${LLVM_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC ${llvm_all})
+include(AddLcc)
 
-#add_subdirectory(tests/ir)
-#add_subdirectory(tests/auto)
+include_directories(BEFORE
+        ${CMAKE_CURRENT_BINARY_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_subdirectory(lib)
+add_subdirectory(tools)

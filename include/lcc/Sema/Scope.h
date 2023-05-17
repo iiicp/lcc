@@ -12,7 +12,7 @@
 #ifndef LCC_SCOPE_H
 #define LCC_SCOPE_H
 
-#include "lcc/Sema/SemaSyntax.h"
+#include "lcc/AST/SemaAST.h"
 #include "lcc/Sema/Type.h"
 #include "llvm/ADT/ScopeExit.h"
 #include <string_view>

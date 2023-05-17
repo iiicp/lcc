@@ -10,16 +10,16 @@
 
 #ifndef LCC_PARSER_H
 #define LCC_PARSER_H
-#include "lcc/Lexer/Token.h"
+#include "lcc/AST/AST.h"
 #include "lcc/Basic/Diagnostic.h"
-#include "lcc/AST/Syntax.h"
-#include <vector>
+#include "lcc/Lexer/Token.h"
+#include <bitset>
+#include <map>
+#include <optional>
 #include <set>
 #include <string>
-#include <optional>
-#include <map>
 #include <unordered_map>
-#include <bitset>
+#include <vector>
 namespace lcc {
 using TokenBitSet = std::bitset<tok::TokenKind::NUM_TOKENS>;
 class Parser {

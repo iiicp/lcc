@@ -27,4 +27,4 @@ const Scope::DeclarationSymbol* Scope::FindDeclSymbol(std::string_view name, siz
   return nullptr;
 }
 
-} // namespace lcc::SemaAnalyse
+} // namespace lcc

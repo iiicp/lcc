@@ -11,7 +11,7 @@
  ***********************************/
 #ifndef LCC_DUMPTOOL_H
 #define LCC_DUMPTOOL_H
-#include "lcc/AST/Syntax.h"
+#include "lcc/AST/AST.h"
 namespace lcc::dump {
 
 void dumpTokens(const std::vector<lcc::Token> &tokens);

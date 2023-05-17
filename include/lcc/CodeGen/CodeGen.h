@@ -11,7 +11,7 @@
  ***********************************/
 #ifndef LCC_CODEGEN_H
 #define LCC_CODEGEN_H
-#include "lcc/Sema/SemaSyntax.h"
+#include "lcc/AST/SemaAST.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"

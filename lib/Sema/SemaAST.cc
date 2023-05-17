@@ -9,4 +9,4 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#include "lcc/Sema/SemaSyntax.h"
+#include "lcc/AST/SemaAST.h"

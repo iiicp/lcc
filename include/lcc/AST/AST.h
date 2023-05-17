@@ -11,9 +11,9 @@
  ***********************************/
 #ifndef LCC_SYNTAX_H
 #define LCC_SYNTAX_H
-#include "lcc/Lexer/Token.h"
 #include "lcc/Basic/Box.h"
 #include "lcc/Basic/Util.h"
+#include "lcc/Lexer/Token.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -1036,7 +1036,7 @@ private:
 public:
   LabelStmt(TokIter begin, std::string_view identifier)
       : Node(begin), mIdentifier(identifier) {}
-  [[nodiscard]] std::string_view getIdentifier() const{ return mIdentifier; }
+  [[nodiscard]] std::string_view getIdentifier() const { return mIdentifier; }
 };
 
 /**
@@ -1102,8 +1102,8 @@ public:
           std::variant<box<Declaration>, std::optional<Expr>> &&initial,
           std::optional<Expr> &&controlExpr = {std::nullopt},
           std::optional<Expr> &&postExpr = {std::nullopt})
-      : Node(begin), initial_(MV_(initial)),
-        controlExpr_(MV_(controlExpr)), postExpr_(MV_(postExpr)),stmt_(MV_(stmt)) {}
+      : Node(begin), initial_(MV_(initial)), controlExpr_(MV_(controlExpr)),
+        postExpr_(MV_(postExpr)), stmt_(MV_(stmt)) {}
   [[nodiscard]] const Stmt &getStatement() const { return stmt_; }
 
   [[nodiscard]] const std::variant<box<Declaration>, std::optional<Expr>> &
@@ -1515,7 +1515,8 @@ public:
       : Node(begin),
         optionalDirectAbstractDeclarator_(MV_(directAbstractDeclarator)) {}
 
-  [[nodiscard]] const DirectAbstractDeclarator * getDirectAbstractDeclarator() const {
+  [[nodiscard]] const DirectAbstractDeclarator *
+  getDirectAbstractDeclarator() const {
     if (optionalDirectAbstractDeclarator_) {
       return &optionalDirectAbstractDeclarator_.value();
     }
@@ -1712,7 +1713,7 @@ private:
 public:
   StructOrUnionSpec(TokIter begin, bool isUnion, std::string_view identifier,
                     std::vector<StructDeclaration> &&structDeclarations)
-      : Node(begin), name_(identifier),isUnion_(isUnion),
+      : Node(begin), name_(identifier), isUnion_(isUnion),
         structDeclarations_(MV_(structDeclarations)) {}
 
   [[nodiscard]] bool isUnion() const { return isUnion_; }

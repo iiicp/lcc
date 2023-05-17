@@ -9,8 +9,8 @@
  *
  * Sign:     enjoy life
  ***********************************/
-#ifndef LCC_SEMASYNTAX_H
-#define LCC_SEMASYNTAX_H
+#ifndef LCC_SEMAAST_H
+#define LCC_SEMAAST_H
 #include "lcc/Basic/Box.h"
 #include "lcc/Sema/Type.h"
 #include <string>
@@ -138,8 +138,7 @@ private:
 public:
   BinaryOperator(box<Expression> &&leftOperand, Kind kind,
                  box<Expression> &&rightOperand)
-      : kind_(kind),
-        leftOperand_(std::move(leftOperand)),
+      : kind_(kind), leftOperand_(std::move(leftOperand)),
         rightOperand_(std::move(rightOperand)) {}
   DECL_GETTER(Kind, kind);
   DECL_GETTER(const box<Expression> &, leftOperand);
@@ -255,10 +254,10 @@ private:
 
 public:
   using Variant =
-      std::variant<std::monostate, Constant, Conversion,
-                   MemberAccess, SubscriptOperator, CallExpression,
-                   BinaryOperator, UnaryOperator, Cast, SizeOfOperator,
-                   Assignment, CommaExpression, Conditional>;
+      std::variant<std::monostate, Constant, Conversion, MemberAccess,
+                   SubscriptOperator, CallExpression, BinaryOperator,
+                   UnaryOperator, Cast, SizeOfOperator, Assignment,
+                   CommaExpression, Conditional>;
 
 private:
   Variant expression_;
@@ -356,8 +355,8 @@ private:
 
 public:
   FunctionDefinition(std::shared_ptr<Type> type,
-                     std::vector<Declaration> &&paramDecls,
-                     Linkage linkage, CompoundStatement &&compoundStatement)
+                     std::vector<Declaration> &&paramDecls, Linkage linkage,
+                     CompoundStatement &&compoundStatement)
       : type_(type), paramDecls_(MV_(paramDecls)), linkage_(linkage),
         compoundStatement_(MV_(compoundStatement)) {}
 
@@ -381,5 +380,5 @@ public:
   const std::vector<Variant> &getGlobals() const { return globals_; }
 };
 
-} // namespace lcc::SemaAnalyse
-#endif // LCC_SEMASYNTAX_H
+} // namespace lcc::SemaSyntax
+#endif // LCC_SEMAAST_H

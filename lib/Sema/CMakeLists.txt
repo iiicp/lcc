@@ -1,7 +1,7 @@
 set(LLVM_LINK_COMPONENTS support)
 
 add_lcc_library(lccSema
-        SemaAnalyse.cc
+        Sema.cc
         Scope.cc
         Type.cc
 

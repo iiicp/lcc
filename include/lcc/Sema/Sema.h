@@ -1,5 +1,5 @@
 /***********************************
- * File:     SemaAnalyse.h
+ * File:     Sema.h
  *
  * Author:   caipeng
  *
@@ -11,13 +11,13 @@
  ***********************************/
 #ifndef LCC_SEMA_ANALYZER_H
 #define LCC_SEMA_ANALYZER_H
-#include "lcc/Sema/SemaSyntax.h"
-#include "lcc/AST/Syntax.h"
+#include "lcc/AST/AST.h"
+#include "lcc/AST/SemaAST.h"
 
 namespace lcc {
-class SemaAnalyse {
+class Sema {
 public:
-  SemaAnalyse(){}
+  Sema(){}
   SemaSyntax::TranslationUnit Analyse(const Syntax::TranslationUnit &translationUnit);
 private:
   SemaSyntax::TranslationUnit

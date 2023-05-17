@@ -1,15 +1,15 @@
-#include "lcc/CodeGen/CodeGen.h"
 #include "lcc/Basic/Diagnostic.h"
+#include "lcc/Basic/Version.h"
+#include "lcc/CodeGen/CodeGen.h"
 #include "lcc/Lexer/Lexer.h"
 #include "lcc/Parser/Parser.h"
-#include "lcc/Basic/Version.h"
-#include "lcc/Sema/SemaAnalyse.h"
+#include "lcc/Sema/Sema.h"
 #include "lcc/Support/DumpTool.h"
-#include "llvm/Pass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SMLoc.h"
@@ -91,9 +91,8 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
   }
   llvm::SourceMgr mgr;
   lcc::DiagnosticEngine diag(mgr, llvm::errs());
-  std::string code((*FileOrErr)->getBuffer());
-  std::string_view path = (*FileOrErr)->getBufferIdentifier();
-  lcc::Lexer lexer(mgr, diag, std::move(code), path);
+  std::string sourceCode((*FileOrErr)->getBuffer());
+  lcc::Lexer lexer(mgr, diag, std::move(sourceCode), (*FileOrErr)->getBufferIdentifier());
   auto ppTokens = lexer.tokenize();
   if (diag.numErrors())
     return false;
@@ -128,7 +127,7 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
                            *timer);
     semanticsTimeRegion.emplace(*semanticsTimer);
   }
-  lcc::SemaAnalyse semaAnalyse;
+  lcc::Sema semaAnalyse;
   auto semaTranslationUnit = semaAnalyse.Analyse(translationUnit);
   semanticsTimeRegion.reset();
   /// semantics end

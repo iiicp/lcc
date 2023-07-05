@@ -99,6 +99,9 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
   auto tokens = lexer.toCTokens(std::move(ppTokens));
   if (diag.numErrors())
     return false;
+  if (EmitTokens) {
+    lcc::dump::dumpTokens(tokens);
+  }
   lexerTimeRegion.reset();
   /// lexer end
 
@@ -192,7 +195,7 @@ bool compileCFile(Action action, std::filesystem::path sourceFile) {
     compileTimeRegion.emplace(*compileTimer);
   }
   llvm::PassManagerBuilder builder;
-  targetMachine->adjustPassManager(builder);
+//  targetMachine->adjustPassManager(builder);
   llvm::legacy::PassManager pass;
   builder.populateModulePassManager(pass);
   if (EmitLLVM) {

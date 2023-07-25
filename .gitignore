@@ -2,3 +2,4 @@
 .idea/
 cmake-build*
 .DS_Store
+bin/

@@ -1,0 +1,5 @@
+- 添加预处理器 
+- 每个组件使用c接口封装  
+- 词法和语法部分更简洁，考虑sharder_ptr，语法parse重复代码
+- unicode
+- wchar_t

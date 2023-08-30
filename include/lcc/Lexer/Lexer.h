@@ -17,53 +17,14 @@
 #include <string>
 #include <vector>
 
-namespace lcc {
+#include "TokenStream.h"
 
-enum class State {
-  Start,
-  CharacterLiteral,
-  StringLiteral,
-  Identifier,
-  Number,
-  Punctuator,
-  LineComment,
-  BlockComment,
-  AfterInclude
-};
+namespace lcc::lexer {
+    TokenStream<PPToken> tokenize(std::string_view filePath, llvm::raw_ostream *reporter = &llvm::errs(), bool *errors = nullptr);
+    TokenStream<PPToken> tokenize(const std::string &source, llvm::raw_ostream *reporter = &llvm::errs(), bool *errors = nullptr, std::string_view path = "<stdin>");
+    TokenStream<CToken> toCTokens(TokenStream<PPToken> &&ppTokenStream, llvm::raw_ostream *reporter = &llvm::errs(), bool *errors = nullptr);
+    TokenStream<CToken> toCTokens(const TokenStream<PPToken> &ppTokenStream, llvm::raw_ostream *reporter = &llvm::errs(), bool *errors = nullptr);
+}// namespace lcc::lexer
 
-class Lexer {
-private:
-  State state = State::Start;
-  llvm::SourceMgr &Mgr;
-  DiagnosticEngine &Diag;
-  std::string mSourceCode;
-  const char *P{nullptr};
-  const char *Ep{nullptr};
 
-public:
-  explicit Lexer(llvm::SourceMgr &mgr, DiagnosticEngine &diag,
-                 std::string &&sourceCode,
-                 std::string_view sourcePath = "<stdin>");
-  std::vector<Token> tokenize();
-  std::vector<Token> toCTokens(std::vector<Token> &&ppTokens);
-
-private:
-  void RegularSourceCode();
-  static bool IsLetter(char ch);
-  static bool IsWhiteSpace(char ch);
-  static bool IsDigit(char ch);
-  static bool IsOctDigit(char ch);
-  static bool IsHexDigit(char ch);
-  static bool IsPunctuation(char ch);
-  static uint32_t OctalToNum(std::string_view value);
-  static tok::TokenKind ParsePunctuation(const char *&offset, char curChar,
-                                         char nextChar, char nnChar);
-
-  Token::ValueType ParseNumber(const Token &ppToken);
-  std::vector<char> ParseCharacters(const Token &ppToken, bool handleCharMode);
-  std::uint32_t ParseEscapeChar(const char *p, char escape);
-  static bool IsJudgeNumber(const std::string &preCharacters, char curChar);
-};
-} // namespace lcc
-
-#endif // LCC_LEXER_H
+#endif// LCC_LEXER_H
